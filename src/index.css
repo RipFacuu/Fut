@@ -1,0 +1,124 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    @apply antialiased;
+  }
+  
+  body {
+    @apply bg-secondary-100 text-primary-900;
+  }
+  
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-heading font-semibold tracking-tight text-primary-600;
+  }
+  
+  h1 {
+    @apply text-3xl md:text-4xl;
+  }
+  
+  h2 {
+    @apply text-2xl md:text-3xl;
+  }
+  
+  h3 {
+    @apply text-xl md:text-2xl;
+  }
+}
+
+@layer components {
+  .btn {
+    @apply inline-flex items-center justify-center px-4 py-2 rounded-md font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2;
+  }
+  
+  .btn-primary {
+    @apply bg-accent-500 text-white hover:bg-accent-600 focus:ring-accent-500;
+  }
+  
+  .btn-secondary {
+    @apply bg-primary-600 text-white hover:bg-primary-700 focus:ring-primary-500;
+  }
+  
+  .btn-outline {
+    @apply border border-primary-200 bg-white text-primary-700 hover:bg-primary-50 focus:ring-primary-500;
+  }
+  
+  .card {
+    @apply bg-white rounded-lg shadow-card overflow-hidden;
+  }
+  
+  .form-input {
+    @apply w-full px-3 py-2 border border-primary-200 rounded-md focus:outline-none focus:ring-2 focus:ring-accent-500 focus:border-transparent;
+  }
+  
+  .form-label {
+    @apply block text-sm font-medium text-primary-700 mb-1;
+  }
+  
+  .nav-link {
+    @apply px-3 py-2 rounded-md text-sm font-medium text-primary-700 hover:bg-primary-50 hover:text-primary-900 transition-colors;
+  }
+  
+  .nav-link-active {
+    @apply bg-accent-50 text-accent-700;
+  }
+  
+  .league-panel {
+    @apply card p-4 transition-all duration-200 hover:shadow-lg border border-primary-100;
+  }
+  
+  .fixture-card {
+    @apply card p-4 hover:shadow-fixture transition-all duration-200 border border-primary-100;
+  }
+  
+  .team-row {
+    @apply border-b border-primary-100 hover:bg-primary-50 transition-colors;
+  }
+}
+
+/* Estilos para la tabla de posiciones */
+.standings-container {
+  animation: fadeIn 0.5s ease-in-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.standings-container table {
+  border-collapse: separate;
+  border-spacing: 0;
+  border-radius: 0.5rem;
+  overflow: hidden;
+}
+
+.standings-container th {
+  font-size: 0.85rem;
+  letter-spacing: 0.05em;
+}
+
+.standings-container td {
+  transition: all 0.2s ease;
+}
+
+.standings-container tr:hover td {
+  background-color: rgba(59, 130, 246, 0.05);
+}
+
+/* Estilos para los botones */
+.btn {
+  transition: all 0.2s ease;
+}
+
+.btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+.btn:active {
+  transform: translateY(0);
+  box-shadow: none;
+}
