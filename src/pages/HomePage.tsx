@@ -11,30 +11,30 @@ const HomePage: React.FC = () => {
       {/* Hero Section */}
       <section className="relative bg-secondary-600 rounded-xl overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-r from-secondary-900 to-transparent opacity-70"></div>
-        <div className="relative z-10 p-8 md:p-12">
-          <h1 className="text-3xl md:text-4xl font-bold text-white mb-4">
+        <div className="relative z-10 p-4 sm:p-8 md:p-12">
+          <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-white mb-4">
             Bienvenido a Liga Participando
           </h1>
-          <p className="text-white/85 text-lg max-w-2xl mb-6">
+          <p className="text-white/85 text-base sm:text-lg max-w-2xl mb-6">
             La plataforma oficial para seguir todas las competiciones,
             resultados y estadísticas de nuestras ligas.
           </p>
-          <div className="flex flex-wrap gap-3">
+          <div className="flex flex-col sm:flex-row flex-wrap gap-3">
             <Link 
-              to="/league/liga_masculina" 
-              className="btn bg-primary-600 hover:bg-primary-700 text-white"
+              to="/league/1" 
+              className="btn bg-primary-600 hover:bg-primary-700 text-white text-center"
             >
-              Liga Participando
+              Liga Masculina
             </Link>
             <Link 
               to="/league/lifufe" 
-              className="btn bg-accent-600 hover:bg-accent-700 text-white"
+              className="btn bg-accent-600 hover:bg-accent-700 text-white text-center"
             >
               LIFUFE
             </Link>
             <Link 
               to="/league/mundialito" 
-              className="btn bg-white hover:bg-gray-100 text-secondary-800"
+              className="btn bg-white hover:bg-gray-100 text-secondary-800 text-center"
             >
               Mundialito
             </Link>

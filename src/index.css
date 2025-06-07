@@ -122,3 +122,74 @@
   transform: translateY(0);
   box-shadow: none;
 }
+
+/* Agregar al final del archivo */
+
+/* Mejoras para móvil */
+@media (max-width: 768px) {
+  .container {
+    @apply px-3;
+  }
+  
+  /* Mejorar botones en móvil */
+  .btn {
+    @apply min-h-[44px] touch-manipulation;
+  }
+  
+  /* Mejorar espaciado en móvil */
+  .league-panel {
+    @apply p-3;
+  }
+  
+  .fixture-card {
+    @apply p-3;
+  }
+  
+  /* Ocultar scrollbar en navegación horizontal */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+  
+  /* Mejorar tablas en móvil */
+  .overflow-x-auto {
+    @apply -mx-3;
+  }
+  
+  .overflow-x-auto table {
+    @apply min-w-full;
+  }
+}
+
+/* Mejoras generales de accesibilidad */
+.touch-manipulation {
+  touch-action: manipulation;
+}
+
+/* Mejorar contraste en elementos interactivos */
+@media (prefers-contrast: high) {
+  .btn {
+    @apply border-2;
+  }
+  
+  .nav-link {
+    @apply border border-transparent;
+  }
+  
+  .nav-link:hover {
+    @apply border-primary-300;
+  }
+}
+
+/* Reducir animaciones para usuarios que las prefieren reducidas */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

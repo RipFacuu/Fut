@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { useLeague } from '../contexts/LeagueContext';
 import CategoryPanel from '../components/league/CategoryPanel';
@@ -12,10 +12,28 @@ type Tab = 'fixtures' | 'results' | 'standings' | 'teams';
 
 const LeaguePage: React.FC = () => {
   const { leagueId } = useParams<{ leagueId: string }>();
-  const { getLeague, getCategoriesByLeague } = useLeague();
+  const { getLeague, getCategoriesByLeague, refreshFixtures } = useLeague();
   const [activeTab, setActiveTab] = useState<Tab>('fixtures');
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
   const [selectedZoneId, setSelectedZoneId] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  
+  // Cargar fixtures al montar el componente
+  useEffect(() => {
+    const loadFixtures = async () => {
+      try {
+        setIsLoading(true);
+        await refreshFixtures();
+        console.log('Fixtures loaded in LeaguePage');
+      } catch (error) {
+        console.error('Error loading fixtures in LeaguePage:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    loadFixtures();
+  }, [refreshFixtures]);
   
   // Get league data
   const league = getLeague(leagueId || '');
@@ -38,9 +56,18 @@ const LeaguePage: React.FC = () => {
     if (!selectedCategoryId || !selectedZoneId) {
       return (
         <div className="text-center py-12 text-gray-500">
-          {league.id === 'liga_masculina' 
+          {league.id === 'liga_masculina'
             ? 'Selecciona una zona y categoría para ver la información'
             : 'Selecciona una categoría y zona para ver la información'}
+        </div>
+      );
+    }
+    
+    if (isLoading && activeTab === 'fixtures') {
+      return (
+        <div className="text-center py-12">
+          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
+          <p className="mt-2 text-gray-600">Cargando fixtures...</p>
         </div>
       );
     }
@@ -51,7 +78,13 @@ const LeaguePage: React.FC = () => {
       case 'results':
         return <FixtureList zoneId={selectedZoneId} resultsOnly={true} />;
       case 'standings':
-        return <StandingsTable zoneId={selectedZoneId} />;
+        return (
+          <StandingsTable
+            zoneId={selectedZoneId}
+            leagueId={leagueId || ''}
+            categoryId={selectedCategoryId}
+          />
+        );
       case 'teams':
         return <TeamList zoneId={selectedZoneId} />;
       default:
@@ -113,30 +146,48 @@ const LeaguePage: React.FC = () => {
       
       {/* Tabs */}
       <div className="border-b">
-        <nav className="flex overflow-x-auto">
+        <nav className="flex overflow-x-auto scrollbar-hide">
           <button
             className={cn(
-              "py-4 px-6 font-medium text-sm focus:outline-none whitespace-nowrap flex items-center space-x-2",
+              "py-3 px-4 sm:px-6 font-medium text-xs sm:text-sm focus:outline-none whitespace-nowrap flex items-center space-x-1 sm:space-x-2 min-w-0 flex-shrink-0",
               activeTab === 'fixtures'
                 ? "border-b-2 border-primary-600 text-primary-700"
                 : "text-gray-500 hover:text-gray-700"
             )}
             onClick={() => setActiveTab('fixtures')}
           >
-            <ClipboardList size={18} />
-            <span>Fixture</span>
+            <ClipboardList size={16} className="sm:w-[18px] sm:h-[18px]" />
+            <span className="hidden sm:inline">Fixture</span>
+            <span className="sm:hidden">Fix</span>
           </button>
+          
+          {/* NUEVA PESTAÑA DE RESULTADOS */}
           <button
             className={cn(
-              "py-4 px-6 font-medium text-sm focus:outline-none whitespace-nowrap flex items-center space-x-2",
+              "py-3 px-4 sm:px-6 font-medium text-xs sm:text-sm focus:outline-none whitespace-nowrap flex items-center space-x-1 sm:space-x-2 min-w-0 flex-shrink-0",
+              activeTab === 'results'
+                ? "border-b-2 border-primary-600 text-primary-700"
+                : "text-gray-500 hover:text-gray-700"
+            )}
+            onClick={() => setActiveTab('results')}
+          >
+            <Newspaper size={16} className="sm:w-[18px] sm:h-[18px]" />
+            <span className="hidden sm:inline">Resultados</span>
+            <span className="sm:hidden">Res</span>
+          </button>
+          
+          <button
+            className={cn(
+              "py-3 px-4 sm:px-6 font-medium text-xs sm:text-sm focus:outline-none whitespace-nowrap flex items-center space-x-1 sm:space-x-2 min-w-0 flex-shrink-0",
               activeTab === 'standings'
                 ? "border-b-2 border-primary-600 text-primary-700"
                 : "text-gray-500 hover:text-gray-700"
             )}
             onClick={() => setActiveTab('standings')}
           >
-            <Trophy size={18} />
-            <span>Tabla de Posiciones</span>
+            <Trophy size={16} className="sm:w-[18px] sm:h-[18px]" />
+            <span className="hidden sm:inline">Tabla de Posiciones</span>
+            <span className="sm:hidden">Pos</span>
           </button>
         </nav>
       </div>

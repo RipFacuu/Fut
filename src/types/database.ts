@@ -141,7 +141,62 @@ export interface Database {
           resultado_visitante?: number
         }
       }
-      // ... resto de tablas existentes ...
+      standings: {
+        Row: {
+          id: string
+          equipo_id: string
+          zona_id: string
+          liga_id: string
+          categoria_id: string
+          points: number
+          played: number
+          won: number
+          drawn: number
+          lost: number
+          goals_for: number
+          goals_against: number
+          created_at?: string
+          updated_at?: string
+        }
+        Insert: {
+          id?: string
+          equipo_id: string
+          zona_id: string
+          liga_id: string
+          categoria_id: string
+          points?: number
+          played?: number
+          won?: number
+          drawn?: number
+          lost?: number
+          goals_for?: number
+          goals_against?: number
+        }
+        Update: {
+          id?: string
+          equipo_id?: string
+          zona_id?: string
+          liga_id?: string
+          categoria_id?: string
+          points?: number
+          played?: number
+          won?: number
+          drawn?: number
+          lost?: number
+          goals_for?: number
+          goals_against?: number
+        }
+      }
+      created_at?: string
+      updated_at?: string
     }
   }
+}
+
+export interface PosicionesEditable {
+  equipo_id: number;
+  zona_id: number;
+  equipo_nombre: string;
+  puntos: number | null;
+  pj: number | null; // partidos jugados
 }

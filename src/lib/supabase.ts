@@ -374,7 +374,6 @@ export async function obtenerPartidosPorFixture(fixtureId: string) {
 }
 
 // Función para eliminar fixture
-// Función para eliminar fixture (agregar al final del archivo)
 export async function eliminarFixture(id: string) {
   // Primero eliminar todos los partidos asociados al fixture
   const { error: partidosError } = await supabase
@@ -395,6 +394,340 @@ export async function eliminarFixture(id: string) {
 
   if (fixtureError) {
     console.error('Error eliminando fixture:', fixtureError);
+    return false;
+  }
+
+  return true;
+}
+
+// Funciones para Standings (Tabla de Posiciones)
+export async function obtenerStandingsPorZona(zonaId: string) {
+  const { data, error } = await supabase
+    .from('standings')
+    .select('*')
+    .eq('zona_id', zonaId)
+    .order('points', { ascending: false })
+    .order('goal_difference', { ascending: false });
+
+  if (error) {
+    console.error('Error obteniendo standings:', error);
+    return [];
+  }
+
+  return data;
+}
+
+// Función helper para obtener IDs numéricos
+export async function getNumericIds(equipoUuid: string, zonaUuid: string, ligaUuid?: string, categoriaUuid?: string) {
+  try {
+    const promises = [
+      supabase.from('equipos').select('id').eq('id', equipoUuid).single(),
+      supabase.from('zonas').select('id').eq('id', zonaUuid).single()
+    ];
+
+    if (ligaUuid) {
+      promises.push(supabase.from('ligas').select('id').eq('id', ligaUuid).single());
+    }
+    if (categoriaUuid) {
+      promises.push(supabase.from('categorias').select('id').eq('id', categoriaUuid).single());
+    }
+
+    const results = await Promise.all(promises);
+    
+    // Verificar errores
+    for (const result of results) {
+      if (result.error) {
+        console.error('Error obteniendo ID numérico:', result.error);
+        throw new Error(`No se pudo obtener ID numérico: ${result.error.message}`);
+      }
+    }
+
+    return {
+      equipo_id: results[0]?.data?.id || null,
+      zona_id: results[1]?.data?.id || null,
+      liga_id: ligaUuid ? results[2]?.data?.id || null : null,
+      categoria_id: categoriaUuid ? results[3]?.data?.id || null : null
+    };
+  } catch (error) {
+    console.error('Error en getNumericIds:', error);
+    throw error;
+  }
+}
+
+export async function crearStanding(standing: {
+  equipo_id: string;
+  liga_id: string;
+  categoria_id: string;
+  zona_id: string;
+  points?: number;
+  played?: number;
+  won?: number;
+  drawn?: number;
+  lost?: number;
+  goals_for?: number;
+  goals_against?: number;
+}) {
+  try {
+    // Convertir UUIDs a IDs numéricos
+    const numericIds = await getNumericIds(
+      standing.equipo_id,
+      standing.zona_id,
+      standing.liga_id,
+      standing.categoria_id
+    );
+
+    console.log('🔄 Datos a insertar en standings:', {
+      equipo_id: typeof numericIds.equipo_id,
+      zona_id: typeof numericIds.zona_id,
+      values: numericIds
+    });
+
+    const { data, error } = await supabase
+      .from('standings')
+      .insert([{
+        equipo_id: numericIds.equipo_id,
+        liga_id: numericIds.liga_id,
+        categoria_id: numericIds.categoria_id,
+        zona_id: numericIds.zona_id,
+        points: standing.points || 0,
+        played: standing.played || 0,
+        won: standing.won || 0,
+        drawn: standing.drawn || 0,
+        lost: standing.lost || 0,
+        goals_for: standing.goals_for || 0,
+        goals_against: standing.goals_against || 0
+      }])
+      .select();
+
+    if (error) {
+      console.error('❌ Error creando standing:', error);
+      throw error;
+    }
+
+    console.log('✅ Standing creado exitosamente:', data);
+    return data;
+  } catch (error) {
+    console.error('❌ Error en crearStanding:', error);
+    throw error;
+  }
+}
+
+export async function actualizarStanding(standingId: string, updates: {
+  points?: number;
+  played?: number;
+  won?: number;
+  drawn?: number;
+  lost?: number;
+  goals_for?: number;
+  goals_against?: number;
+}) {
+  console.log('🔄 actualizarStanding en Supabase:', { standingId, updates });
+  
+  try {
+    const { data, error } = await supabase
+      .from('standings')
+      .update(updates)
+      .eq('id', standingId)
+      .select();
+
+    if (error) {
+      console.error('❌ Error actualizando standing en Supabase:', error);
+      throw error;
+    }
+
+    console.log('✅ Standing actualizado en Supabase:', data);
+    return data;
+  } catch (error) {
+    console.error('❌ Error en actualizarStanding:', error);
+    throw error;
+  }
+}
+
+export async function eliminarStanding(standingId: string) {
+  const { error } = await supabase
+    .from('standings')
+    .delete()
+    .eq('id', standingId);
+
+  if (error) {
+    console.error('Error eliminando standing:', error);
+    return false;
+  }
+
+  return true;
+}
+
+// Funciones para Posiciones (Tabla simplificada)
+export async function obtenerPosicionesPorZona(zonaId: string) {
+  const { data, error } = await supabase
+    .from('posiciones_editable')
+    .select(`
+      equipo_id,
+      equipo_nombre,
+      zona_id,
+      pj,
+      puntos
+    `)
+    .eq('zona_id', zonaId)
+    .order('puntos', { ascending: false })
+    .order('pj', { ascending: true }); // En caso de empate, menos partidos jugados primero
+
+  if (error) {
+    console.error('Error obteniendo posiciones:', error);
+    throw error;
+  }
+
+  // Filtrar registros con datos faltantes
+  const validData = (data || []).filter(row =>
+    row.equipo_id &&
+    row.zona_id
+  );
+
+  return validData;
+}
+
+// Crear nueva posición
+export async function crearPosicion(posicion: {
+  equipo_id: string;
+  zona_id: string;
+  equipo_nombre?: string;
+  puntos?: number;
+  pj?: number;
+}) {
+  try {
+    console.log('🔄 Creando nueva posición:', posicion);
+    
+    const { data, error } = await supabase
+      .from('posiciones_editable')
+      .insert([{
+        equipo_id: posicion.equipo_id,
+        zona_id: posicion.zona_id,
+        equipo_nombre: posicion.equipo_nombre,
+        puntos: posicion.puntos || 0,
+        pj: posicion.pj || 0
+      }])
+      .select();
+
+    if (error) {
+      console.error('❌ Error creando posición:', error);
+      throw error;
+    }
+
+    console.log('✅ Posición creada:', data);
+    return data;
+  } catch (error) {
+    console.error('❌ Error en crearPosicion:', error);
+    throw error;
+  }
+}
+
+// Actualizar posición existente
+export async function actualizarPosicion(posicionId: string, updates: {
+  puntos?: number;
+  pj?: number;
+  equipo_nombre?: string;
+}) {
+  console.log('🔄 Actualizando posición en Supabase:', { posicionId, updates });
+  
+  try {
+    // Validar que los datos sean números válidos
+    const cleanUpdates: any = {};
+    
+    if (updates.puntos !== undefined) {
+      cleanUpdates.puntos = Number(updates.puntos) || 0;
+    }
+    
+    if (updates.pj !== undefined) {
+      cleanUpdates.pj = Number(updates.pj) || 0;
+    }
+    
+    if (updates.equipo_nombre !== undefined) {
+      cleanUpdates.equipo_nombre = updates.equipo_nombre;
+    }
+    
+    console.log('📤 Datos limpios a enviar:', cleanUpdates);
+    
+    const { data, error } = await supabase
+      .from('posiciones_editable')
+      .update(cleanUpdates)
+      .eq('equipo_id', posicionId) // Usar equipo_id como identificador
+      .select();
+
+    if (error) {
+      console.error('❌ Error actualizando posición:', error);
+      throw error;
+    }
+
+    console.log('✅ Posición actualizada:', data);
+    return data;
+  } catch (error) {
+    console.error('❌ Error en actualizarPosicion:', error);
+    throw error;
+  }
+}
+
+export async function eliminarPosicion(posicionId: string) {
+  const { error } = await supabase
+    .from('posiciones_editable')
+    .delete()
+    .eq('id', posicionId);
+
+  if (error) {
+    console.error('Error eliminando posición:', error);
+    return false;
+  }
+
+  return true;
+}
+
+// Funciones para Cursos
+export async function crearCurso(curso: {
+  title: string;
+  description: string;
+  image_data: Uint8Array; // Cambiar de image_url a image_data
+  date: string;
+}) {
+  const { data, error } = await supabase
+    .from('courses')
+    .insert([curso])
+    .select();
+
+  if (error) {
+    console.error('Error creando curso:', error);
+    throw error;
+  }
+
+  return data[0];
+}
+
+export async function actualizarCurso(cursoId: string, updates: {
+  title?: string;
+  description?: string;
+  image_data?: Uint8Array; // Cambiar de image_url a image_data
+  date?: string;
+}) {
+  const { data, error } = await supabase
+    .from('courses')
+    .update(updates)
+    .eq('id', cursoId)
+    .select();
+
+  if (error) {
+    console.error('Error actualizando curso:', error);
+    throw error;
+  }
+
+  return data[0];
+}
+
+export async function eliminarCurso(cursoId: string) {
+  const { error } = await supabase
+    .from('courses')
+    .delete()
+    .eq('id', cursoId);
+
+  if (error) {
+    console.error('Error eliminando curso:', error);
     return false;
   }
 

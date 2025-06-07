@@ -7,7 +7,7 @@ import { supabase } from '../../lib/supabase';
 interface CourseFormData {
   title: string;
   description: string;
-  imageUrl: string;
+  imageFile: FileList; // Cambiar de imageUrl a imageFile
   date: string;
   active: boolean;
 }
@@ -46,20 +46,38 @@ const AdminCoursesPage: React.FC = () => {
     reset();
   };
 
-  const onSubmit = (data: CourseFormData) => {
-    if (isAdding) {
-      addCourse(data);
-    } else if (editingId) {
-      updateCourse(editingId, data);
+  const onSubmit = async (data: CourseFormData) => {
+    try {
+      const courseData = {
+        title: data.title,
+        description: data.description,
+        imageFile: data.imageFile[0], // Obtener el primer archivo
+        date: data.date
+      };
+
+      if (isAdding) {
+        await addCourse(courseData);
+      } else if (editingId) {
+        await updateCourse(editingId, courseData);
+      }
+      setIsAdding(false);
+      setEditingId(null);
+      reset();
+    } catch (error) {
+      console.error('Error saving course:', error);
     }
-    setIsAdding(false);
-    setEditingId(null);
-    reset();
   };
 
-  const handleDeleteCourse = (id: string) => {
+  // Eliminar la función handleImageUpload ya que no la necesitamos
+
+  const handleDeleteCourse = async (id: string) => {
     if (window.confirm('¿Estás seguro de eliminar este curso?')) {
-      deleteCourse(id);
+      try {
+        await deleteCourse(id);
+      } catch (error) {
+        console.error('Error deleting course:', error);
+        // Aquí puedes agregar un mensaje de error para el usuario
+      }
     }
   };
 

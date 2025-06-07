@@ -63,6 +63,7 @@ const CategoryPanel: React.FC<CategoryPanelProps> = ({
     onSelect(category.id, zoneId);
   };
   
+  // En el return, mejorar la responsividad:
   return (
     <div 
       className={cn(
@@ -71,21 +72,21 @@ const CategoryPanel: React.FC<CategoryPanelProps> = ({
       )}
     >
       <button
-        className="w-full flex items-center justify-between font-semibold text-lg p-2 rounded-md hover:bg-gray-50 transition-colors"
+        className="w-full flex items-center justify-between font-semibold text-base sm:text-lg p-3 sm:p-2 rounded-md hover:bg-gray-50 transition-colors touch-manipulation"
         onClick={handleCategoryClick}
       >
-        <span>{category.name}</span>
-        <span className="text-gray-400">
+        <span className="text-left">{category.name}</span>
+        <span className="text-gray-400 text-lg">
           {expanded ? '▲' : '▼'}
         </span>
       </button>
       
       {expanded && (
         <div className="mt-3 space-y-2">
-          <h4 className="text-sm font-medium text-gray-500 uppercase">Zonas</h4>
+          <h4 className="text-xs sm:text-sm font-medium text-gray-500 uppercase px-1">Zonas</h4>
           <div className="space-y-1">
             {loading ? (
-              <div className="text-center py-2 text-gray-500">
+              <div className="text-center py-3 text-gray-500 text-sm">
                 Cargando zonas...
               </div>
             ) : zones.length > 0 ? (
@@ -93,9 +94,9 @@ const CategoryPanel: React.FC<CategoryPanelProps> = ({
                 <button
                   key={zone.id}
                   className={cn(
-                    "w-full text-left px-3 py-2 text-sm rounded-md transition-colors",
+                    "w-full text-left px-3 py-3 sm:py-2 text-sm rounded-md transition-colors touch-manipulation",
                     activeZoneId === zone.id
-                      ? "bg-primary-50 text-primary-700"
+                      ? "bg-primary-50 text-primary-700 font-medium"
                       : "text-gray-700 hover:bg-gray-100"
                   )}
                   onClick={() => handleZoneClick(zone.id)}
@@ -104,7 +105,7 @@ const CategoryPanel: React.FC<CategoryPanelProps> = ({
                 </button>
               ))
             ) : (
-              <div className="text-center py-2 text-gray-500 text-sm">
+              <div className="text-center py-3 text-gray-500 text-sm">
                 No hay zonas disponibles
               </div>
             )}

@@ -41,7 +41,7 @@ const Header: React.FC = () => {
               Inicio
             </NavLink>
             <NavLink 
-              to="/league/liga_masculina" 
+              to="/league/1" 
               className={({ isActive }) => cn(
                 "px-3 py-2 rounded-md text-sm font-medium transition-colors",
                 isActive ? "bg-primary-700 text-white" : "text-primary-100 hover:bg-primary-700 hover:text-white"

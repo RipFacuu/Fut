@@ -109,7 +109,8 @@ const FixturesPage: React.FC = () => {
     }
   }, [leagues]); // Solo depende de leagues
   
-  // 2. Auto-selección de categoría cuando cambia la liga
+  // 2. Auto-selección de categoría cuando cambia la liga - COMENTADO
+  /*
   useEffect(() => {
     if (selectedLeague) {
       const categories = getCategoriesByLeague(selectedLeague);
@@ -119,8 +120,10 @@ const FixturesPage: React.FC = () => {
       }
     }
   }, [selectedLeague, getCategoriesByLeague]); // Incluir la función
+  */
   
-  // 3. Auto-selección de zona cuando cambia la categoría
+  // 3. Auto-selección de zona cuando cambia la categoría - COMENTADO
+  /*
   useEffect(() => {
     if (selectedCategory) {
       const zones = getZonesByCategory(selectedCategory);
@@ -129,6 +132,13 @@ const FixturesPage: React.FC = () => {
       }
     }
   }, [selectedCategory, getZonesByCategory]);
+  */
+  
+  // Forzar valores vacíos al cargar la página
+  useEffect(() => {
+    setSelectedCategory('');
+    setSelectedZone('');
+  }, []); // Solo se ejecuta una vez al montar el componente
   
   // Effect para debugging - SIN llamadas a refreshFixtures
   useEffect(() => {
@@ -170,10 +180,10 @@ const FixturesPage: React.FC = () => {
       return [];
     }
     
-    // Si no hay liga seleccionada, mostrar todos los fixtures
-    if (!selectedLeague) {
-      console.log('No league selected, showing all fixtures');
-      return fixtures;
+    // NUEVA LÓGICA: Solo mostrar fixtures si liga, categoría Y zona están seleccionadas
+    if (!selectedLeague || !selectedCategory || !selectedZone) {
+      console.log('Liga, categoría o zona no seleccionadas. No se muestran fixtures.');
+      return [];
     }
     
     const filtered = fixtures.filter(fixture => {
@@ -187,12 +197,8 @@ const FixturesPage: React.FC = () => {
       const selectedZoneStr = selectedZone?.toString() || '';
       
       const leagueMatch = fixtureLeagueId === selectedLeagueStr;
-      
-      // Solo filtrar por categoría si hay una seleccionada
-      const categoryMatch = !selectedCategoryStr || fixtureCategoryId === selectedCategoryStr;
-      
-      // Solo filtrar por zona si hay una seleccionada
-      const zoneMatch = !selectedZoneStr || fixtureZoneId === selectedZoneStr;
+      const categoryMatch = fixtureCategoryId === selectedCategoryStr;
+      const zoneMatch = fixtureZoneId === selectedZoneStr;
       
       console.log(`Fixture ${fixture.id}:`, {
         leagueMatch: `${fixtureLeagueId} === ${selectedLeagueStr} = ${leagueMatch}`,

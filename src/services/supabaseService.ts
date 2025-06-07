@@ -15,21 +15,26 @@ import {
   obtenerCategoriasPorLiga,
   crearCategoria,
   eliminarCategoria as eliminarCategoriaSupabase,
-  obtenerZonasPorCategoria,
   crearZona,
-  obtenerEquiposPorZona,
-  crearEquipo,
-  obtenerFixtures,
-  crearPartido,
-  obtenerPartidosConEquiposYResultados,
   obtenerEquipos,
   crearFixture,
   crearPartidoConFixture,
+  obtenerFixtures,
   obtenerPartidosPorFixture,
-  eliminarFixture  // Agregar esta línea
+  eliminarFixture,
+  crearStanding,
+  obtenerStandingsPorZona,
+  obtenerPosicionesPorZona,
+  actualizarStanding,
+  eliminarStanding,
+  // Funciones para cursos que faltaban
+  obtenerCursos,
+  crearCurso,
+  actualizarCurso,
+  eliminarCurso
 } from '../lib/supabase';
 
-import { League, Category, Zone, Team, Fixture, Match } from '../contexts/LeagueContext';
+import { League, Category, Zone, Team, Fixture, Match, Standing, Course } from '../contexts/LeagueContext';
 
 // Mappers
 export const mapSupabaseToLeague = (supabaseLeague: any): League => ({
@@ -59,7 +64,7 @@ export const mapSupabaseToTeam = (supabaseTeam: any): Team => ({
   logo: supabaseTeam.logo,
   leagueId: supabaseTeam.liga_id,
   categoryId: supabaseTeam.categoria_id,
-  zoneId: supabaseTeam.zona_id
+  zoneId: String(supabaseTeam.zona_id)
 });
 
 export const mapSupabaseToFixture = (supabaseFixture: any): Fixture => {
@@ -84,7 +89,6 @@ export const mapSupabaseToFixture = (supabaseFixture: any): Fixture => {
   };
 };
 
-// Mover esta función FUERA de la clase SupabaseService
 export const mapSupabaseToMatch = (supabaseMatch: any): Match => ({
   id: supabaseMatch.id,
   fixtureId: supabaseMatch.fixture_id,
@@ -95,93 +99,222 @@ export const mapSupabaseToMatch = (supabaseMatch: any): Match => ({
   played: supabaseMatch.resultado_local !== null && supabaseMatch.resultado_visitante !== null
 });
 
+export const mapSupabaseToStanding = (supabaseStanding: any): Standing => {
+  // Validar que los campos requeridos existan
+  if (!supabaseStanding) {
+    throw new Error('Standing data is required');
+  }
+
+  return {
+    id: supabaseStanding.id || '',
+    teamId: String(supabaseStanding.equipo_id || supabaseStanding.teamId || ''),
+    leagueId: String(supabaseStanding.liga_id || supabaseStanding.leagueId || ''),
+    categoryId: String(supabaseStanding.categoria_id || supabaseStanding.categoryId || ''),
+    zoneId: String(supabaseStanding.zona_id || supabaseStanding.zoneId || ''),
+    puntos: Number(supabaseStanding.points || supabaseStanding.puntos || 0),
+    pj: Number(supabaseStanding.played || supabaseStanding.pj || 0),
+    won: Number(supabaseStanding.won || 0),
+    drawn: Number(supabaseStanding.drawn || 0),
+    lost: Number(supabaseStanding.lost || 0),
+    goalsFor: Number(supabaseStanding.goals_for || supabaseStanding.goalsFor || 0),
+    goalsAgainst: Number(supabaseStanding.goals_against || supabaseStanding.goalsAgainst || 0)
+  };
+};
+
+// Mapper para posiciones_editable
+export const mapPosicionEditableToStanding = (posicion: any): Standing & { teamName?: string } => {
+  if (!posicion) {
+    throw new Error('Posicion data is required');
+  }
+
+  return {
+    id: `${posicion.equipo_id}_${posicion.zona_id}`,
+    teamId: String(posicion.equipo_id || ''),
+    leagueId: String(posicion.liga_id || ''),
+    categoryId: String(posicion.categoria_id || ''),
+    zoneId: String(posicion.zona_id || ''),
+    puntos: Number(posicion.puntos || 0),
+    pj: Number(posicion.pj || 0),
+    won: Number(posicion.won || 0),
+    drawn: Number(posicion.drawn || 0),
+    lost: Number(posicion.lost || 0),
+    goalsFor: Number(posicion.goals_for || 0),
+    goalsAgainst: Number(posicion.goals_against || 0),
+    teamName: posicion.equipo_nombre || posicion.teamName
+  };
+};
+
+// Mapper para cursos
+export const mapSupabaseToCourse = (supabaseCourse: any): Course => {
+  // Convertir datos binarios a URL para mostrar en la interfaz
+  let imageUrl = '';
+  if (supabaseCourse.image_data) {
+    const blob = new Blob([supabaseCourse.image_data], { type: 'image/png' });
+    imageUrl = URL.createObjectURL(blob);
+  }
+
+  return {
+    id: supabaseCourse.id || '',
+    title: supabaseCourse.title || '',
+    description: supabaseCourse.description || '',
+    imageUrl: imageUrl,
+    date: supabaseCourse.date || '',
+    active: supabaseCourse.active !== undefined ? supabaseCourse.active : true
+  };
+};
+
 // Servicio principal
 export class SupabaseService {
   // Ligas
   static async getLeagues(): Promise<League[]> {
-    const data = await obtenerLigas();
-    return data.map(mapSupabaseToLeague);
+    try {
+      const data = await obtenerLigas();
+      return data.map(mapSupabaseToLeague);
+    } catch (error) {
+      console.error('Error getting leagues:', error);
+      return [];
+    }
   }
 
   // Categorías
   static async getCategoriesByLeague(leagueId: string): Promise<Category[]> {
-    const data = await obtenerCategoriasPorLiga(leagueId);
-    return data.map(mapSupabaseToCategory);
+    try {
+      const data = await obtenerCategoriasPorLiga(leagueId);
+      return data.map(mapSupabaseToCategory);
+    } catch (error) {
+      console.error('Error getting categories by league:', error);
+      return [];
+    }
   }
 
   static async createCategory(name: string, leagueId: string): Promise<Category | null> {
-    const data = await crearCategoria(name, leagueId);
-    return data ? mapSupabaseToCategory(data[0]) : null;
+    try {
+      const data = await crearCategoria(name, leagueId);
+      return data ? mapSupabaseToCategory(data[0]) : null;
+    } catch (error) {
+      console.error('Error creating category:', error);
+      return null;
+    }
   }
 
   static async deleteCategory(id: string): Promise<boolean> {
-    const result = await eliminarCategoria(id);
-    return !!result;
+    try {
+      const result = await eliminarCategoriaSupabase(id);
+      return !!result;
+    } catch (error) {
+      console.error('Error deleting category:', error);
+      return false;
+    }
   }
 
   // Zonas
   static async getZonas(): Promise<Zone[]> {
-    const { data } = await supabase.from('zonas').select('*').order('created_at', { ascending: false });
-    return data ? data.map(mapSupabaseToZone) : [];
+    try {
+      const { data } = await supabase.from('zonas').select('*').order('created_at', { ascending: false });
+      return data ? data.map(mapSupabaseToZone) : [];
+    } catch (error) {
+      console.error('Error getting zonas:', error);
+      return [];
+    }
   }
 
   static async getZonasByCategory(categoryId: string): Promise<Zone[]> {
-    const { data } = await supabase
-      .from('zonas')
-      .select('*')
-      .eq('categoria_id', categoryId)
-      .order('created_at', { ascending: false });
-    return data ? data.map(mapSupabaseToZone) : [];
+    try {
+      const { data } = await supabase
+        .from('zonas')
+        .select('*')
+        .eq('categoria_id', categoryId)
+        .order('created_at', { ascending: false });
+      return data ? data.map(mapSupabaseToZone) : [];
+    } catch (error) {
+      console.error('Error getting zonas by category:', error);
+      return [];
+    }
   }
 
   static async getZonasByLeagueAndCategory(leagueId: string, categoryId: string): Promise<Zone[]> {
-    const data = await obtenerZonasPorLigaYCategoria(leagueId, categoryId);
-    return data.map(mapSupabaseToZone);
+    try {
+      const data = await obtenerZonasPorLigaYCategoria(leagueId, categoryId);
+      return data.map(mapSupabaseToZone);
+    } catch (error) {
+      console.error('Error getting zonas by league and category:', error);
+      return [];
+    }
   }
 
   static async createZone(name: string, leagueId: string, categoryId: string): Promise<Zone | null> {
-    const data = await crearZona(name, leagueId, categoryId);
-    return data ? mapSupabaseToZone(data[0]) : null;
+    try {
+      const data = await crearZona(name, leagueId, categoryId);
+      return data ? mapSupabaseToZone(data[0]) : null;
+    } catch (error) {
+      console.error('Error creating zone:', error);
+      return null;
+    }
   }
 
   static async updateZone(id: string, zoneData: Partial<Zone>): Promise<Zone | null> {
-    const { data } = await supabase
-      .from('zonas')
-      .update({
-        nombre: zoneData.name,
-        liga_id: zoneData.leagueId,
-        categoria_id: zoneData.categoryId,
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', id)
-      .select()
-      .single();
-    return data ? mapSupabaseToZone(data) : null;
+    try {
+      const { data } = await supabase
+        .from('zonas')
+        .update({
+          nombre: zoneData.name,
+          liga_id: zoneData.leagueId,
+          categoria_id: zoneData.categoryId,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', id)
+        .select()
+        .single();
+      return data ? mapSupabaseToZone(data) : null;
+    } catch (error) {
+      console.error('Error updating zone:', error);
+      return null;
+    }
   }
 
   static async deleteZone(id: string): Promise<boolean> {
-    const { error } = await supabase.from('zonas').delete().eq('id', id);
-    if (error) {
+    try {
+      const { error } = await supabase.from('zonas').delete().eq('id', id);
+      if (error) {
+        console.error('Error deleting zone:', error);
+        return false;
+      }
+      return true;
+    } catch (error) {
       console.error('Error deleting zone:', error);
       return false;
     }
-    return true;
   }
 
   static async getAllZones(): Promise<Zone[]> {
-    const data = await obtenerTodasLasZonas();
-    return data.map(mapSupabaseToZone);
+    try {
+      const data = await obtenerTodasLasZonas();
+      return data.map(mapSupabaseToZone);
+    } catch (error) {
+      console.error('Error getting all zones:', error);
+      return [];
+    }
   }
 
   // Equipos
   static async getTeamsByZone(zoneId: string): Promise<Team[]> {
-    const data = await obtenerEquiposPorZona(zoneId);
-    return data.map(mapSupabaseToTeam);
+    try {
+      const data = await obtenerEquiposPorZona(zoneId);
+      return data.map(mapSupabaseToTeam);
+    } catch (error) {
+      console.error('Error getting teams by zone:', error);
+      return [];
+    }
   }
 
   static async getAllTeams(): Promise<Team[]> {
-    const data = await obtenerTodosLosEquipos();
-    return data.map(mapSupabaseToTeam);
+    try {
+      const data = await obtenerTodosLosEquipos();
+      return data.map(mapSupabaseToTeam);
+    } catch (error) {
+      console.error('Error getting all teams:', error);
+      return [];
+    }
   }
 
   static async createTeam(
@@ -191,25 +324,45 @@ export class SupabaseService {
     categoryId: string,
     logo?: string
   ): Promise<Team | null> {
-    const data = await agregarEquipoCompleto(name, zoneId, leagueId, categoryId, logo);
-    if (!data || data.length === 0) {
-      console.error('Error creando equipo: No se pudo insertar');
+    try {
+      const data = await agregarEquipoCompleto(name, zoneId, leagueId, categoryId, logo);
+      if (!data || data.length === 0) {
+        console.error('Error creando equipo: No se pudo insertar');
+        return null;
+      }
+      return mapSupabaseToTeam(data[0]);
+    } catch (error) {
+      console.error('Error creating team:', error);
       return null;
     }
-    return mapSupabaseToTeam(data[0]);
   }
 
   // Partidos
   static async createMatch(homeTeamId: string, awayTeamId: string, zoneId: string, date: string) {
-    return await crearPartido(homeTeamId, awayTeamId, zoneId, date);
+    try {
+      return await crearPartido(homeTeamId, awayTeamId, zoneId, date);
+    } catch (error) {
+      console.error('Error creating match:', error);
+      return null;
+    }
   }
 
   static async getMatchesWithTeamsAndResults() {
-    return await obtenerPartidosConEquiposYResultados();
+    try {
+      return await obtenerPartidosConEquiposYResultados();
+    } catch (error) {
+      console.error('Error getting matches with teams and results:', error);
+      return [];
+    }
   }
 
   static async updateMatchResult(matchId: string, homeScore: number, awayScore: number) {
-    return await actualizarResultadoPartido(matchId, homeScore, awayScore);
+    try {
+      return await actualizarResultadoPartido(matchId, homeScore, awayScore);
+    } catch (error) {
+      console.error('Error updating match result:', error);
+      return null;
+    }
   }
 
   // Fixtures
@@ -290,12 +443,18 @@ export class SupabaseService {
       return fixtures;
     } catch (error) {
       console.error('Error in getFixtures:', error);
-      throw error;
+      return [];
     }
   }
 
   static async getMatchesByFixture(fixtureId: string): Promise<Match[]> {
-    return await obtenerPartidosPorFixture(fixtureId);
+    try {
+      const data = await obtenerPartidosPorFixture(fixtureId);
+      return data.map(mapSupabaseToMatch);
+    } catch (error) {
+      console.error('Error getting matches by fixture:', error);
+      return [];
+    }
   }
 
   static async deleteFixture(fixtureId: string): Promise<boolean> {
@@ -306,7 +465,203 @@ export class SupabaseService {
       return false;
     }
   }
+
+  // Standings
+  static async getStandingsByZone(zoneId: string): Promise<Standing[]> {
+    try {
+      // Usar posiciones_editable en lugar de standings
+      const posicionesData = await obtenerPosicionesPorZona(zoneId);
+      return posicionesData.map(mapPosicionEditableToStanding);
+    } catch (error) {
+      console.error('Error getting standings by zone:', error);
+      return [];
+    }
+  }
+
+  static async createStanding(standing: {
+    teamId: string;
+    leagueId: string;
+    categoryId: string;
+    zoneId: string;
+    points?: number;
+    played?: number;
+    won?: number;
+    drawn?: number;
+    lost?: number;
+    goalsFor?: number;
+    goalsAgainst?: number;
+  }): Promise<any> {
+    try {
+      console.log('🔄 SupabaseService.createStanding llamado con:', standing);
+      
+      // Validar que no sean IDs temporales
+      if (standing.teamId.startsWith('temp-')) {
+        throw new Error('No se puede crear standing para equipo temporal');
+      }
+
+      // Validar campos requeridos
+      if (!standing.teamId || !standing.zoneId) {
+        throw new Error('teamId y zoneId son requeridos');
+      }
+  
+      const result = await crearStanding({
+        equipo_id: standing.teamId,
+        liga_id: standing.leagueId,
+        categoria_id: standing.categoryId,
+        zona_id: standing.zoneId,
+        points: standing.points || 0,
+        played: standing.played || 0,
+        won: standing.won || 0,
+        drawn: standing.drawn || 0,
+        lost: standing.lost || 0,
+        goals_for: standing.goalsFor || 0,
+        goals_against: standing.goalsAgainst || 0
+      });
+      
+      console.log('✅ Standing creado en Supabase:', result);
+      return result;
+    } catch (error) {
+      console.error('❌ Error en SupabaseService.createStanding:', error);
+      throw error;
+    }
+  }
+
+  static async updateStanding(standingId: string, updates: Partial<Standing>): Promise<Standing | null> {
+    try {
+      console.log('🔄 SupabaseService.updateStanding:', { standingId, updates });
+      
+      // Validar que el ID sea un UUID válido
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+      if (!uuidRegex.test(standingId)) {
+        console.error('❌ ID inválido, no es un UUID:', standingId);
+        throw new Error(`ID inválido: ${standingId}. Debe ser un UUID válido.`);
+      }
+      
+      const supabaseUpdates: any = {};
+      
+      // Mapear campos con validación
+      if (updates.puntos !== undefined && !isNaN(Number(updates.puntos))) {
+        supabaseUpdates.points = Number(updates.puntos);
+        console.log('📊 Mapeando points:', updates.puntos, '->', supabaseUpdates.points);
+      }
+      if (updates.pj !== undefined && !isNaN(Number(updates.pj))) {
+        supabaseUpdates.played = Number(updates.pj);
+        console.log('📊 Mapeando played:', updates.pj, '->', supabaseUpdates.played);
+      }
+      if (updates.won !== undefined && !isNaN(Number(updates.won))) {
+        supabaseUpdates.won = Number(updates.won);
+      }
+      if (updates.drawn !== undefined && !isNaN(Number(updates.drawn))) {
+        supabaseUpdates.drawn = Number(updates.drawn);
+      }
+      if (updates.lost !== undefined && !isNaN(Number(updates.lost))) {
+        supabaseUpdates.lost = Number(updates.lost);
+      }
+      if (updates.goalsFor !== undefined && !isNaN(Number(updates.goalsFor))) {
+        supabaseUpdates.goals_for = Number(updates.goalsFor);
+      }
+      if (updates.goalsAgainst !== undefined && !isNaN(Number(updates.goalsAgainst))) {
+        supabaseUpdates.goals_against = Number(updates.goalsAgainst);
+      }
+      
+      console.log('📤 Enviando a Supabase:', supabaseUpdates);
+      
+      const supabaseStanding = await actualizarStanding(standingId, supabaseUpdates);
+      
+      if (supabaseStanding && supabaseStanding[0]) {
+        console.log('📥 Respuesta de Supabase:', supabaseStanding[0]);
+        const mappedStanding = mapSupabaseToStanding(supabaseStanding[0]);
+        console.log('✅ Standing mapeado:', mappedStanding);
+        return mappedStanding;
+      }
+      
+      console.error('❌ No se recibió respuesta válida de Supabase');
+      return null;
+    } catch (error) {
+      console.error('❌ Error updating standing:', error);
+      throw error;
+    }
+  }
+
+  static async deleteStanding(standingId: string): Promise<boolean> {
+    try {
+      return await eliminarStanding(standingId);
+    } catch (error) {
+      console.error('Error deleting standing:', error);
+      return false;
+    }
+  }
+
+  // Métodos para Cursos
+  static async getCourses(): Promise<Course[]> {
+    try {
+      const supabaseCourses = await obtenerCursos();
+      return supabaseCourses.map(mapSupabaseToCourse);
+    } catch (error) {
+      console.error('Error getting courses:', error);
+      return [];
+    }
+  }
+
+  static async createCourse(course: {
+    title: string;
+    description: string;
+    imageFile: File; // Cambiar para recibir archivo en lugar de URL
+    date: string;
+  }): Promise<Course> {
+    try {
+      // Convertir archivo a datos binarios
+      const arrayBuffer = await course.imageFile.arrayBuffer();
+      const imageData = new Uint8Array(arrayBuffer);
+  
+      const supabaseCourse = await crearCurso({
+        title: course.title,
+        description: course.description,
+        image_data: imageData, // Usar datos binarios
+        date: course.date,
+      });
+  
+      return mapSupabaseToCourse(supabaseCourse);
+    } catch (error) {
+      console.error('Error creating course:', error);
+      throw error;
+    }
+  }
+
+  static async updateCourse(courseId: string, updates: {
+    title?: string;
+    description?: string;
+    imageFile?: File; // Cambiar de imageUrl a imageFile
+    date?: string;
+  }): Promise<Course | null> {
+    try {
+      const supabaseUpdates: any = {};
+      if (updates.title !== undefined) supabaseUpdates.title = updates.title;
+      if (updates.description !== undefined) supabaseUpdates.description = updates.description;
+      if (updates.imageFile !== undefined) {
+        // Convertir archivo a datos binarios
+        const arrayBuffer = await updates.imageFile.arrayBuffer();
+        supabaseUpdates.image_data = new Uint8Array(arrayBuffer);
+      }
+      if (updates.date !== undefined) supabaseUpdates.date = updates.date;
+  
+      const supabaseCourse = await actualizarCurso(courseId, supabaseUpdates);
+      return supabaseCourse ? mapSupabaseToCourse(supabaseCourse) : null;
+    } catch (error) {
+      console.error('Error updating course:', error);
+      return null;
+    }
+  }
+
+  static async deleteCourse(courseId: string): Promise<boolean> {
+    try {
+      return await eliminarCurso(courseId);
+    } catch (error) {
+      console.error('Error deleting course:', error);
+      return false;
+    }
+  }
 }
 
 // Exportación específica
-export { eliminarCategoria };
+export { eliminarCategoriaSupabase as eliminarCategoria };

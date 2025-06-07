@@ -4,6 +4,7 @@ import { mockLeagueData } from '../data/mockData';
 import { zonesService } from '../services/zonesService';
 import { supabase, eliminarEquipo, eliminarCategoria } from '../lib/supabase';
 import { SupabaseService } from '../services/supabaseService';
+import { v4 as uuidv4 } from 'uuid';
 
 // Types
 export interface Team {
@@ -55,8 +56,8 @@ export interface Standing {
   leagueId: string;
   categoryId: string;
   zoneId: string;
-  points: number;
-  played: number;
+  puntos: number;  // Cambiar de 'points' a 'puntos'
+  pj: number;      // Cambiar de 'played' a 'pj'
   won: number;
   drawn: number;
   lost: number;
@@ -365,7 +366,24 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
 
   // Team operations
   const getTeamsByZone = (zoneId: string) => {
-    return teams.filter(team => team.zoneId === zoneId);
+    console.log('Filtering teams for zoneId:', zoneId, 'type:', typeof zoneId);
+    
+    const result = teams.filter(team => {
+      // Normalizar ambos valores a string para comparación consistente
+      const teamZoneId = String(team.zoneId);
+      const searchZoneId = String(zoneId);
+      
+      const match = teamZoneId === searchZoneId;
+      
+      if (match) {
+        console.log(`✅ Team match found: ${team.name} (zone: ${teamZoneId})`);
+      }
+      
+      return match;
+    });
+    
+    console.log(`Found ${result.length} teams for zone ${zoneId}`);
+    return result;
   };
 
   const addTeam = async (team: Omit<Team, 'id'>): Promise<Team | undefined> => {
@@ -421,7 +439,24 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
 
   // Fixture operations
   const getFixturesByZone = (zoneId: string) => {
-    return fixtures.filter(fixture => fixture.zoneId === zoneId);
+    console.log('Filtering fixtures for zoneId:', zoneId, 'type:', typeof zoneId);
+    
+    const result = fixtures.filter(fixture => {
+      // Normalizar ambos valores a string para comparación consistente
+      const fixtureZoneId = String(fixture.zoneId);
+      const searchZoneId = String(zoneId);
+      
+      const match = fixtureZoneId === searchZoneId;
+      
+      if (match) {
+        console.log(`✅ Match found: Fixture ${fixture.id} (zone: ${fixtureZoneId})`);
+      }
+      
+      return match;
+    });
+    
+    console.log(`Found ${result.length} fixtures for zone ${zoneId}`);
+    return result;
   };
 
   const addFixture = (fixture: Omit<Fixture, 'id'>) => {
@@ -506,22 +541,25 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
 
   // Función para calcular automáticamente las posiciones
   const calculateStandingsFromMatches = useCallback((zoneId: string) => {
-    // Obtener todos los partidos de la zona
-    const zoneFixtures = fixtures.filter(fixture => fixture.zoneId === zoneId);
+    console.log('Calculando standings para zona:', zoneId);
+    
+    // ✅ CAMBIO: Usar getFixturesByZone en lugar de filtrar directamente
+    const zoneFixtures = getFixturesByZone(zoneId);
     const zoneTeams = teams.filter(team => team.zoneId === zoneId);
     
-    // Inicializar estadísticas para cada equipo
+    // CAMBIO: Crear standings automáticamente para todos los equipos de la zona
     const teamStats: { [teamId: string]: Standing } = {};
     
+    // Inicializar estadísticas para cada equipo de la zona
     zoneTeams.forEach(team => {
       teamStats[team.id] = {
-        id: `standing-${team.id}`,
+        id: uuidv4(),
         teamId: team.id,
         leagueId: team.leagueId,
         categoryId: team.categoryId,
         zoneId: team.zoneId,
-        points: 0,
-        played: 0,
+        puntos: 0,    // Cambio: points -> puntos
+        pj: 0,        // Cambio: played -> pj
         won: 0,
         drawn: 0,
         lost: 0,
@@ -539,8 +577,8 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
           
           if (homeTeam && awayTeam) {
             // Actualizar partidos jugados
-            homeTeam.played++;
-            awayTeam.played++;
+            homeTeam.pj++;  // Cambio: played -> pj
+            awayTeam.pj++;  // Cambio: played -> pj
             
             // Actualizar goles
             homeTeam.goalsFor += match.homeScore;
@@ -552,19 +590,19 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
             if (match.homeScore > match.awayScore) {
               // Victoria local
               homeTeam.won++;
-              homeTeam.points += 3;
+              homeTeam.puntos += 3;  // Cambio: points -> puntos
               awayTeam.lost++;
             } else if (match.homeScore < match.awayScore) {
               // Victoria visitante
               awayTeam.won++;
-              awayTeam.points += 3;
+              awayTeam.puntos += 3;  // Cambio: points -> puntos
               homeTeam.lost++;
             } else {
               // Empate
               homeTeam.drawn++;
-              homeTeam.points += 1;
+              homeTeam.puntos += 1;  // Cambio: points -> puntos
               awayTeam.drawn++;
-              awayTeam.points += 1;
+              awayTeam.puntos += 1;  // Cambio: points -> puntos
             }
           }
         }
@@ -584,47 +622,211 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
   }, [fixtures, teams]);
 
   // Standings operations
-  // Standings operations
-  const getStandingsByZone = (zoneId: string) => {
-  return standings.filter(standing => standing.zoneId === zoneId);
+  // Cargar standings desde Supabase
+  useEffect(() => {
+    const loadAllStandings = async () => {
+      try {
+        console.log('=== LOADING STANDINGS FROM SUPABASE ===');
+        const allStandings: Standing[] = [];
+        
+        // Cargar standings para todas las zonas
+        for (const zone of zones) {
+          console.log('Loading standings for zone:', zone.id);
+          const zoneStandings = await SupabaseService.getStandingsByZone(zone.id);
+          console.log('Standings loaded for zone', zone.id, ':', zoneStandings);
+          allStandings.push(...zoneStandings);
+        }
+        
+        console.log('All standings from Supabase:', allStandings);
+        
+        // Reemplazar completamente los standings en lugar de hacer merge
+        setStandings(allStandings);
+      } catch (error) {
+        console.error('Error loading standings:', error);
+      }
+    };
+    
+    // Solo cargar si hay zonas
+    if (zones.length > 0) {
+      loadAllStandings();
+    } else {
+      // Si no hay zonas, limpiar standings
+      setStandings([]);
+    }
+  }, [zones]); // Mantener solo zones como dependencia
+  
+  // Agregar después del useEffect que carga standings 
+  useEffect(() => { 
+    // Generar standings automáticamente para todas las zonas que tienen equipos 
+    const generateStandingsForAllZones = () => { 
+      zones.forEach(zone => { 
+        const zoneTeams = teams.filter(team => team.zoneId === zone.id); 
+        if (zoneTeams.length > 0) { 
+          calculateStandingsFromMatches(zone.id); 
+        } 
+      }); 
+    }; 
+    
+    // Solo generar si hay equipos cargados 
+    if (teams.length > 0 && zones.length > 0) { 
+      generateStandingsForAllZones(); 
+    } 
+  }, [teams, zones, calculateStandingsFromMatches]);
+  
+  // Función para obtener standings por zona
+  const getStandingsByZone = (zoneId: string): Standing[] => {
+    console.log('getStandingsByZone called with:', zoneId);
+    console.log('All standings:', standings);
+    
+    const filtered = standings.filter(standing => {
+      // Normalizar ambos valores a string para comparación consistente
+      const standingZoneId = String(standing.zoneId);
+      const searchZoneId = String(zoneId);
+      
+      const match = standingZoneId === searchZoneId;
+      
+      if (match) {
+        console.log(`✅ Standing match found: Team ${standing.teamId} (zone: ${standingZoneId})`);
+      }
+      
+      return match;
+    });
+    
+    console.log('Filtered standings:', filtered);
+    console.log(`Found ${filtered.length} standings for zone ${zoneId}`);
+    
+    return filtered;
   };
   
-  const updateStanding = (id: string, data: Partial<Standing>) => {
-  setStandings(standings.map(standing =>
-  standing.id === id ? { ...standing, ...data } : standing
-  ));
-  };
-  
+  // Modificar las funciones de standings para usar Supabase
   const addStanding = (standing: Omit<Standing, 'id'>) => {
-  const newStanding: Standing = {
-  ...standing,
-  id: `standing-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+    // Crear directamente en el estado local (no async)
+    const localStanding: Standing = {
+      ...standing,
+      id: uuidv4()
+    };
+    
+    setStandings(prev => [...prev, localStanding]);
+    
+    // Opcional: Intentar guardar en Supabase en background
+    SupabaseService.createStanding(standing).catch(error => {
+      console.error('Error saving standing to Supabase (background):', error);
+    });
   };
-  setStandings(prev => [...prev, newStanding]);
+  
+  const updateStanding = async (id: string, data: Partial<Standing>) => {
+    try {
+      console.log('🔄 Actualizando standing en Supabase:', { id, data });
+      
+      // Actualizar en Supabase
+      const updatedStanding = await SupabaseService.updateStanding(id, data);
+      
+      if (updatedStanding) {
+        console.log('✅ Standing actualizado en Supabase:', updatedStanding);
+        
+        // Actualizar estado local
+        setStandings(standings.map(standing =>
+          standing.id === id ? updatedStanding : standing
+        ));
+        
+        console.log('✅ Estado local actualizado');
+      } else {
+        throw new Error('No se recibió respuesta de Supabase');
+      }
+    } catch (error) {
+      console.error('❌ Error updating standing:', error);
+      
+      // Fallback: actualizar localmente
+      console.log('🔄 Aplicando fallback: actualización local');
+      setStandings(standings.map(standing =>
+        standing.id === id ? { ...standing, ...data } : standing
+      ));
+      
+      // Re-lanzar el error para que sea manejado por la función que llama
+      throw error;
+    }
   };
 
   // Course operations
+  // Actualizar las funciones de cursos:
   const getCourses = () => {
     return courses;
   };
-
-  const addCourse = (course: Omit<Course, 'id'>) => {
-    const newCourse = {
-      ...course,
-      id: `course_${Date.now()}`
-    };
-    setCourses([...courses, newCourse]);
+  
+  const addCourse = async (course: {
+    title: string;
+    description: string;
+    imageFile: File; // Cambiar de imageUrl a imageFile
+    date: string;
+  }) => {
+    try {
+      const newCourse = await SupabaseService.createCourse({
+        title: course.title,
+        description: course.description,
+        imageFile: course.imageFile, // Pasar el archivo directamente
+        date: course.date
+      });
+      
+      if (newCourse) {
+        setCourses([...courses, newCourse]);
+      }
+    } catch (error) {
+      console.error('Error adding course:', error);
+    }
   };
-
-  const updateCourse = (id: string, data: Partial<Course>) => {
-    setCourses(courses.map(course =>
-      course.id === id ? { ...course, ...data } : course
-    ));
+  
+  const updateCourse = async (id: string, data: {
+    title?: string;
+    description?: string;
+    imageFile?: File; // Cambiar de imageUrl a imageFile
+    date?: string;
+  }) => {
+    try {
+      const updatedCourse = await SupabaseService.updateCourse(id, {
+        title: data.title,
+        description: data.description,
+        imageFile: data.imageFile, // Pasar el archivo directamente
+        date: data.date
+      });
+      
+      if (updatedCourse) {
+        setCourses(courses.map(course =>
+          course.id === id ? updatedCourse : course
+        ));
+      }
+    } catch (error) {
+      console.error('Error updating course:', error);
+    }
   };
-
-  const deleteCourse = (id: string) => {
-    setCourses(courses.filter(course => course.id !== id));
+  
+  const deleteCourse = async (id: string) => {
+    try {
+      const success = await SupabaseService.deleteCourse(id);
+      
+      if (success) {
+        setCourses(courses.filter(course => course.id !== id));
+      }
+    } catch (error) {
+      console.error('Error deleting course:', error);
+    }
   };
+  
+  // Agregar función para cargar cursos desde Supabase
+  const loadAllCourses = async () => {
+    try {
+      console.log('=== LOADING COURSES FROM SUPABASE ===');
+      const allCourses = await SupabaseService.getCourses();
+      console.log('Loaded courses:', allCourses);
+      setCourses(allCourses);
+    } catch (error) {
+      console.error('Error loading courses:', error);
+    }
+  };
+  
+  // Agregar en el useEffect principal para cargar cursos al inicializar:
+  useEffect(() => {
+    loadAllCourses();
+  }, []);
 
   // Función refreshFixtures envuelta en useCallback
   const refreshFixtures = useCallback(async () => {

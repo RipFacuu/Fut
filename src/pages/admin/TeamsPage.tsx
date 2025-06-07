@@ -60,11 +60,27 @@ const TeamsPage: React.FC = () => {
   const formCategoryZones = getZonesByCategory(watchCategoryId);
   
   // Filter teams by selections or show all
-  const filteredTeams = showAllTeams 
-    ? teams // Mostrar todos los equipos
-    : selectedZone 
-      ? getTeamsByZone(selectedZone)
-      : [];
+  const filteredTeams = React.useMemo(() => {
+    console.log('=== FILTERING TEAMS IN COMPONENT ===');
+    console.log('showAllTeams:', showAllTeams);
+    console.log('selectedZone:', selectedZone);
+    console.log('Total teams in context:', teams.length);
+    
+    if (showAllTeams) {
+      console.log('Mostrando todos los equipos');
+      return teams;
+    }
+    
+    if (selectedZone) {
+      console.log('Filtrando por zona:', selectedZone);
+      const result = getTeamsByZone(selectedZone);
+      console.log('Resultado del filtro:', result.length, 'equipos');
+      return result;
+    }
+    
+    console.log('No hay zona seleccionada, devolviendo array vacío');
+    return [];
+  }, [showAllTeams, selectedZone, teams, getTeamsByZone]);
   
   // Helper function to get team details (league, category, zone names)
   const getTeamDetails = (team: Team) => {
@@ -112,7 +128,8 @@ const TeamsPage: React.FC = () => {
     };
   };
   
-  // EFECTOS CORREGIDOS - Solo para auto-selección inicial, no continua
+  // EFECTOS CORREGIDOS - Comentar para evitar auto-selección automática
+  /*
   React.useEffect(() => {
     if (leagueCategories.length > 0 && !selectedCategory && !showAllTeams) {
       setSelectedCategory(leagueCategories[0].id);
@@ -124,6 +141,7 @@ const TeamsPage: React.FC = () => {
       setSelectedZone(categoryZones[0].id);
     }
   }, [selectedCategory, showAllTeams]); 
+  */
   
   // Reset category when league changes in form
   React.useEffect(() => {
