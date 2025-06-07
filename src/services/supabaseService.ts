@@ -28,7 +28,6 @@ import {
   actualizarStanding,
   eliminarStanding,
   // Funciones para cursos que faltaban
-  obtenerCursos,
   crearCurso,
   actualizarCurso,
   eliminarCurso
@@ -148,7 +147,8 @@ export const mapPosicionEditableToStanding = (posicion: any): Standing & { teamN
 export const mapSupabaseToCourse = (supabaseCourse: any): Course => {
   // Convertir datos binarios a URL para mostrar en la interfaz
   let imageUrl = '';
-  if (supabaseCourse.image_data) {
+  if (supabaseCourse.image_data && typeof window !== 'undefined') {
+    // Solo ejecutar en el navegador, no durante el build del servidor
     const blob = new Blob([supabaseCourse.image_data], { type: 'image/png' });
     imageUrl = URL.createObjectURL(blob);
   }

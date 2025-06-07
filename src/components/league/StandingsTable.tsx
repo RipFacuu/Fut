@@ -65,13 +65,28 @@ const StandingsTable: React.FC<StandingsTableProps> = ({ zoneId }) => {
   // Handle CSV export
   const handleExportCSV = () => {
     // Create CSV content
-    let csvContent = "POS,EQUIPO,PJ,PTS\n";
-    
-    sortedStandings.forEach((standing, index) => {
-      const teamName = getTeamName(standing.teamId, standing);
-      csvContent += `${index + 1},${teamName},${standing.pj},${standing.puntos}\n`;
-    });
-    
+    const exportToCSV = () => {
+      if (typeof window === 'undefined') return; // Verificar entorno del navegador
+      
+      let csvContent = "Posición,Equipo,PJ,Puntos\n";
+      standings.forEach((standing, index) => {
+        const teamName = getTeamName(standing.teamId, standing);
+        csvContent += `${index + 1},${teamName},${standing.pj},${standing.puntos}\n`;
+      });
+      
+      // Create download link
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.setAttribute('href', url);
+      link.setAttribute('download', `standings_${zoneId}.csv`);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    };
+  
     // Create download link
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);

@@ -313,16 +313,16 @@ const StandingsTable: React.FC<{ zoneId: string; leagueId: string; categoryId: s
     }
   };
 
-  const handleExportCSV = () => {
+  const exportToCSV = (zoneId: string) => {
+    if (typeof window === 'undefined') return; // Verificar entorno del navegador
+    
     try {
-      // Crear contenido CSV
-      let csvContent = "POS,EQUIPO,PJ,G,E,P,GF,GC,DIF,PTS\n";
+      const zoneStandings = standings.filter(s => s.zoneId === zoneId);
       
-      sortedStandings.forEach((standing, index) => {
-        const team = teams.find(t => t.id === standing.teamId);
-        if (team) {
-          csvContent += `${index + 1},"${team.name}",${standing.played},${standing.won},${standing.drawn},${standing.lost},${standing.goalsFor},${standing.goalsAgainst},${standing.goalsFor - standing.goalsAgainst},${standing.points}\n`;
-        }
+      let csvContent = "Posición,Equipo,PJ,PG,PE,PP,GF,GC,DG,Puntos\n";
+      zoneStandings.forEach((standing, index) => {
+        const teamName = getTeamName(standing.teamId);
+        csvContent += `${index + 1},${teamName},${standing.pj},${standing.pg},${standing.pe},${standing.pp},${standing.gf},${standing.gc},${standing.dg},${standing.puntos}\n`;
       });
       
       // Crear enlace de descarga
@@ -338,7 +338,6 @@ const StandingsTable: React.FC<{ zoneId: string; leagueId: string; categoryId: s
       URL.revokeObjectURL(url);
     } catch (error) {
       console.error('Error exportando CSV:', error);
-      alert('Error al exportar CSV. Inténtalo de nuevo.');
     }
   };
 
@@ -594,7 +593,7 @@ const StandingsTable: React.FC<{ zoneId: string; leagueId: string; categoryId: s
                     isModified && "bg-yellow-50/30"
                   )}
                 >
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-500">
                     {index + 1}
                   </td>
                   <EditableCell 
