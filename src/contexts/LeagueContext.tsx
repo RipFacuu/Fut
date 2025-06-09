@@ -108,7 +108,7 @@ export interface LeagueContextType {
   // Team operations
   getTeamsByZone: (zoneId: string) => Team[];
   addTeam: (team: Omit<Team, 'id'>) => Promise<Team | undefined>;
-  updateTeam: (id: string, data: Partial<Team>) => void;
+  updateTeam: (id: string, data: Partial<Team>) => Promise<void>;
   deleteTeam: (id: string) => Promise<void>;
   
   // Fixture operations
@@ -132,6 +132,10 @@ export interface LeagueContextType {
   addCourse: (course: Omit<Course, 'id'>) => void;
   updateCourse: (id: string, data: Partial<Course>) => void;
   deleteCourse: (id: string) => void;
+  
+  // Nuevas funciones de diagnóstico y utilidad
+  ensureCategoriesExist: (leagueId: string, leagueName: string) => Promise<void>;
+  debugCategorySelection: (selectedLeagueId: string) => void;
 }
 
 // Solo una declaración del contexto
@@ -146,53 +150,116 @@ export function useLeague() {
   return context;
 }
 
-
 interface LeagueProviderProps {
   children: React.ReactNode;
 }
 
 export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
-  // Initialize state with mock data
-  const [leagues, setLeagues] = useState<League[]>(mockLeagueData.leagues);
-  const [categories, setCategories] = useState<Category[]>(mockLeagueData.categories);
+  // Initialize state with empty arrays instead of mock data
+  const [leagues, setLeagues] = useState<League[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [zones, setZones] = useState<Zone[]>([]);
-  const [teams, setTeams] = useState<Team[]>(mockLeagueData.teams);
-  const [fixtures, setFixtures] = useState<Fixture[]>(mockLeagueData.fixtures);
-  const [standings, setStandings] = useState<Standing[]>(mockLeagueData.standings);
+  const [teams, setTeams] = useState<Team[]>([]);
+  const [fixtures, setFixtures] = useState<Fixture[]>([]);
+  const [standings, setStandings] = useState<Standing[]>([]);
   const [courses, setCourses] = useState<Course[]>([]);
 
-  // Cargar todas las categorías al inicializar
+  // Cargar todas las ligas al inicializar
+  useEffect(() => {
+    const loadAllLeagues = async () => {
+      try {
+        console.log('=== LOADING LEAGUES FROM SUPABASE ===');
+        const supabaseLeagues = await SupabaseService.getLeagues();
+        console.log('Leagues from Supabase:', supabaseLeagues);
+        
+        // Usar solo datos de Supabase (sin combinar con mock)
+        setLeagues(supabaseLeagues);
+      } catch (error) {
+        console.error('Error loading leagues:', error);
+      }
+    };
+    
+    loadAllLeagues();
+  }, []);
+
+  // SOLUCIÓN 2: Función para asegurar que existan categorías por defecto
+  const ensureCategoriesExist = async (leagueId: string, leagueName: string) => {
+    const existingCategories = getCategoriesByLeague(leagueId);
+    
+    if (existingCategories.length === 0) {
+      console.log(`📝 Creating default categories for ${leagueName}`);
+      
+      // Crear categorías por defecto
+      const defaultCategories = [
+        { name: 'Primera División', leagueId, isEditable: true },
+        { name: 'Segunda División', leagueId, isEditable: true }
+      ];
+      
+      for (const categoryData of defaultCategories) {
+        try {
+          await addCategory(categoryData);
+          console.log(`✅ Created category: ${categoryData.name}`);
+        } catch (error) {
+          console.error(`❌ Error creating category ${categoryData.name}:`, error);
+        }
+      }
+    }
+  };
+
+  // SOLUCIÓN 3: Modificar el useEffect que carga las categorías
   useEffect(() => {
     const loadAllCategories = async () => {
       try {
         console.log('=== LOADING CATEGORIES FROM SUPABASE ===');
-        // Cargar categorías para todas las ligas
         const allCategories: Category[] = [];
+        
         for (const league of leagues) {
-          console.log('Loading categories for league:', league.id);
-          const leagueCategories = await SupabaseService.getCategoriesByLeague(league.id);
-          console.log('Categories loaded for league', league.id, ':', leagueCategories);
-          allCategories.push(...leagueCategories);
+          console.log(`🔍 Loading categories for league: ${league.name} (ID: ${league.id})`);
+          
+          try {
+            const leagueCategories = await SupabaseService.getCategoriesByLeague(league.id);
+            console.log(`📋 Categories loaded for ${league.name}:`, leagueCategories);
+            
+            if (leagueCategories.length === 0) {
+              console.warn(`⚠️ No categories found for ${league.name} in database`);
+              
+              // Opcional: Crear categorías por defecto
+              // await ensureCategoriesExist(league.id, league.name);
+            }
+            
+            allCategories.push(...leagueCategories);
+          } catch (error) {
+            console.error(`❌ Error loading categories for ${league.name}:`, error);
+          }
         }
         
-        console.log('All categories from Supabase:', allCategories);
+        console.log('📊 All categories from Supabase:', allCategories);
         
-        // Combinar con las categorías mock existentes (evitar duplicados)
+        // Actualizar el estado
         setCategories(prev => {
-          console.log('Previous categories:', prev);
+          console.log('📋 Previous categories:', prev);
+          
+          // Evitar duplicados por ID
           const existingIds = prev.map(cat => cat.id);
           const newCategories = allCategories.filter(cat => !existingIds.includes(cat.id));
-          console.log('New categories to add:', newCategories);
+          
+          console.log('➕ New categories to add:', newCategories);
+          
           const finalCategories = [...prev, ...newCategories];
-          console.log('Final categories:', finalCategories);
+          console.log('📈 Final categories:', finalCategories);
+          
           return finalCategories;
         });
+        
       } catch (error) {
-        console.error('Error loading categories:', error);
+        console.error('❌ Error loading categories:', error);
       }
     };
     
-    loadAllCategories();
+    // Solo cargar si hay ligas disponibles
+    if (leagues.length > 0) {
+      loadAllCategories();
+    }
   }, [leagues]);
 
   // Cargar todas las zonas al inicializar
@@ -270,12 +337,67 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
     return leagues.find(league => league.id === id);
   };
 
-  // Category operations
+  // SOLUCIÓN 1: Category operations con mejor debugging
   const getCategoriesByLeague = (leagueId: string) => {
-    const filtered = categories.filter(category => category.leagueId === leagueId);
-    console.log('getCategoriesByLeague called with:', leagueId, 'returning:', filtered);
+    console.log('getCategoriesByLeague called with:', leagueId, 'type:', typeof leagueId);
+    console.log('Available categories:', categories);
+    
+    if (!leagueId) {
+      console.warn('⚠️ LeagueId is null/undefined');
+      return [];
+    }
+    
+    const filtered = categories.filter(category => {
+      if (!category.leagueId) {
+        console.warn('⚠️ Category without leagueId:', category);
+        return false;
+      }
+      
+      // Normalizar ambos valores a string y eliminar espacios
+      const categoryLeagueId = String(category.leagueId).trim();
+      const searchLeagueId = String(leagueId).trim();
+      
+      const match = categoryLeagueId === searchLeagueId;
+      
+      if (match) {
+        console.log(`✅ Category match: ${category.name} for league ${leagueId}`);
+      }
+      
+      return match;
+    });
+    
+    console.log(`📊 Result: ${filtered.length} categories for league ${leagueId}`);
+    
+    // Si no hay categorías, mostrar advertencia específica
+    if (filtered.length === 0) {
+      console.warn(`⚠️ No categories found for league ${leagueId}. Available league IDs in categories:`,
+        [...new Set(categories.map(c => c.leagueId))]);
+    }
+    
     return filtered;
   };
+
+  // SOLUCIÓN 4: Función de diagnóstico para debugging
+  const debugCategorySelection = useCallback((selectedLeagueId: string) => {
+    console.log('🔍 DEBUGGING CATEGORY SELECTION');
+    console.log('Selected league ID:', selectedLeagueId);
+    console.log('Available leagues:', leagues);
+    console.log('Available categories:', categories);
+    
+    const selectedLeague = leagues.find(l => l.id === selectedLeagueId);
+    console.log('Selected league object:', selectedLeague);
+    
+    const availableCategories = getCategoriesByLeague(selectedLeagueId);
+    console.log('Available categories for this league:', availableCategories);
+    
+    if (availableCategories.length === 0) {
+      console.error('❌ NO CATEGORIES FOUND - This will disable the category input');
+      console.log('💡 Possible solutions:');
+      console.log('1. Check if categories exist in Supabase for this league');
+      console.log('2. Verify the league ID matches between leagues and categories tables');
+      console.log('3. Check if there are any async loading issues');
+    }
+  }, [leagues, categories]);
 
   const addCategory = async (category: Omit<Category, 'id'>) => {
     try {
@@ -412,10 +534,42 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
     }
   };
 
-  const updateTeam = (id: string, data: Partial<Team>) => {
-    setTeams(teams.map(team =>
-      team.id === id ? { ...team, ...data } : team
-    ));
+  const updateTeam = async (id: string, data: Partial<Team>) => {
+    try {
+      // Buscar el equipo actual para obtener todos los datos
+      const currentTeam = teams.find(team => team.id === id);
+      if (!currentTeam) {
+        console.error('Team not found:', id);
+        return;
+      }
+  
+      // Combinar datos actuales con los nuevos
+      const updatedData = { ...currentTeam, ...data };
+      
+      // Actualizar en Supabase
+      const updatedTeam = await SupabaseService.updateTeam(
+        id,
+        updatedData.name,
+        updatedData.zoneId,
+        updatedData.leagueId,
+        updatedData.categoryId,
+        updatedData.logo
+      );
+  
+      if (updatedTeam) {
+        // Actualizar estado local solo si la actualización en DB fue exitosa
+        setTeams(teams.map(team =>
+          team.id === id ? updatedTeam : team
+        ));
+        console.log('Equipo actualizado exitosamente');
+      } else {
+        console.error('Error al actualizar equipo en la base de datos');
+        alert('Error al actualizar el equipo');
+      }
+    } catch (error) {
+      console.error('Error updating team:', error);
+      alert('Error al actualizar el equipo');
+    }
   };
 
   const deleteTeam = async (id: string) => {
@@ -810,23 +964,6 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
       console.error('Error deleting course:', error);
     }
   };
-  
-  // Agregar función para cargar cursos desde Supabase
-  const loadAllCourses = async () => {
-    try {
-      console.log('=== LOADING COURSES FROM SUPABASE ===');
-      const allCourses = await SupabaseService.getCourses();
-      console.log('Loaded courses:', allCourses);
-      setCourses(allCourses);
-    } catch (error) {
-      console.error('Error loading courses:', error);
-    }
-  };
-  
-  // Agregar en el useEffect principal para cargar cursos al inicializar:
-  useEffect(() => {
-    loadAllCourses();
-  }, []);
 
   // Función refreshFixtures envuelta en useCallback
   const refreshFixtures = useCallback(async () => {
@@ -877,7 +1014,10 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
     getCourses,
     addCourse,
     updateCourse,
-    deleteCourse
+    deleteCourse,
+    // Nuevas funciones
+    ensureCategoriesExist,
+    debugCategorySelection
   };
 
   return (

@@ -45,8 +45,8 @@ const FixturesPage: React.FC = () => {
   const [refreshKey, setRefreshKey] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   
-  // Verificar si la liga seleccionada es "Liga Participando"
-  const isLigaParticipando = selectedLeague === 'liga_masculina';
+  // ELIMINADO: Verificar si la liga seleccionada es "Liga Participando"
+  // const isLigaParticipando = selectedLeague === 'liga_masculina';
   
   // Get form handling
   const { register, handleSubmit, control, reset, watch, setValue, formState: { errors } } = useForm<FixtureFormData>({
@@ -432,8 +432,7 @@ const FixturesPage: React.FC = () => {
               ))}
             </select>
           </div>
-          
-          <div style={{ display: isLigaParticipando ? 'none' : 'block' }}>
+          <div>
             <label htmlFor="categoryFilter" className="block text-sm font-medium text-gray-700 mb-2">
               Categoría
             </label>
@@ -546,7 +545,7 @@ const FixturesPage: React.FC = () => {
                 </select>
               </div>
               
-              <div style={{ display: watchLeagueId === 'liga_masculina' ? 'none' : 'block' }}>
+              <div>
                 <label className="form-label" htmlFor="formCategoryId">
                   Categoría
                 </label>
@@ -556,7 +555,7 @@ const FixturesPage: React.FC = () => {
                     "form-input",
                     errors.categoryId && "border-red-500"
                   )}
-                  {...register('categoryId', { required: watchLeagueId !== 'liga_masculina' ? 'La categoría es requerida' : false })}
+                  {...register('categoryId', { required: 'La categoría es requerida' })}
                   onChange={(e) => {
                     setValue('categoryId', e.target.value);
                     setValue('zoneId', '');
@@ -593,97 +592,158 @@ const FixturesPage: React.FC = () => {
               </div>
             </div>
             
-            {/* Matches */}
+            {/* Matches Section */}
             <div className="mb-4">
-              <h3 className="text-lg font-medium mb-3">Partidos</h3>
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-lg font-medium">Partidos</h3>
+                <button
+                  type="button"
+                  onClick={() => append({ homeTeamId: '', awayTeamId: '', played: false })}
+                  className="btn btn-secondary btn-sm flex items-center space-x-1"
+                  disabled={zoneTeams.length < 2}
+                >
+                  <Plus size={16} />
+                  <span>Agregar Partido</span>
+                </button>
+              </div>
               
               {fields.map((field, index) => (
-                <div
-                  key={field.id}
-                  className="grid grid-cols-5 gap-2 items-center mb-3 pb-3 border-b last:border-0"
-                >
-                  <div className="col-span-2">
-                    <label className="form-label text-sm">Equipo Local</label>
-                    <select
-                      className={cn(
-                        "form-input",
-                        errors.matches?.[index]?.homeTeamId && "border-red-500"
+                <div key={field.id} className="bg-white p-4 rounded-md border mb-3">
+                  <div className="flex items-center justify-between mb-3">
+                    <h4 className="font-medium">Partido {index + 1}</h4>
+                    {fields.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => remove(index)}
+                        className="text-red-600 hover:text-red-800"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    )}
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="form-label">
+                        Equipo Local
+                      </label>
+                      <select
+                        className={cn(
+                          "form-input",
+                          errors.matches?.[index]?.homeTeamId && "border-red-500"
+                        )}
+                        {...register(`matches.${index}.homeTeamId`, {
+                          required: 'El equipo local es requerido'
+                        })}
+                      >
+                        <option value="">Seleccionar equipo local</option>
+                        {zoneTeams.map(team => (
+                          <option key={team.id} value={team.id}>
+                            {team.name}
+                          </option>
+                        ))}
+                      </select>
+                      {errors.matches?.[index]?.homeTeamId && (
+                        <p className="mt-1 text-sm text-red-600">
+                          {errors.matches[index]?.homeTeamId?.message}
+                        </p>
                       )}
-                      {...register(`matches.${index}.homeTeamId` as const, {
-                        required: 'Requerido'
-                      })}
-                    >
-                      <option value="">Seleccionar equipo</option>
-                      {zoneTeams.map(team => (
-                        <option key={team.id} value={team.id}>
-                          {team.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  
-                  <div className="flex items-center justify-center">
-                    <span className="text-gray-400">VS</span>
-                  </div>
-                  
-                  <div className="col-span-2">
-                    <label className="form-label text-sm">Equipo Visitante</label>
-                    <select
-                      className={cn(
-                        "form-input",
-                        errors.matches?.[index]?.awayTeamId && "border-red-500"
+                    </div>
+                    
+                    <div>
+                      <label className="form-label">
+                        Equipo Visitante
+                      </label>
+                      <select
+                        className={cn(
+                          "form-input",
+                          errors.matches?.[index]?.awayTeamId && "border-red-500"
+                        )}
+                        {...register(`matches.${index}.awayTeamId`, {
+                          required: 'El equipo visitante es requerido'
+                        })}
+                      >
+                        <option value="">Seleccionar equipo visitante</option>
+                        {zoneTeams.map(team => (
+                          <option key={team.id} value={team.id}>
+                            {team.name}
+                          </option>
+                        ))}
+                      </select>
+                      {errors.matches?.[index]?.awayTeamId && (
+                        <p className="mt-1 text-sm text-red-600">
+                          {errors.matches[index]?.awayTeamId?.message}
+                        </p>
                       )}
-                      {...register(`matches.${index}.awayTeamId` as const, {
-                        required: 'Requerido'
-                      })}
-                    >
-                      <option value="">Seleccionar equipo</option>
-                      {zoneTeams.map(team => (
-                        <option key={team.id} value={team.id}>
-                          {team.name}
-                        </option>
-                      ))}
-                    </select>
+                    </div>
                   </div>
                   
-                  <div className="flex items-end justify-end">
-                    <button
-                      type="button"
-                      className="p-2 text-red-600 hover:bg-red-50 rounded-md transition-colors"
-                      onClick={() => remove(index)}
-                      disabled={fields.length <= 1}
-                    >
-                      <Trash2 size={18} />
-                    </button>
+                  {/* Match result section */}
+                  <div className="mt-4">
+                    <div className="flex items-center space-x-4">
+                      <label className="flex items-center space-x-2">
+                        <input
+                          type="checkbox"
+                          {...register(`matches.${index}.played`)}
+                          className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                        />
+                        <span className="text-sm font-medium">Partido jugado</span>
+                      </label>
+                    </div>
+                    
+                    {watch(`matches.${index}.played`) && (
+                      <div className="grid grid-cols-2 gap-4 mt-3">
+                        <div>
+                          <label className="form-label">
+                            Goles Local
+                          </label>
+                          <input
+                            type="number"
+                            min="0"
+                            className="form-input"
+                            {...register(`matches.${index}.homeScore`, {
+                              valueAsNumber: true,
+                              min: { value: 0, message: 'Los goles no pueden ser negativos' }
+                            })}
+                          />
+                        </div>
+                        <div>
+                          <label className="form-label">
+                            Goles Visitante
+                          </label>
+                          <input
+                            type="number"
+                            min="0"
+                            className="form-input"
+                            {...register(`matches.${index}.awayScore`, {
+                              valueAsNumber: true,
+                              min: { value: 0, message: 'Los goles no pueden ser negativos' }
+                            })}
+                          />
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               ))}
-              
-              <button
-                type="button"
-                className="btn btn-outline text-sm w-full mt-2"
-                onClick={() => append({ homeTeamId: '', awayTeamId: '', played: false })}
-              >
-                <Plus size={14} className="mr-1" /> Agregar Partido
-              </button>
             </div>
             
-            <div className="flex justify-end space-x-3">
-              <button
-                type="button"
-                className="btn btn-outline flex items-center space-x-2"
-                onClick={handleCancelClick}
-              >
-                <X size={18} />
-                <span>Cancelar</span>
-              </button>
-              
+            <div className="flex space-x-2">
               <button
                 type="submit"
                 className="btn btn-primary flex items-center space-x-2"
+                disabled={isLoading}
               >
                 <Save size={18} />
-                <span>{isAdding ? 'Crear Fixture' : 'Guardar Cambios'}</span>
+                <span>{isAdding ? 'Crear Fixture' : 'Actualizar Fixture'}</span>
+              </button>
+              <button
+                type="button"
+                onClick={handleCancelClick}
+                className="btn btn-secondary flex items-center space-x-2"
+              >
+                <X size={18} />
+                <span>Cancelar</span>
               </button>
             </div>
           </form>
@@ -691,146 +751,97 @@ const FixturesPage: React.FC = () => {
       )}
       
       {/* Fixtures List */}
-      {isLoading ? (
-        <div className="text-center py-12 bg-gradient-to-br from-blue-50 to-indigo-100 rounded-xl border border-blue-200">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4"></div>
-          <h3 className="text-lg font-medium text-gray-900 mb-2">Cargando fixtures...</h3>
-          <p className="text-gray-500">
-            Obteniendo datos desde la base de datos...
-          </p>
+      <div className="bg-white rounded-xl shadow-lg border border-gray-200">
+        <div className="p-6 border-b border-gray-200">
+          <h2 className="text-lg font-semibold text-gray-900 flex items-center">
+            <Calendar size={20} className="mr-2 text-indigo-600" />
+            Lista de Fixtures
+            {filteredFixtures.length > 0 && (
+              <span className="ml-2 text-sm text-gray-500">({filteredFixtures.length})</span>
+            )}
+          </h2>
         </div>
-      ) : selectedLeague ? (
-        filteredFixtures.length > 0 ? (
-          <div className="space-y-6">
-            {filteredFixtures.map(fixture => (
-              <div key={fixture.id} className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-lg hover:shadow-xl transition-all duration-300">
-                {/* Header del Fixture */}
-                <div className="bg-gradient-to-r from-indigo-500 to-purple-600 p-6 text-white">
-                  <div className="flex items-center justify-between">
+        
+        <div className="p-6">
+          {isLoading ? (
+            <div className="text-center py-8">
+              <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+              <p className="mt-2 text-gray-600">Cargando fixtures...</p>
+            </div>
+          ) : filteredFixtures.length === 0 ? (
+            <div className="text-center py-8">
+              <Calendar size={48} className="mx-auto text-gray-400 mb-4" />
+              <p className="text-gray-600">
+                {!selectedLeague || !selectedCategory || !selectedZone
+                  ? 'Selecciona liga, categoría y zona para ver los fixtures'
+                  : 'No hay fixtures para los filtros seleccionados'}
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {filteredFixtures.map(fixture => (
+                <div key={fixture.id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                  <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center space-x-4">
-                      <div className="bg-white/20 p-3 rounded-lg">
-                        <Calendar size={24} className="text-white" />
-                      </div>
-                      <div>
-                        <h3 className="font-bold text-xl">{fixture.date}</h3>
-                        <p className="text-indigo-100 text-sm flex items-center mt-1">
-                          <Calendar size={16} className="mr-2" />
-                          {new Date(fixture.matchDate).toLocaleDateString('es-ES', {
-                            weekday: 'long',
-                            year: 'numeric',
-                            month: 'long',
-                            day: 'numeric'
-                          })}
-                        </p>
-                      </div>
+                      <h3 className="font-semibold text-lg">{fixture.date}</h3>
+                      <span className="text-sm text-gray-600">
+                        {new Date(fixture.matchDate).toLocaleDateString('es-ES', {
+                          weekday: 'long',
+                          year: 'numeric',
+                          month: 'long',
+                          day: 'numeric'
+                        })}
+                      </span>
                     </div>
                     <div className="flex space-x-2">
                       <button
-                        className="bg-white/20 hover:bg-white/30 p-2 rounded-lg transition-colors duration-200"
                         onClick={() => handleEditClick(fixture.id)}
+                        className="btn btn-secondary btn-sm flex items-center space-x-1"
                         disabled={isAdding || !!editingId}
                       >
-                        <Edit size={18} />
+                        <Edit size={16} />
+                        <span>Editar</span>
                       </button>
                       <button
-                        className="bg-red-500/20 hover:bg-red-500/30 p-2 rounded-lg transition-colors duration-200"
                         onClick={() => handleDeleteFixture(fixture.id)}
+                        className="btn btn-danger btn-sm flex items-center space-x-1"
                         disabled={isAdding || !!editingId}
                       >
-                        <Trash2 size={18} />
+                        <Trash2 size={16} />
+                        <span>Eliminar</span>
                       </button>
                     </div>
                   </div>
-                </div>
-
-                {/* Lista de Partidos */}
-                <div className="p-6">
-                  {fixture.matches && fixture.matches.length > 0 ? (
-                    <div className="space-y-4">
-                      <div className="flex items-center justify-between mb-4">
-                        <h4 className="text-lg font-semibold text-gray-800 flex items-center">
-                          <Users size={20} className="mr-2 text-indigo-600" />
-                          Partidos ({fixture.matches.length})
-                        </h4>
-                      </div>
-                      <div className="grid gap-4">
-                        {fixture.matches.map((match, index) => (
-                          <div key={match.id || index} className="bg-gray-50 rounded-lg p-4 border border-gray-200 hover:bg-gray-100 transition-colors duration-200">
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center space-x-4 flex-1">
-                                <div className="text-center flex-1">
-                                  <p className="font-medium text-gray-900">
-                                    {getTeamName(match.homeTeamId)}
-                                  </p>
-                                  <p className="text-xs text-gray-500 mt-1">Local</p>
-                                </div>
-                                
-                                <div className="flex items-center space-x-3">
-                                  <div className="bg-indigo-100 text-indigo-800 px-3 py-1 rounded-full text-sm font-medium">
-                                    VS
-                                  </div>
-                                </div>
-                                
-                                <div className="text-center flex-1">
-                                  <p className="font-medium text-gray-900">
-                                    {getTeamName(match.awayTeamId)}
-                                  </p>
-                                  <p className="text-xs text-gray-500 mt-1">Visitante</p>
-                                </div>
-                              </div>
-                              
-                              {match.played && (
-                                <div className="ml-4 bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm font-medium">
-                                  {match.homeScore} - {match.awayScore}
-                                </div>
-                              )}
-                            </div>
+                  
+                  <div className="space-y-2">
+                    {fixture.matches.map((match, index) => (
+                      <div key={match.id || index} className="bg-gray-50 p-3 rounded-md">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center space-x-4">
+                            <span className="font-medium">{getTeamName(match.homeTeamId)}</span>
+                            <span className="text-gray-500">vs</span>
+                            <span className="font-medium">{getTeamName(match.awayTeamId)}</span>
                           </div>
-                        ))}
+                          {match.played && (
+                            <div className="flex items-center space-x-2">
+                              <span className="font-bold text-lg">
+                                {match.homeScore} - {match.awayScore}
+                              </span>
+                              <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full">
+                                Jugado
+                              </span>
+                            </div>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  ) : (
-                    <div className="text-center py-8">
-                      <Users size={48} className="mx-auto text-gray-300 mb-3" />
-                      <p className="text-gray-500 text-sm">
-                        No hay partidos programados para este fixture
-                      </p>
-                    </div>
-                  )}
+                    ))}
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="text-center py-16 bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl border-2 border-dashed border-gray-300">
-            <div className="bg-white p-4 rounded-full w-20 h-20 mx-auto mb-6 shadow-lg">
-              <Calendar size={48} className="mx-auto text-gray-400" />
+              ))}
             </div>
-            <h3 className="text-xl font-semibold text-gray-900 mb-3">No hay fixtures disponibles</h3>
-            <p className="text-gray-500 mb-6 max-w-md mx-auto">
-              No hay fixtures que coincidan con los filtros seleccionados. Crea el primer fixture para comenzar.
-            </p>
-            <button
-              className="btn btn-primary px-6 py-3 text-lg font-medium shadow-lg hover:shadow-xl transition-all duration-300"
-              onClick={handleAddClick}
-              disabled={!selectedZone}
-            >
-              <Plus size={20} className="mr-2" />
-              Crear Primer Fixture
-            </button>
-          </div>
-        )
-      ) : (
-        <div className="text-center py-16 bg-gradient-to-br from-indigo-50 to-purple-100 rounded-xl border-2 border-dashed border-indigo-300">
-          <div className="bg-white p-4 rounded-full w-20 h-20 mx-auto mb-6 shadow-lg">
-            <Calendar size={48} className="mx-auto text-indigo-400" />
-          </div>
-          <h3 className="text-xl font-semibold text-gray-900 mb-3">Selecciona una liga</h3>
-          <p className="text-gray-500 max-w-md mx-auto">
-            Selecciona una liga, categoría y zona para ver y gestionar los fixtures correspondientes.
-          </p>
+          )}
         </div>
-      )}
+      </div>
     </div>
   );
 };

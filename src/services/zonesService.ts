@@ -13,24 +13,51 @@ export interface Zone {
 }
 
 // Convertir de formato de base de datos a formato de aplicación
-const mapZonaToZone = (zona: ZonaRow): Zone => ({
-  id: zona.id,
-  name: zona.nombre,
-  leagueId: zona.liga_id,
-  categoryId: zona.categoria_id
-})
+const mapZonaToZone = (zona: ZonaRow): Zone => {
+  // Convertir liga_id de la base de datos a string para consistencia
+  const getStringLeagueId = (dbLeagueId: any): string => {
+    // Si ya es string, devolverlo tal como está
+    if (typeof dbLeagueId === 'string') {
+      return dbLeagueId;
+    }
+    
+    // Si es numérico, mapear a string
+    const idMap: { [key: number]: string } = {
+      1: 'liga_masculina',
+      2: 'lifufe', 
+      3: 'mundialito'
+    };
+    
+    return idMap[dbLeagueId] || String(dbLeagueId);
+  };
+  
+  return {
+    id: zona.id,
+    name: zona.nombre,
+    leagueId: getStringLeagueId(zona.liga_id),
+    categoryId: String(zona.categoria_id)
+  };
+};
 
 // Convertir de formato de aplicación a formato de base de datos
-const mapZoneToZona = (zone: Omit<Zone, 'id'>): ZonaInsert => ({
-  nombre: zone.name,
-  liga_id: zone.leagueId,
-  categoria_id: zone.categoryId
-})
+const mapZoneToZona = (zone: Omit<Zone, 'id'>): ZonaInsert => {
+  // Mapear IDs de liga del formato de aplicación al formato de base de datos
+  const getDbLeagueId = (appLeagueId: string): any => {
+    // Para Liga Masculina usar ID numérico como está en la DB
+    if (appLeagueId === 'liga_masculina') return 1;
+    // Para LIFUFE y Mundialito, usar strings como están en la DB
+    return appLeagueId;
+  };
+  
+  return {
+    nombre: zone.name,
+    liga_id: getDbLeagueId(zone.leagueId),
+    categoria_id: zone.categoryId
+  };
+};
 
 export const zonesService = {
   // Obtener todas las zonas
-  // AGREGAR este método si no existe
-  // En getAllZones(), cambiar esta parte:
   async getAllZones(): Promise<Zone[]> {
     try {
       const { data, error } = await supabase
@@ -39,7 +66,7 @@ export const zonesService = {
       
       if (error) throw error;
       
-      // Usar el mapper consistente en lugar de mapeo manual
+      // Usar el mapper consistente
       return data.map(mapZonaToZone);
     } catch (error) {
       console.error('Error fetching all zones:', error);
@@ -60,7 +87,7 @@ export const zonesService = {
       throw new Error('Error al obtener las zonas de la categoría');
     }
 
-    return data?.map(mapZonaToZone) || []; // Agregar punto y coma aquí
+    return data?.map(mapZonaToZone) || [];
   },
 
   // Crear nueva zona

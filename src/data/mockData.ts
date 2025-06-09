@@ -23,14 +23,46 @@ const leagues: League[] = [
   }
 ];
 
-// Categories - Eliminar categorías de LIFUFE y Mundialito
+// Categories - Agregar categorías para todas las ligas
 const categories: Category[] = [
-  // Solo mantener categorías de Liga Masculina si las hay, o dejar vacío
+  // Liga Masculina
+  {
+    id: 'cat_liga_masc_primera',
+    name: 'Primera División',
+    leagueId: 'liga_masculina',
+    isEditable: true
+  },
+  {
+    id: 'cat_liga_masc_segunda',
+    name: 'Segunda División', 
+    leagueId: 'liga_masculina',
+    isEditable: true
+  },
+  // LIFUFE
+  {
+    id: 'cat_lifufe_primera',
+    name: 'Primera División',
+    leagueId: 'lifufe',
+    isEditable: true
+  },
+  {
+    id: 'cat_lifufe_segunda',
+    name: 'Segunda División',
+    leagueId: 'lifufe', 
+    isEditable: true
+  },
+  // Mundialito
+  {
+    id: 'cat_mundialito_unica',
+    name: 'Categoría Única',
+    leagueId: 'mundialito',
+    isEditable: true
+  }
 ];
 
-// Zones - Eliminar zonas de LIFUFE y Mundialito
+// Zones - Agregar zonas para todas las ligas
 const zones: Zone[] = [
-  // Liga Masculina zones (mantener solo estas si existen)
+  // Liga Masculina zones (existentes)
   {
     id: 'zone_liga_masc_primera_norte',
     name: 'Zona Norte',
@@ -38,7 +70,7 @@ const zones: Zone[] = [
     categoryId: 'cat_liga_masc_primera'
   },
   {
-    id: 'zone_liga_masc_primera_sur',
+    id: 'zone_liga_masc_primera_sur', 
     name: 'Zona Sur',
     leagueId: 'liga_masculina',
     categoryId: 'cat_liga_masc_primera'
@@ -48,8 +80,33 @@ const zones: Zone[] = [
     name: 'Zona Única',
     leagueId: 'liga_masculina',
     categoryId: 'cat_liga_masc_segunda'
+  },
+  // LIFUFE zones (nuevas)
+  {
+    id: 'zone_lifufe_primera_norte',
+    name: 'Zona Norte',
+    leagueId: 'lifufe',
+    categoryId: 'cat_lifufe_primera'
+  },
+  {
+    id: 'zone_lifufe_primera_sur',
+    name: 'Zona Sur', 
+    leagueId: 'lifufe',
+    categoryId: 'cat_lifufe_primera'
+  },
+  {
+    id: 'zone_lifufe_segunda_unica',
+    name: 'Zona Única',
+    leagueId: 'lifufe',
+    categoryId: 'cat_lifufe_segunda'
+  },
+  // Mundialito zones (nuevas)
+  {
+    id: 'zone_mundialito_unica',
+    name: 'Zona Única',
+    leagueId: 'mundialito',
+    categoryId: 'cat_mundialito_unica'
   }
-  // Eliminar todas las zonas de LIFUFE y Mundialito
 ];
 
 // Teams - Vaciar para empezar sin equipos preestablecidos

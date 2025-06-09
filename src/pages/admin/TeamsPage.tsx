@@ -144,12 +144,12 @@ const TeamsPage: React.FC = () => {
   */
   
   // Reset category when league changes in form
-  React.useEffect(() => {
-    if (formLeagueCategories.length > 0 && (isAdding || editingId)) {
-      setValue('categoryId', formLeagueCategories[0].id);
-      setValue('zoneId', ''); // Reset zone when league changes
-    }
-  }, [watchLeagueId, isAdding, editingId]);
+  // React.useEffect(() => {
+  //   if (formLeagueCategories.length > 0 && (isAdding || editingId)) {
+  //     setValue('categoryId', formLeagueCategories[0].id);
+  //     setValue('zoneId', ''); // Reset zone when league changes
+  //   }
+  // }, [watchLeagueId, isAdding, editingId]);
   
   // Reset zone when category changes in form
   React.useEffect(() => {
@@ -162,21 +162,19 @@ const TeamsPage: React.FC = () => {
     setIsAdding(true);
     setEditingId(null);
     
-    // Inicializar formulario con valores por defecto inteligentes
+    // Inicializar formulario con valores vacíos para que el usuario seleccione
     const targetLeague = showAllTeams ? leagues[0]?.id || '' : selectedLeague;
-    const defaultCategory = getCategoriesByLeague(targetLeague)[0];
-    const defaultZone = defaultCategory ? getZonesByCategory(defaultCategory.id)[0] : null;
     
     console.log('Inicializando formulario con:', {
       leagueId: targetLeague,
-      categoryId: defaultCategory?.id || '',
-      zoneId: defaultZone?.id || ''
+      categoryId: '',
+      zoneId: ''
     });
     
     reset({
       leagueId: targetLeague,
-      categoryId: defaultCategory?.id || '',
-      zoneId: defaultZone?.id || '',
+      categoryId: '', // Iniciar vacío
+      zoneId: '',     // Iniciar vacío
       name: '',
       logo: ''
     });
@@ -212,10 +210,13 @@ const TeamsPage: React.FC = () => {
 
       console.log('Datos del equipo a guardar:', data);
       
+      // En la función onSubmit (línea 218), cambiar:
       if (isAdding) {
         await addTeam(data);
       } else if (editingId) {
         await updateTeam(editingId, data);
+      } else if (editingId) {
+        await updateTeam(editingId, data); // Ya está correcto
       }
       
       setIsAdding(false);
@@ -591,14 +592,3 @@ const TeamsPage: React.FC = () => {
 
 export default TeamsPage;
 // Agregar este botón temporal en el componente TeamsPage para debugging
-<button 
-  type="button" 
-  onClick={async () => {
-    console.log('Recargando zonas...');
-    const allZones = await zonesService.getAllZones();
-    console.log('Zonas cargadas:', allZones);
-  }}
-  className="px-4 py-2 bg-blue-500 text-white rounded"
->
-  Debug: Recargar Zonas
-</button>

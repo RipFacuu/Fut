@@ -80,23 +80,6 @@ const ResultsPage: React.FC = () => {
     }
   }, [categoryZones, selectedLeague, selectedCategory, fixtures, selectedZone]);
   
-  // Limpiar categoría y zona cuando cambia la liga
-  useEffect(() => {
-    if (selectedLeague) {
-      // Reset category and zone when league changes
-      setSelectedCategory('');
-      setSelectedZone('');
-    }
-  }, [selectedLeague]);
-  
-  // Limpiar zona cuando cambia la categoría
-  useEffect(() => {
-    if (selectedCategory) {
-      // Reset zone when category changes
-      setSelectedZone('');
-    }
-  }, [selectedCategory]);
-  
   const handleEditClick = (match: Match) => {
     setEditingMatch(match.id);
     setHomeScore(match.homeScore?.toString() || '');
@@ -123,7 +106,6 @@ const ResultsPage: React.FC = () => {
       setEditingMatch(null);
       setHomeScore('');
       setAwayScore('');
-      // Opcional: mostrar mensaje de éxito
       console.log('Resultado guardado exitosamente');
     } catch (error) {
       console.error('Error guardando resultado:', error);
@@ -134,11 +116,16 @@ const ResultsPage: React.FC = () => {
   const handleLeagueChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const leagueId = e.target.value;
     setSelectedLeague(leagueId);
+    // Reset dependent selections when league changes
+    setSelectedCategory('');
+    setSelectedZone('');
   };
   
   const handleCategoryChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const categoryId = e.target.value;
     setSelectedCategory(categoryId);
+    // Reset zone when category changes
+    setSelectedZone('');
   };
   
   const handleZoneChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -207,7 +194,7 @@ const ResultsPage: React.FC = () => {
             className="form-input"
             value={selectedCategory}
             onChange={handleCategoryChange}
-            disabled={!selectedLeague || leagueCategories.length === 0}
+            disabled={!selectedLeague}
           >
             <option value="">Seleccionar categoría</option>
             {leagueCategories.map(category => (
@@ -227,7 +214,7 @@ const ResultsPage: React.FC = () => {
             className="form-input"
             value={selectedZone}
             onChange={handleZoneChange}
-            disabled={!selectedCategory || categoryZones.length === 0}
+            disabled={!selectedCategory}
           >
             <option value="">Seleccionar zona</option>
             {categoryZones.map(zone => (

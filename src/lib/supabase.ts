@@ -6,6 +6,23 @@ const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS
 
 export const supabase = createClient<Database>(supabaseUrl, supabaseKey)
 
+// Función helper para mapear IDs de liga (movida fuera de la función)
+export function getNumericLeagueId(leagueStringId: string): number {
+  const leagueMap: { [key: string]: number } = {
+    'liga_masculina': 1,
+    'lifufe': 2,
+    'mundialito': 3
+  };
+  
+  // Si ya es un número, devolverlo como está
+  if (!isNaN(Number(leagueStringId))) {
+    return Number(leagueStringId);
+  }
+  
+  // Si es un string, mapear al número correspondiente
+  return leagueMap[leagueStringId] || 1; // Default a Liga Masculina si no se encuentra
+}
+
 // Funciones para Zonas
 export async function obtenerZonasPorLigaYCategoria(ligaId: string, categoriaId: string) {
   const { data, error } = await supabase
@@ -193,25 +210,87 @@ export async function crearZona(nombre: string, ligaId: string, categoriaId: str
   return data;
 }
 
+// Función helper para obtener IDs numéricos
+export async function getNumericIds(equipoUuid: string | null, zonaUuid: string, ligaUuid?: string, categoriaUuid?: string) {
+  try {
+    const promises = [];
+    let promiseIndex = 0;
+    const indexMap: { [key: string]: number } = {};
+
+    // Zona (siempre requerida)
+    promises.push(supabase.from('zonas').select('id').eq('id', zonaUuid).single());
+    indexMap.zona = promiseIndex++;
+
+    // Equipo (opcional)
+    if (equipoUuid) {
+      promises.push(supabase.from('equipos').select('id').eq('id', equipoUuid).single());
+      indexMap.equipo = promiseIndex++;
+    }
+
+    // Liga (opcional)
+    if (ligaUuid) {
+      promises.push(supabase.from('ligas').select('id').eq('id', ligaUuid).single());
+      indexMap.liga = promiseIndex++;
+    }
+
+    // Categoría (opcional)
+    if (categoriaUuid) {
+      promises.push(supabase.from('categorias').select('id').eq('id', categoriaUuid).single());
+      indexMap.categoria = promiseIndex++;
+    }
+
+    const results = await Promise.all(promises);
+    
+    // Verificar errores
+    for (const result of results) {
+      if (result.error) {
+        console.error('Error obteniendo ID numérico:', result.error);
+        throw new Error(`No se pudo obtener ID numérico: ${result.error.message}`);
+      }
+    }
+
+    return {
+      equipo_id: equipoUuid ? results[indexMap.equipo]?.data?.id || null : null,
+      zona_id: results[indexMap.zona]?.data?.id || null,
+      liga_id: ligaUuid ? results[indexMap.liga]?.data?.id || null : null,
+      categoria_id: categoriaUuid ? results[indexMap.categoria]?.data?.id || null : null
+    };
+  } catch (error) {
+    console.error('Error en getNumericIds:', error);
+    throw error;
+  }
+}
+
 // Nueva función para agregar equipo con todos los campos
 export async function agregarEquipoCompleto(nombre: string, zonaId: string, ligaId: string, categoriaId: string, logo?: string) {
-  const { data, error } = await supabase
-    .from('equipos')
-    .insert([{ 
-      nombre, 
-      zona_id: zonaId,
-      liga_id: ligaId,
-      categoria_id: categoriaId,
-      logo: logo || null
-    }])
-    .select();
+  try {
+    // Convertir UUIDs a IDs numéricos
+    const numericIds = await getNumericIds(null, zonaId, ligaId, categoriaId);
+    
+    // Asegurar que liga_id sea numérico
+    const numericLeagueId = getNumericLeagueId(ligaId);
+    
+    const { data, error } = await supabase
+      .from('equipos')
+      .insert([{ 
+        nombre, 
+        zona_id: numericIds.zona_id,
+        liga_id: numericLeagueId, // Usar el ID numérico mapeado
+        categoria_id: numericIds.categoria_id,
+        logo: logo || null
+      }])
+      .select();
 
-  if (error) {
-    console.error('Error agregando equipo completo:', error);
+    if (error) {
+      console.error('Error agregando equipo completo:', error);
+      return null;
+    }
+
+    return data;
+  } catch (error) {
+    console.error('Error en agregarEquipoCompleto:', error);
     return null;
   }
-
-  return data;
 }
 
 // Agregar esta función después de obtenerZonasPorLigaYCategoria
@@ -288,14 +367,28 @@ export async function eliminarCategoria(id: string) {
 
 // Funciones para Fixtures
 export async function crearFixture(nombre: string, fechaPartido: string, ligaId: string, categoriaId: string, zonaId: string) {
+  // Agregar función de mapeo para convertir IDs de string a número
+  const getNumericLeagueId = (leagueStringId: string): number => {
+    const leagueMap: { [key: string]: number } = {
+      'liga_masculina': 1,
+      'lifufe': 2,
+      'mundialito': 3
+    };
+    return leagueMap[leagueStringId] || parseInt(leagueStringId);
+  };
+
+  const numericLeagueId = getNumericLeagueId(ligaId);
+  const numericCategoryId = parseInt(categoriaId);
+  const numericZoneId = parseInt(zonaId);
+
   const { data, error } = await supabase
     .from('fixtures')
     .insert([{ 
       nombre, 
       fecha_partido: fechaPartido,
-      liga_id: ligaId,
-      categoria_id: categoriaId,
-      zona_id: zonaId
+      liga_id: numericLeagueId,        // Ahora envía número
+      categoria_id: numericCategoryId, // Ahora envía número
+      zona_id: numericZoneId          // Ahora envía número
     }])
     .select();
 
@@ -308,14 +401,19 @@ export async function crearFixture(nombre: string, fechaPartido: string, ligaId:
 }
 
 export async function crearPartidoConFixture(equipoLocalId: string, equipoVisitanteId: string, zonaId: string, fecha: string, fixtureId: string) {
+  const numericZoneId = parseInt(zonaId);
+  const numericEquipoLocalId = parseInt(equipoLocalId);
+  const numericEquipoVisitanteId = parseInt(equipoVisitanteId);
+  const numericFixtureId = parseInt(fixtureId);
+
   const { data, error } = await supabase
     .from('partidos')
     .insert([{ 
-      equipo_local_id: equipoLocalId, 
-      equipo_visitante_id: equipoVisitanteId, 
-      zona_id: zonaId, 
+      equipo_local_id: numericEquipoLocalId,     // Ahora envía número
+      equipo_visitante_id: numericEquipoVisitanteId, // Ahora envía número
+      zona_id: numericZoneId,                    // Ahora envía número
       fecha,
-      fixture_id: fixtureId
+      fixture_id: numericFixtureId               // Ahora envía número
     }])
     .select();
 
@@ -415,43 +513,6 @@ export async function obtenerStandingsPorZona(zonaId: string) {
   }
 
   return data;
-}
-
-// Función helper para obtener IDs numéricos
-export async function getNumericIds(equipoUuid: string, zonaUuid: string, ligaUuid?: string, categoriaUuid?: string) {
-  try {
-    const promises = [
-      supabase.from('equipos').select('id').eq('id', equipoUuid).single(),
-      supabase.from('zonas').select('id').eq('id', zonaUuid).single()
-    ];
-
-    if (ligaUuid) {
-      promises.push(supabase.from('ligas').select('id').eq('id', ligaUuid).single());
-    }
-    if (categoriaUuid) {
-      promises.push(supabase.from('categorias').select('id').eq('id', categoriaUuid).single());
-    }
-
-    const results = await Promise.all(promises);
-    
-    // Verificar errores
-    for (const result of results) {
-      if (result.error) {
-        console.error('Error obteniendo ID numérico:', result.error);
-        throw new Error(`No se pudo obtener ID numérico: ${result.error.message}`);
-      }
-    }
-
-    return {
-      equipo_id: results[0]?.data?.id || null,
-      zona_id: results[1]?.data?.id || null,
-      liga_id: ligaUuid ? results[2]?.data?.id || null : null,
-      categoria_id: categoriaUuid ? results[3]?.data?.id || null : null
-    };
-  } catch (error) {
-    console.error('Error en getNumericIds:', error);
-    throw error;
-  }
 }
 
 export async function crearStanding(standing: {
