@@ -794,3 +794,122 @@ export async function eliminarCurso(cursoId: string) {
 
   return true;
 }
+
+// Add these functions at the end of the file
+
+// Función para obtener zonas por liga
+export async function obtenerZonasPorLiga(leagueId: string) {
+  const numericLeagueId = getNumericLeagueId(leagueId);
+  
+  const { data, error } = await supabase
+    .from('zonas')
+    .select('*')
+    .eq('liga_id', numericLeagueId);
+    
+  if (error) {
+    console.error('Error obteniendo zonas por liga:', error);
+    return [];
+  }
+  
+  return data || [];
+}
+
+// Función para obtener categorías por liga con estructura dinámica
+export async function obtenerCategoriasPorLigaConEstructura(leagueId: string, zoneId?: string) {
+  const numericLeagueId = getNumericLeagueId(leagueId);
+  
+  let query = supabase
+    .from('categorias')
+    .select('*')
+    .eq('liga_id', numericLeagueId);
+  
+  if (zoneId) {
+    query = query.eq('zona_id', parseInt(zoneId));
+  }
+  
+  const { data, error } = await query;
+  
+  if (error) {
+    console.error('Error obteniendo categorías por liga con estructura:', error);
+    return [];
+  }
+  
+  return data || [];
+}
+
+// Función para obtener zonas por liga con estructura dinámica
+export async function obtenerZonasPorLigaConEstructura(leagueId: string, categoryId?: string) {
+  const numericLeagueId = getNumericLeagueId(leagueId);
+  
+  let query = supabase
+    .from('zonas')
+    .select('*')
+    .eq('liga_id', numericLeagueId);
+  
+  if (categoryId) {
+    query = query.eq('categoria_id', parseInt(categoryId));
+  }
+  
+  const { data, error } = await query;
+  
+  if (error) {
+    console.error('Error obteniendo zonas por liga con estructura:', error);
+    return [];
+  }
+  
+  return data || [];
+}
+
+// Función para crear categoría con estructura
+export async function crearCategoriaConEstructura(name: string, leagueId: string, zoneId?: string) {
+  const numericLeagueId = getNumericLeagueId(leagueId);
+  
+  const insertData: any = {
+    nombre: name,
+    liga_id: numericLeagueId
+  };
+  
+  if (zoneId) {
+    insertData.zona_id = parseInt(zoneId);
+  }
+  
+  const { data, error } = await supabase
+    .from('categorias')
+    .insert([insertData])
+    .select()
+    .single();
+  
+  if (error) {
+    console.error('Error creando categoría con estructura:', error);
+    return null;
+  }
+  
+  return data;
+}
+
+// Función para crear zona con estructura
+export async function crearZonaConEstructura(name: string, leagueId: string, categoryId?: string) {
+  const numericLeagueId = getNumericLeagueId(leagueId);
+  
+  const insertData: any = {
+    nombre: name,
+    liga_id: numericLeagueId
+  };
+  
+  if (categoryId) {
+    insertData.categoria_id = parseInt(categoryId);
+  }
+  
+  const { data, error } = await supabase
+    .from('zonas')
+    .insert([insertData])
+    .select()
+    .single();
+  
+  if (error) {
+    console.error('Error creando zona con estructura:', error);
+    return null;
+  }
+  
+  return data;
+}

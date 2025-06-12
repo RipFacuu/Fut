@@ -1,4 +1,10 @@
-const LeagueHeader: React.FC<Props> = ({ league }) => {
+interface Props {
+  league: {
+    name: string;
+  };
+}
+
+export const LeagueHeader: React.FC<Props> = ({ league }) => {
   return (
     <div>
       <h1>{league.name}</h1> {/* Esto debería mostrar "Liga Participando" */}

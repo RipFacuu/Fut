@@ -7,6 +7,7 @@ import StandingsTable from '../components/league/StandingsTable';
 import TeamList from '../components/league/TeamList';
 import { Trophy, Users, ClipboardList, Newspaper } from 'lucide-react';
 import { cn } from '../utils/cn';
+import ZonePanel from '../components/league/ZonePanel';
 
 type Tab = 'fixtures' | 'results' | 'standings' | 'teams';
 
@@ -81,8 +82,8 @@ const LeaguePage: React.FC = () => {
         return (
           <StandingsTable
             zoneId={selectedZoneId}
-            leagueId={leagueId || ''}
-            categoryId={selectedCategoryId}
+            // Remove leagueId prop since it's not defined in StandingsTableProps
+            // Removed categoryId prop since it's not defined in StandingsTableProps
           />
         );
       case 'teams':
@@ -106,7 +107,7 @@ const LeaguePage: React.FC = () => {
   };
   
   // Sort categories based on league
-  const sortedCategories = [...categories].sort((a, b) => {
+  const sortedCategories = [...categories].sort((a) => {
     if (league.id === 'liga_masculina') {
       // Para Liga Masculina, las categorías vienen primero
       return a.name.toLowerCase().includes('zona') ? 1 : -1;
@@ -131,17 +132,33 @@ const LeaguePage: React.FC = () => {
       
       {/* Categories */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {sortedCategories.map((category) => (
-          <CategoryPanel
-            key={category.id}
-            category={category}
-            isSelected={category.id === selectedCategoryId}
-            onSelect={(categoryId, zoneId) => {
-              setSelectedCategoryId(categoryId);
-              setSelectedZoneId(zoneId);
-            }}
-          />
-        ))}
+        {isLigaMasculina ? (
+          // Para Liga Masculina: mostrar ZonePanels
+          zones.map((zone) => (
+            <ZonePanel
+              key={zone.id}
+              zone={zone}
+              isSelected={zone.id === selectedZoneId}
+              onSelect={(zoneId, categoryId) => {
+                setSelectedZoneId(zoneId);
+                setSelectedCategoryId(categoryId);
+              }}
+            />
+          ))
+        ) : (
+          // Para otras ligas: mostrar CategoryPanels (lógica existente)
+          sortedCategories.map((category) => (
+            <CategoryPanel
+              key={category.id}
+              category={category}
+              isSelected={category.id === selectedCategoryId}
+              onSelect={(categoryId, zoneId) => {
+                setSelectedCategoryId(categoryId);
+                setSelectedZoneId(zoneId);
+              }}
+            />
+          ))
+        )}
       </div>
       
       {/* Tabs */}

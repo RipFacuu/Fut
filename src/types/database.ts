@@ -39,7 +39,7 @@ export interface Database {
           id?: string
           nombre: string
           liga_id: string
-          categoria_id: string
+          categoria_id?: string  // ← Hacer opcional
         }
         Update: {
           id?: string

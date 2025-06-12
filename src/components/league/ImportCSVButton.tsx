@@ -1,6 +1,5 @@
 import React, { useRef } from 'react';
 import { useLeague } from '../../contexts/LeagueContext';
-import { Download } from 'lucide-react';
 import { Upload } from 'lucide-react';
 
 interface ImportCSVButtonProps {
@@ -27,7 +26,7 @@ const ImportCSVButton: React.FC<ImportCSVButtonProps> = ({ zoneId, onImportCompl
       const csvData = event.target?.result as string;
       if (csvData) {
         const success = importStandingsFromCSV(csvData, zoneId);
-        if (success && onImportComplete) {
+        if (onImportComplete) {
           onImportComplete();
         }
         

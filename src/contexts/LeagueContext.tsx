@@ -101,6 +101,8 @@ export interface LeagueContextType {
   
   // Zone operations
   getZonesByCategory: (categoryId: string) => Zone[];
+  getZonesByLeague: (leagueId: string) => Zone[];
+  getCategoriesByZone: (zoneId: string) => Category[];
   addZone: (zone: Omit<Zone, 'id'>) => Promise<Zone>;
   updateZone: (id: string, data: Partial<Zone>) => Promise<Zone>;
   deleteZone: (id: string) => Promise<void>;
@@ -126,6 +128,8 @@ export interface LeagueContextType {
   updateStanding: (id: string, data: Partial<Standing>) => void;
   addStanding: (standing: Omit<Standing, 'id'>) => void;
   calculateStandingsFromMatches: (zoneId: string) => Standing[];
+  createStanding: (standing: Omit<Standing, 'id'>) => Promise<void>;
+  importStandingsFromCSV: (csvData: string, zoneId: string) => Promise<void>;
 
   // Course operations
   getCourses: () => Course[];
@@ -399,6 +403,11 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
     }
   }, [leagues, categories]);
 
+  // Función para obtener categorías por zona
+  const getCategoriesByZone = (zoneId: string): Category[] => {
+    return categories.filter(category => category.zoneId === zoneId);
+  };
+
   const addCategory = async (category: Omit<Category, 'id'>) => {
     try {
       const newCategory = await SupabaseService.createCategory(
@@ -445,6 +454,12 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
   const getZonesByCategory = (categoryId: string): Zone[] => {
     const filtered = zones.filter(zone => zone.categoryId === categoryId);
     console.log('getZonesByCategory called with:', categoryId, 'returning:', filtered);
+    return filtered;
+  };
+  
+  const getZonesByLeague = (leagueId: string): Zone[] => {
+    const filtered = zones.filter(zone => zone.leagueId === leagueId);
+    console.log('getZonesByLeague called with:', leagueId, 'returning:', filtered);
     return filtered;
   };
   
@@ -901,68 +916,133 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
     }
   };
 
+  // Función para crear standing en Supabase
+  const createStanding = async (standing: Omit<Standing, 'id'>) => {
+    try {
+      console.log('🔄 Creando nuevo standing:', standing);
+      
+      // Crear en Supabase
+      const newStanding = await SupabaseService.createStanding(standing);
+      
+      if (newStanding) {
+        console.log('✅ Standing creado en Supabase:', newStanding);
+        
+        // Actualizar estado local
+        setStandings(prev => [...prev, newStanding]);
+        
+        console.log('✅ Estado local actualizado');
+      } else {
+        throw new Error('No se recibió respuesta de Supabase');
+      }
+    } catch (error) {
+      console.error('❌ Error creating standing:', error);
+      
+      // Fallback: crear localmente
+      const localStanding: Standing = {
+        ...standing,
+        id: uuidv4()
+      };
+      
+      setStandings(prev => [...prev, localStanding]);
+      
+      throw error;
+    }
+  };
+
+  // Función para importar standings desde CSV
+  const importStandingsFromCSV = async (csvData: string, zoneId: string) => {
+    try {
+      console.log('🔄 Importando standings desde CSV para zona:', zoneId);
+      
+      // Parsear CSV
+      const lines = csvData.trim().split('\n');
+      const headers = lines[0].split(',').map(h => h.trim());
+      
+      // Validar headers mínimos requeridos
+      const requiredHeaders = ['teamId', 'pj', 'won', 'drawn', 'lost', 'goalsFor', 'goalsAgainst', 'puntos'];
+      const missingHeaders = requiredHeaders.filter(h => !headers.includes(h));
+      
+      if (missingHeaders.length > 0) {
+        throw new Error(`Headers faltantes en CSV: ${missingHeaders.join(', ')}`);
+      }
+      
+      const newStandings: Omit<Standing, 'id'>[] = [];
+      
+      // Procesar cada fila (saltando el header)
+      for (let i = 1; i < lines.length; i++) {
+        const values = lines[i].split(',').map(v => v.trim());
+        
+        if (values.length !== headers.length) {
+          console.warn(`Fila ${i + 1} tiene ${values.length} columnas, esperadas ${headers.length}`);
+          continue;
+        }
+        
+        const rowData: any = {};
+        headers.forEach((header, index) => {
+          rowData[header] = values[index];
+        });
+        
+        // Crear standing object
+        const standing: Omit<Standing, 'id'> = {
+          teamId: rowData.teamId,
+          leagueId: '', // Se puede obtener del equipo
+          categoryId: '', // Se puede obtener del equipo
+          zoneId: zoneId,
+          pj: parseInt(rowData.pj) || 0,
+          won: parseInt(rowData.won) || 0,
+          drawn: parseInt(rowData.drawn) || 0,
+          lost: parseInt(rowData.lost) || 0,
+          goalsFor: parseInt(rowData.goalsFor) || 0,
+          goalsAgainst: parseInt(rowData.goalsAgainst) || 0,
+          puntos: parseInt(rowData.puntos) || 0
+        };
+        
+        // Obtener leagueId y categoryId del equipo
+        const team = teams.find(t => t.id === standing.teamId);
+        if (team) {
+          standing.leagueId = team.leagueId;
+          standing.categoryId = team.categoryId;
+        }
+        
+        newStandings.push(standing);
+      }
+      
+      console.log(`📊 Procesados ${newStandings.length} standings desde CSV`);
+      
+      // Crear todos los standings
+      for (const standing of newStandings) {
+        await createStanding(standing);
+      }
+      
+      console.log('✅ Importación de CSV completada');
+      
+    } catch (error) {
+      console.error('❌ Error importing CSV:', error);
+      throw error;
+    }
+  };
+
   // Course operations
-  // Actualizar las funciones de cursos:
   const getCourses = () => {
     return courses;
   };
   
-  const addCourse = async (course: {
-    title: string;
-    description: string;
-    imageFile: File; // Cambiar de imageUrl a imageFile
-    date: string;
-  }) => {
-    try {
-      const newCourse = await SupabaseService.createCourse({
-        title: course.title,
-        description: course.description,
-        imageFile: course.imageFile, // Pasar el archivo directamente
-        date: course.date
-      });
-      
-      if (newCourse) {
-        setCourses([...courses, newCourse]);
-      }
-    } catch (error) {
-      console.error('Error adding course:', error);
-    }
+  const addCourse = (course: Omit<Course, 'id'>) => {
+    const newCourse = {
+      ...course,
+      id: `course_${Date.now()}`
+    };
+    setCourses([...courses, newCourse]);
   };
   
-  const updateCourse = async (id: string, data: {
-    title?: string;
-    description?: string;
-    imageFile?: File; // Cambiar de imageUrl a imageFile
-    date?: string;
-  }) => {
-    try {
-      const updatedCourse = await SupabaseService.updateCourse(id, {
-        title: data.title,
-        description: data.description,
-        imageFile: data.imageFile, // Pasar el archivo directamente
-        date: data.date
-      });
-      
-      if (updatedCourse) {
-        setCourses(courses.map(course =>
-          course.id === id ? updatedCourse : course
-        ));
-      }
-    } catch (error) {
-      console.error('Error updating course:', error);
-    }
+  const updateCourse = (id: string, data: Partial<Course>) => {
+    setCourses(courses.map(course =>
+      course.id === id ? { ...course, ...data } : course
+    ));
   };
   
-  const deleteCourse = async (id: string) => {
-    try {
-      const success = await SupabaseService.deleteCourse(id);
-      
-      if (success) {
-        setCourses(courses.filter(course => course.id !== id));
-      }
-    } catch (error) {
-      console.error('Error deleting course:', error);
-    }
+  const deleteCourse = (id: string) => {
+    setCourses(courses.filter(course => course.id !== id));
   };
 
   // Función refreshFixtures envuelta en useCallback
@@ -994,6 +1074,8 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
     updateCategory,
     deleteCategory,
     getZonesByCategory,
+    getZonesByLeague,
+    getCategoriesByZone,
     addZone,
     updateZone,
     deleteZone,
@@ -1015,6 +1097,8 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
     addCourse,
     updateCourse,
     deleteCourse,
+    createStanding,
+    importStandingsFromCSV,
     // Nuevas funciones
     ensureCategoriesExist,
     debugCategorySelection

@@ -13,16 +13,18 @@ interface TeamFormData {
 }
 
 const TeamsPage: React.FC = () => {
+  // Importar la nueva función
   const { 
-    leagues, 
-    teams,
-    zones, // Agregar zones aquí
-    addTeam, 
-    updateTeam, 
-    deleteTeam, 
-    getCategoriesByLeague, 
-    getZonesByCategory,
-    getTeamsByZone
+  leagues, 
+  teams,
+  zones,
+  addTeam, 
+  updateTeam, 
+  deleteTeam, 
+  getCategoriesByLeague, 
+  getZonesByCategory,
+  getZonesByLeague, // Agregar esta línea
+  getTeamsByZone
   } = useLeague();
   
   const [isAdding, setIsAdding] = useState(false);
@@ -52,6 +54,16 @@ const TeamsPage: React.FC = () => {
   
   // Get categories for form league (formulario)
   const formLeagueCategories = getCategoriesByLeague(watchLeagueId);
+  
+  // Modificar la lógica de zonas de filtros
+  const filterZones = selectedLeague === 'liga_masculina' 
+  ? getZonesByLeague(selectedLeague)
+  : getZonesByCategory(selectedCategory);
+  
+  // Modificar la lógica de zonas del formulario - solo para liga masculina
+  const formZones = watchLeagueId === 'liga_masculina' 
+  ? getZonesByLeague(watchLeagueId) 
+  : getZonesByCategory(watchCategoryId);
   
   // Get zones for selected category (filtros)
   const categoryZones = getZonesByCategory(selectedCategory);
@@ -325,45 +337,74 @@ const TeamsPage: React.FC = () => {
             </select>
           </div>
           
-          <div>
-            <label htmlFor="categoryFilter" className="form-label">
-              Categoría
-            </label>
-            <select
-              id="categoryFilter"
-              className="form-input"
-              value={selectedCategory}
-              onChange={handleCategoryChange}
-              disabled={leagueCategories.length === 0}
-            >
-              <option value="">Seleccionar categoría</option>
-              {leagueCategories.map(category => (
-                <option key={category.id} value={category.id}>
-                  {category.name}
-                </option>
-              ))}
-            </select>
-          </div>
-          
-          <div>
-            <label htmlFor="zoneFilter" className="form-label">
-              Zona
-            </label>
-            <select
-              id="zoneFilter"
-              className="form-input"
-              value={selectedZone}
-              onChange={handleZoneChange}
-              disabled={categoryZones.length === 0}
-            >
-              <option value="">Seleccionar zona</option>
-              {categoryZones.map(zone => (
-                <option key={zone.id} value={zone.id}>
-                  {zone.name}
-                </option>
-              ))}
-            </select>
-          </div>
+          {/* Orden condicional para filtros */}
+          {selectedLeague === 'liga_masculina' ? (
+            <>
+              {/* Solo Zona para Liga Masculina - sin categoría */}
+              <div>
+                <label htmlFor="zoneFilter" className="form-label">
+                  Zona
+                </label>
+                <select
+                  id="zoneFilter"
+                  className="form-input"
+                  value={selectedZone}
+                  onChange={handleZoneChange}
+                  disabled={filterZones.length === 0}
+                >
+                  <option value="">Seleccionar zona</option>
+                  {filterZones.map(zone => (
+                    <option key={zone.id} value={zone.id}>
+                      {zone.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </>
+          ) : (
+            <>
+              {/* Orden normal para otras ligas */}
+              <div>
+                <label htmlFor="categoryFilter" className="form-label">
+                  Categoría
+                </label>
+                <select
+                  id="categoryFilter"
+                  className="form-input"
+                  value={selectedCategory}
+                  onChange={handleCategoryChange}
+                  disabled={leagueCategories.length === 0}
+                >
+                  <option value="">Seleccionar categoría</option>
+                  {leagueCategories.map(category => (
+                    <option key={category.id} value={category.id}>
+                      {category.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              
+              <div>
+                <label htmlFor="zoneFilter" className="form-label">
+                  Zona
+                </label>
+                <select
+                  id="zoneFilter"
+                  className="form-input"
+                  value={selectedZone}
+                  onChange={handleZoneChange}
+                  disabled={categoryZones.length === 0}
+                >
+                  <option value="">Seleccionar zona</option>
+                  {categoryZones.map(zone => (
+                    <option key={zone.id} value={zone.id}>
+                      {zone.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </>
+          )}
         </div>
       )}
       
@@ -430,53 +471,88 @@ const TeamsPage: React.FC = () => {
                 )}
               </div>
               
-              <div>
-                <label className="form-label" htmlFor="categoryId">
-                  Categoría
-                </label>
-                <select
-                  id="categoryId"
-                  className={cn(
-                    "form-input",
-                    errors.categoryId && "border-red-500"
-                  )}
-                  {...register('categoryId', { required: 'La categoría es requerida' })}
-                >
-                  <option value="">Seleccionar categoría</option>
-                  {formLeagueCategories.map(category => (
-                    <option key={category.id} value={category.id}>
-                      {category.name}
-                    </option>
-                  ))}
-                </select>
-                {errors.categoryId && (
-                  <p className="mt-1 text-sm text-red-600">{errors.categoryId.message}</p>
-                )}
-              </div>
-              
-              <div>
-                <label className="form-label" htmlFor="zoneId">
-                  Zona
-                </label>
-                <select
-                  id="zoneId"
-                  className={cn(
-                    "form-input",
-                    errors.zoneId && "border-red-500"
-                  )}
-                  {...register('zoneId', { required: 'La zona es requerida' })}
-                >
-                  <option value="">Seleccionar zona</option>
-                  {formCategoryZones.map(zone => (
-                    <option key={zone.id} value={zone.id}>
-                      {zone.name}
-                    </option>
-                  ))}
-                </select>
-                {errors.zoneId && (
-                  <p className="mt-1 text-sm text-red-600">{errors.zoneId.message}</p>
-                )}
-              </div>
+              {/* ORDEN CONDICIONAL: Si es Liga Masculina, solo mostrar Zona */}
+              {watchLeagueId === 'liga_masculina' ? (
+                <>
+                  {/* Solo Zona para Liga Masculina */}
+                  <div>
+                    <label className="form-label" htmlFor="zoneId">
+                      Zona
+                    </label>
+                    <select
+                      id="zoneId"
+                      className={cn(
+                        "form-input",
+                        errors.zoneId && "border-red-500"
+                      )}
+                      {...register('zoneId', { required: 'La zona es requerida' })}
+                    >
+                      <option value="">Seleccionar zona</option>
+                      {formZones.map(zone => (
+                        <option key={zone.id} value={zone.id}>
+                          {zone.name}
+                        </option>
+                      ))}
+                    </select>
+                    <input type="hidden" {...register('categoryId')} value="" />
+                    {errors.zoneId && (
+                      <p className="mt-1 text-sm text-red-600">{errors.zoneId.message}</p>
+                    )}
+                  </div>
+                </>
+              ) : (
+                <>
+                  {/* Orden normal para otras ligas: Categoría primero */}
+                  <div>
+                    <label className="form-label" htmlFor="categoryId">
+                      Categoría
+                    </label>
+                    <select
+                      id="categoryId"
+                      className={cn(
+                        "form-input",
+                        errors.categoryId && "border-red-500"
+                      )}
+                      {...register('categoryId', { required: 'La categoría es requerida' })}
+                    >
+                      <option value="">Seleccionar categoría</option>
+                      {formLeagueCategories.map(category => (
+                        <option key={category.id} value={category.id}>
+                          {category.name}
+                        </option>
+                      ))}
+                    </select>
+                    {errors.categoryId && (
+                      <p className="mt-1 text-sm text-red-600">{errors.categoryId.message}</p>
+                    )}
+                  </div>
+                  
+                  {/* Zona después para otras ligas */}
+                  <div>
+                    <label className="form-label" htmlFor="zoneId">
+                      Zona
+                    </label>
+                    <select
+                      id="zoneId"
+                      className={cn(
+                        "form-input",
+                        errors.zoneId && "border-red-500"
+                      )}
+                      {...register('zoneId', { required: 'La zona es requerida' })}
+                    >
+                      <option value="">Seleccionar zona</option>
+                      {formCategoryZones.map(zone => (
+                        <option key={zone.id} value={zone.id}>
+                          {zone.name}
+                        </option>
+                      ))}
+                    </select>
+                    {errors.zoneId && (
+                      <p className="mt-1 text-sm text-red-600">{errors.zoneId.message}</p>
+                    )}
+                  </div>
+                </>
+              )}
             </div>
             
             <div className="flex justify-end space-x-3">

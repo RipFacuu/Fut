@@ -8,9 +8,19 @@ import {
   actualizarPosicion, 
   eliminarPosicion 
 } from '../../lib/supabase';
-import type { Database } from '../../types/database';
 
-type PosicionRow = Database['public']['Tables']['posiciones']['Row'];
+type PosicionRow = {
+  id: string;
+  equipo_id: string;
+  zona_id: string;
+  liga_id: string;
+  categoria_id: string;
+  equipo_nombre: string;
+  puntos: number;
+  pj: number;
+  created_at?: string;
+  updated_at?: string;
+};
 
 interface EditableCellProps {
   value: number | string;
@@ -144,12 +154,11 @@ const StandingsPage: React.FC = () => {
     teams,
     getCategoriesByLeague, 
     getZonesByCategory,
-    updateStanding,
+    getZonesByLeague,
     updateTeam,
     getTeamsByZone,
     addTeam,
     addStanding,
-    deleteTeam,
     calculateStandingsFromMatches
   } = useLeague();
   
@@ -168,7 +177,14 @@ const StandingsPage: React.FC = () => {
   const leagueCategories = useMemo(() => getCategoriesByLeague(selectedLeague), [selectedLeague, getCategoriesByLeague]);
   
   // Get zones for selected category
-  const categoryZones = useMemo(() => getZonesByCategory(selectedCategory), [selectedCategory, getZonesByCategory]);
+  const categoryZones = useMemo(() => {
+    // Si es liga masculina, obtener todas las zonas de esa liga
+    if (selectedLeague === 'liga_masculina') {
+      return getZonesByLeague(selectedLeague);
+    }
+    // Para otras ligas, usar el filtro por categoría
+    return getZonesByCategory(selectedCategory);
+  }, [selectedLeague, selectedCategory, getZonesByCategory, getZonesByLeague]);
   
   // Get teams for the selected zone
   const zoneTeams = useMemo(() => selectedZone ? getTeamsByZone(selectedZone) : [], [selectedZone, getTeamsByZone]);
@@ -220,7 +236,7 @@ const StandingsPage: React.FC = () => {
         const posiciones = await obtenerPosicionesPorZona(selectedZone);
         
         // Convertir los datos de la tabla 'posiciones_editable' al formato Standing
-        const standingsData = posiciones.map((pos, index) => ({
+        const standingsData = posiciones.map((pos) => ({
           id: `${pos.equipo_id}-${pos.zona_id}`, // ID compuesto
           teamId: pos.equipo_id,
           leagueId: selectedLeague, // Usar el seleccionado
@@ -478,7 +494,7 @@ const StandingsPage: React.FC = () => {
       
     } catch (error) {
       console.error('❌ Error guardando:', error);
-      setError(`Error al guardar: ${error.message || 'Error desconocido'}`);
+      setError(`Error al guardar: ${error instanceof Error ? error.message : 'Error desconocido'}`);
     } finally {
       setLoading(false);
     }
@@ -510,8 +526,6 @@ const StandingsPage: React.FC = () => {
             const result: PosicionRow[] = await crearPosicion({
               equipo_id: standing.teamId,
               zona_id: standing.zoneId,
-              liga_id: standing.leagueId,
-              categoria_id: standing.categoryId,
               puntos: standing.puntos || 0,
               pj: standing.pj || 0
             });
@@ -691,8 +705,6 @@ const StandingsPage: React.FC = () => {
       const result: PosicionRow[] = await crearPosicion({
         equipo_id: team.id,
         zona_id: selectedZone,
-        liga_id: selectedLeague,
-        categoria_id: selectedCategory,
         puntos: 0,
         pj: 0
       });
@@ -757,13 +769,11 @@ const StandingsPage: React.FC = () => {
       
       // Crear la posición en la base de datos
       const result: PosicionRow[] = await crearPosicion({
-        equipo_id: newTeam.id,
-        zona_id: selectedZone,
-        liga_id: selectedLeague,
-        categoria_id: selectedCategory,
-        puntos: 0,
-        pj: 0
-      });
+          equipo_id: newTeam.id,
+          zona_id: selectedZone,
+          puntos: 0,
+          pj: 0
+        });
       
       // Crear el standing
       const newStanding: Standing = {

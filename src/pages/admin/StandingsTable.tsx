@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
+import { useState, useEffect } from 'react';
 import { useLeague, Standing, Team } from '../../contexts/LeagueContext';
 import { Trash2, Save, Plus, X, Download, Upload, RefreshCw } from 'lucide-react';
 import { cn } from '../../utils/cn';
@@ -130,52 +131,61 @@ const StandingsTable: React.FC<{ zoneId: string; leagueId: string; categoryId: s
     teamsForZone: teams.filter(t => t.zoneId === zoneId)
   });
   
-  // useEffect para crear datos de prueba si no existen
   useEffect(() => {
-    // Solo para testing - crear datos de prueba si no existen
-    if (zoneStandings.length === 0 && zoneId && leagueId && categoryId) {
-      console.log('Creando datos de prueba...');
-      
-      // Crear equipos de prueba
-      const testTeams = [
-        { id: `test_team_1_${zoneId}`, name: 'Equipo 1', leagueId, categoryId, zoneId, logo: '' },
-        { id: `test_team_2_${zoneId}`, name: 'Equipo 2', leagueId, categoryId, zoneId, logo: '' }
-      ];
-      
-      // Crear standings de prueba
-      const testStandings = [
-        {
-          id: `test_standing_1_${zoneId}`,
-          teamId: `test_team_1_${zoneId}`,
-          zoneId,
-          played: 1,
-          won: 1,
-          drawn: 0,
-          lost: 0,
-          goalsFor: 2,
-          goalsAgainst: 1,
-          points: 3
-        },
-        {
-          id: `test_standing_2_${zoneId}`,
-          teamId: `test_team_2_${zoneId}`,
-          zoneId,
-          played: 1,
-          won: 0,
-          drawn: 0,
-          lost: 1,
-          goalsFor: 1,
-          goalsAgainst: 2,
-          points: 0
+    const createTestData = async () => {
+      // Solo para testing - crear datos de prueba si no existen
+      if (zoneStandings.length === 0 && zoneId && leagueId && categoryId) {
+        console.log('Creando datos de prueba...');
+        
+        // Crear equipos de prueba
+        const testTeams = [
+          { id: `test_team_1_${zoneId}`, name: 'Equipo 1', leagueId, categoryId, zoneId, logo: '' },
+          { id: `test_team_2_${zoneId}`, name: 'Equipo 2', leagueId, categoryId, zoneId, logo: '' }
+        ];
+        
+        // Crear standings de prueba
+        const testStandings = [
+          {
+            id: `test_standing_1_${zoneId}`,
+            teamId: `test_team_1_${zoneId}`,
+            leagueId,  // Agregar leagueId
+            categoryId, // Agregar categoryId
+            zoneId,
+            pj: 1,      // Cambiar 'played' por 'pj'
+            won: 1,
+            drawn: 0,
+            lost: 0,
+            goalsFor: 2,
+            goalsAgainst: 1,
+            puntos: 3   // Cambiar 'points' por 'puntos'
+          },
+          {
+            id: `test_standing_2_${zoneId}`,
+            teamId: `test_team_2_${zoneId}`,
+            leagueId,  // Agregar leagueId
+            categoryId, // Agregar categoryId
+            zoneId,
+            pj: 1,      // Cambiar 'played' por 'pj'
+            won: 0,
+            drawn: 0,
+            lost: 1,
+            goalsFor: 1,
+            goalsAgainst: 2,
+            puntos: 0   // Cambiar 'points' por 'puntos'
+          }
+        ];
+        
+        // Agregar a tu contexto (esto depende de cómo manejes el estado)
+        testTeams.forEach(team => addTeam(team));
+        if (createStanding) {
+          for (const standing of testStandings) {
+            await createStanding(standing);
+          }
         }
-      ];
-      
-      // Agregar a tu contexto (esto depende de cómo manejes el estado)
-      testTeams.forEach(team => addTeam(team));
-      if (createStanding) {
-        testStandings.forEach(standing => createStanding(standing));
-      }
-    }
+      };
+    };
+    
+    createTestData();
   }, [zoneId, leagueId, categoryId, zoneStandings.length, addTeam, createStanding]);
   
   // Ordenar standings por puntos (descendente)
@@ -288,6 +298,8 @@ const StandingsTable: React.FC<{ zoneId: string; leagueId: string; categoryId: s
       // Crear standing para el nuevo equipo si existe la función
       if (createStanding) {
         const newStanding: Omit<Standing, 'id'> = {
+          leagueId,
+          categoryId,
           teamId: newTeamId,
           zoneId: zoneId,
           pj: data.played,
@@ -321,8 +333,8 @@ const StandingsTable: React.FC<{ zoneId: string; leagueId: string; categoryId: s
       
       let csvContent = "Posición,Equipo,PJ,PG,PE,PP,GF,GC,DG,Puntos\n";
       zoneStandings.forEach((standing, index) => {
-        const teamName = getTeamName(standing.teamId);
-        csvContent += `${index + 1},${teamName},${standing.pj},${standing.pg},${standing.pe},${standing.pp},${standing.gf},${standing.gc},${standing.dg},${standing.puntos}\n`;
+        const teamName = teams.find(t => t.id === standing.teamId)?.name || 'Unknown Team';
+        csvContent += `${index + 1},${teamName},${standing.pj},${standing.won},${standing.drawn},${standing.lost},${standing.goalsFor},${standing.goalsAgainst},${standing.goalsFor - standing.goalsAgainst},${standing.puntos}\n`;
       });
       
       // Crear enlace de descarga
@@ -412,7 +424,7 @@ const StandingsTable: React.FC<{ zoneId: string; leagueId: string; categoryId: s
             <span>Importar CSV</span>
           </button>
           <button
-            onClick={handleExportCSV}
+            onClick={() => exportToCSV(zoneId)}
             className="btn btn-sm btn-outline flex items-center space-x-1"
             disabled={isLoading}
           >
@@ -603,7 +615,7 @@ const StandingsTable: React.FC<{ zoneId: string; leagueId: string; categoryId: s
                     onUpdate={handleUpdate}
                     type="text"
                   />
-                  <EditableCell value={standing.pj} standing={standing} field="played" onUpdate={handleUpdate} />
+                  <EditableCell value={standing.pj} standing={standing} field="pj" onUpdate={handleUpdate} />
                   <EditableCell value={standing.won} standing={standing} field="won" onUpdate={handleUpdate} />
                   <EditableCell value={standing.drawn} standing={standing} field="drawn" onUpdate={handleUpdate} />
                   <EditableCell value={standing.lost} standing={standing} field="lost" onUpdate={handleUpdate} />
@@ -612,7 +624,7 @@ const StandingsTable: React.FC<{ zoneId: string; leagueId: string; categoryId: s
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-center">
                     {standing.goalsFor - standing.goalsAgainst}
                   </td>
-                  <EditableCell value={standing.puntos} standing={standing} field="points" onUpdate={handleUpdate} />
+                  <EditableCell value={standing.puntos} standing={standing} field="puntos" onUpdate={handleUpdate} />
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                     <div className="flex justify-end space-x-2">
                       {isModified && (

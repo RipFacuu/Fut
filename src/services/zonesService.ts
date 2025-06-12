@@ -91,7 +91,7 @@ export const zonesService = {
   },
 
   // Crear nueva zona
-  async createZone(zoneData: { name: string; leagueId: string; categoryId: string }): Promise<Zone> {
+  async createZone(zoneData: { name: string; leagueId: string; categoryId?: string }): Promise<Zone> {
     const zonaData = mapZoneToZona(zoneData)
     
     const { data, error } = await supabase
