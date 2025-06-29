@@ -47,7 +47,7 @@ const ZonesPage: React.FC = () => {
   // Modificar el useEffect para cargar zonas:
   useEffect(() => {
     if (selectedLeague === 'liga_masculina') {
-      // Para liga masculina, cargar zonas por liga
+      // Para liga participando, cargar zonas por liga
       loadZonesByLeague(selectedLeague);
     } else if (selectedCategory) {
       // Para otras ligas, cargar zonas por categoría
@@ -130,10 +130,12 @@ const ZonesPage: React.FC = () => {
         const newZone = await zonesService.createZone(zoneData);
         setZones(prev => [newZone, ...prev]);
       } else if (editingId) {
-        const zoneData = data.leagueId === 'liga_masculina'
-          ? { name: data.name, leagueId: data.leagueId }
-          : { name: data.name, leagueId: data.leagueId, categoryId: data.categoryId };
-          
+        const zoneData = {
+          name: data.name,
+          leagueId: data.leagueId,
+          categoryId: data.leagueId === 'liga_masculina' ? '' : (data.categoryId || ''),
+        };
+        
         const updatedZone = await zonesService.updateZone(editingId, zoneData);
         setZones(prev => prev.map(zone =>
           zone.id === editingId ? updatedZone : zone
@@ -170,7 +172,7 @@ const ZonesPage: React.FC = () => {
     }
   };
 
-  const categories = getCategoriesByLeague(watchLeagueId || selectedLeague);
+// Removed unused categories variable
   const filteredZones = watchCategoryId ? 
     zones.filter(zone => zone.categoryId === watchCategoryId) : 
     zones;
@@ -216,7 +218,7 @@ const ZonesPage: React.FC = () => {
             </select>
           </div>
 
-          {/* Ocultar selector de categoría para liga masculina */}
+          {/* Ocultar selector de categoría para liga participando */}
           {selectedLeague !== 'liga_masculina' && (
             <div>
               <label className="form-label" htmlFor="categoryFilter">
@@ -286,7 +288,10 @@ const ZonesPage: React.FC = () => {
                   <p className="text-sm text-red-500">{errors.leagueId.message}</p>
                 )}
               </div>
+            </div>
 
+            {/* Segunda fila para categoría */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
               {/* En el formulario, ocultar el campo de categoría para liga masculina */}
               {watchLeagueId !== 'liga_masculina' && (
                 <div>
@@ -349,7 +354,8 @@ const ZonesPage: React.FC = () => {
         </div>
       )}
 
-      {!loading && selectedCategory ? (
+      {/* Modificar la condición para mostrar las zonas */}
+      {!loading && (selectedCategory || selectedLeague === 'liga_masculina') ? (
         filteredZones.length > 0 ? (
           <div className="bg-white border rounded-md overflow-hidden">
             <table className="min-w-full divide-y divide-gray-200">
@@ -395,7 +401,10 @@ const ZonesPage: React.FC = () => {
         )
       ) : !loading && (
         <p className="text-center py-12 text-gray-500">
-          Seleccioná una liga y categoría para ver las zonas.
+          {selectedLeague === 'liga_masculina' 
+            ? 'Seleccioná la Liga Participando para ver las zonas.'
+            : 'Seleccioná una liga y categoría para ver las zonas.'
+          }
         </p>
       )}
     </div>

@@ -10,6 +10,7 @@ export interface Zone {
   name: string
   leagueId: string
   categoryId: string
+  legend?: string // Campo para leyenda editable
 }
 
 // Convertir de formato de base de datos a formato de aplicación
@@ -35,7 +36,8 @@ const mapZonaToZone = (zona: ZonaRow): Zone => {
     id: zona.id,
     name: zona.nombre,
     leagueId: getStringLeagueId(zona.liga_id),
-    categoryId: String(zona.categoria_id)
+    categoryId: String(zona.categoria_id),
+    legend: zona.legend || undefined
   };
 };
 
@@ -52,7 +54,8 @@ const mapZoneToZona = (zone: Omit<Zone, 'id'>): ZonaInsert => {
   return {
     nombre: zone.name,
     liga_id: getDbLeagueId(zone.leagueId),
-    categoria_id: zone.categoryId
+    categoria_id: zone.categoryId,
+    legend: zone.legend
   };
 };
 
@@ -91,8 +94,13 @@ export const zonesService = {
   },
 
   // Crear nueva zona
-  async createZone(zoneData: { name: string; leagueId: string; categoryId?: string }): Promise<Zone> {
-    const zonaData = mapZoneToZona(zoneData)
+  async createZone(zoneData: { name: string; leagueId: string; categoryId?: string; legend?: string }): Promise<Zone> {
+    const zonaData = mapZoneToZona({
+      name: zoneData.name,
+      leagueId: zoneData.leagueId,
+      categoryId: zoneData.categoryId || '',
+      legend: zoneData.legend
+    })
     
     const { data, error } = await supabase
       .from('zonas')
@@ -109,11 +117,12 @@ export const zonesService = {
   },
 
   // Actualizar zona
-  async updateZone(id: string, zoneData: { name: string; leagueId: string; categoryId: string }): Promise<Zone> {
+  async updateZone(id: string, zoneData: { name: string; leagueId: string; categoryId: string; legend?: string }): Promise<Zone> {
     const zonaUpdate: ZonaUpdate = {
       nombre: zoneData.name,
       liga_id: zoneData.leagueId,
-      categoria_id: zoneData.categoryId
+      categoria_id: zoneData.categoryId,
+      legend: zoneData.legend
     }
 
     const { data, error } = await supabase

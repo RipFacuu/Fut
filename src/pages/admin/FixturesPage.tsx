@@ -34,7 +34,9 @@ const FixturesPage: React.FC = () => {
     getCategoriesByLeague, 
     getZonesByCategory,
     getTeamsByZone,
-    refreshFixtures
+    refreshFixtures,
+    getZonesByLeague,
+    getCategoriesByZone
   } = useLeague();
   
   const [isAdding, setIsAdding] = useState(false);
@@ -345,44 +347,21 @@ const FixturesPage: React.FC = () => {
   
   const handleLeagueChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const leagueId = e.target.value;
-    
-    // Actualizar estados
     setSelectedLeague(leagueId);
-    setSelectedCategory('');
     setSelectedZone('');
-    
-    // Actualizar formulario si está activo
-    if (isAdding || editingId) {
-      setValue('leagueId', leagueId);
-      setValue('categoryId', '');
-      setValue('zoneId', '');
-    }
+    setSelectedCategory('');
   };
   
   const handleCategoryChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const categoryId = e.target.value;
-    
-    // Actualizar estados
     setSelectedCategory(categoryId);
-    setSelectedZone('');
-    
-    // Actualizar formulario si está abierto
-    if (isAdding || editingId) {
-      setValue('categoryId', categoryId);
-      setValue('zoneId', '');
-    }
+    // NO resetear zona en liga_masculina
   };
   
   const handleZoneChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const zoneId = e.target.value;
-    
-    // Actualizar estado
     setSelectedZone(zoneId);
-    
-    // Actualizar formulario si está activo
-    if (isAdding || editingId) {
-      setValue('zoneId', zoneId);
-    }
+    setSelectedCategory(''); // Resetear categoría al cambiar zona
   };
   
   // Get team name by ID
@@ -390,6 +369,13 @@ const FixturesPage: React.FC = () => {
     const team = teams.find(team => team.id === teamId);
     return team ? team.name : 'Equipo desconocido';
   };
+  
+  // Filtros para Liga Participando (liga_masculina): primero zona, luego categoría
+  const isLigaMasculina = selectedLeague === 'liga_masculina';
+  const availableZones = isLigaMasculina ? getZonesByLeague(selectedLeague) : getZonesByCategory(selectedCategory);
+  const availableCategories = isLigaMasculina && selectedZone ? getCategoriesByZone(selectedZone) : getCategoriesByLeague(selectedLeague);
+  
+  const formZoneTeams = getTeamsByZone(watch('zoneId'));
   
   return (
     <div key={refreshKey}>
@@ -412,65 +398,88 @@ const FixturesPage: React.FC = () => {
           <Users size={20} className="mr-2 text-indigo-600" />
           Filtros de Búsqueda
         </h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
           <div>
-            <label htmlFor="leagueFilter" className="block text-sm font-medium text-gray-700 mb-2">
-              Liga
-            </label>
+            <label htmlFor="leagueFilter" className="form-label">Liga</label>
             <select
               id="leagueFilter"
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors duration-200"
+              className="form-input"
               value={selectedLeague}
               onChange={handleLeagueChange}
-              disabled={isAdding || !!editingId}
             >
               <option value="">Seleccionar liga</option>
               {leagues.map(league => (
-                <option key={league.id} value={league.id}>
-                  {league.name}
-                </option>
+                <option key={league.id} value={league.id}>{league.name}</option>
               ))}
             </select>
           </div>
-          <div>
-            <label htmlFor="categoryFilter" className="block text-sm font-medium text-gray-700 mb-2">
-              Categoría
-            </label>
-            <select
-              id="categoryFilter"
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors duration-200"
-              value={selectedCategory}
-              onChange={handleCategoryChange}
-              disabled={isAdding || !!editingId || leagueCategories.length === 0}
-            >
-              <option value="">Seleccionar categoría</option>
-              {leagueCategories.map(category => (
-                <option key={category.id} value={category.id}>
-                  {category.name}
-                </option>
-              ))}
-            </select>
-          </div>
-          
-          <div>
-            <label htmlFor="zoneFilter" className="block text-sm font-medium text-gray-700 mb-2">
-              Zona
-            </label>
-            <select
-              id="zoneFilter"
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors duration-200"
-              value={selectedZone}
-              onChange={handleZoneChange}
-              disabled={isAdding || !!editingId || categoryZones.length === 0}
-            >
-              <option value="">Seleccionar zona</option>
-              {categoryZones.map(zone => (
-                <option key={zone.id} value={zone.id}>
-                  {zone.name}
-                </option>
-              ))}
-            </select>
-          </div>
+          {isLigaMasculina ? (
+            <>
+              <div>
+                <label htmlFor="zoneFilter" className="form-label">Zona</label>
+                <select
+                  id="zoneFilter"
+                  className="form-input"
+                  value={selectedZone}
+                  onChange={handleZoneChange}
+                  disabled={!selectedLeague}
+                >
+                  <option value="">Seleccionar zona</option>
+                  {availableZones.map(zone => (
+                    <option key={zone.id} value={zone.id}>{zone.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label htmlFor="categoryFilter" className="form-label">Categoría</label>
+                <select
+                  id="categoryFilter"
+                  className="form-input"
+                  value={selectedCategory}
+                  onChange={handleCategoryChange}
+                  disabled={!selectedZone}
+                >
+                  <option value="">Seleccionar categoría</option>
+                  {availableCategories.map(category => (
+                    <option key={category.id} value={category.id}>{category.name}</option>
+                  ))}
+                </select>
+              </div>
+            </>
+          ) : (
+            <>
+              <div>
+                <label htmlFor="categoryFilter" className="form-label">Categoría</label>
+                <select
+                  id="categoryFilter"
+                  className="form-input"
+                  value={selectedCategory}
+                  onChange={handleCategoryChange}
+                  disabled={!selectedLeague}
+                >
+                  <option value="">Seleccionar categoría</option>
+                  {availableCategories.map(category => (
+                    <option key={category.id} value={category.id}>{category.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label htmlFor="zoneFilter" className="form-label">Zona</label>
+                <select
+                  id="zoneFilter"
+                  className="form-input"
+                  value={selectedZone}
+                  onChange={handleZoneChange}
+                  disabled={!selectedCategory}
+                >
+                  <option value="">Seleccionar zona</option>
+                  {availableZones.map(zone => (
+                    <option key={zone.id} value={zone.id}>{zone.name}</option>
+                  ))}
+                </select>
+              </div>
+            </>
+          )}
         </div>
       </div>
       
@@ -545,51 +554,97 @@ const FixturesPage: React.FC = () => {
                 </select>
               </div>
               
-              <div>
-                <label className="form-label" htmlFor="formCategoryId">
-                  Categoría
-                </label>
-                <select
-                  id="formCategoryId"
-                  className={cn(
-                    "form-input",
-                    errors.categoryId && "border-red-500"
-                  )}
-                  {...register('categoryId', { required: 'La categoría es requerida' })}
-                  onChange={(e) => {
-                    setValue('categoryId', e.target.value);
-                    setValue('zoneId', '');
-                  }}
-                >
-                  <option value="">Seleccionar categoría</option>
-                  {getCategoriesByLeague(watchLeagueId).map(category => (
-                    <option key={category.id} value={category.id}>
-                      {category.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              
-              <div>
-                <label className="form-label" htmlFor="formZoneId">
-                  Zona
-                </label>
-                <select
-                  id="formZoneId"
-                  className={cn(
-                    "form-input",
-                    errors.zoneId && "border-red-500"
-                  )}
-                  {...register('zoneId', { required: 'La zona es requerida' })}
-                >
-                  <option value="">Seleccionar zona</option>
-                  {getZonesByCategory(watchCategoryId).map(zone => (
-                    <option key={zone.id} value={zone.id}>
-                      {zone.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              {isLigaMasculina ? (
+                <>
+                  <div>
+                    <label className="form-label" htmlFor="formZoneId">Zona</label>
+                    <select
+                      id="formZoneId"
+                      className={cn(
+                        "form-input",
+                        errors.zoneId && "border-red-500"
+                      )}
+                      {...register('zoneId', { required: 'La zona es requerida' })}
+                      value={watch('zoneId')}
+                      onChange={e => {
+                        setValue('zoneId', e.target.value);
+                        setValue('categoryId', ''); // Resetear categoría al cambiar zona
+                      }}
+                    >
+                      <option value="">Seleccionar zona</option>
+                      {getZonesByLeague(watch('leagueId')).map(zone => (
+                        <option key={zone.id} value={zone.id}>{zone.name}</option>
+                      ))}
+                    </select>
+                    {errors.zoneId && <p className="mt-1 text-sm text-red-600">{errors.zoneId.message}</p>}
+                  </div>
+                  <div>
+                    <label className="form-label" htmlFor="formCategoryId">Categoría</label>
+                    <select
+                      id="formCategoryId"
+                      className={cn(
+                        "form-input",
+                        errors.categoryId && "border-red-500"
+                      )}
+                      {...register('categoryId', { required: 'La categoría es requerida' })}
+                      value={watch('categoryId')}
+                      onChange={e => setValue('categoryId', e.target.value)}
+                      disabled={!watch('zoneId')}
+                    >
+                      <option value="">Seleccionar categoría</option>
+                      {getCategoriesByZone(watch('zoneId')).map(category => (
+                        <option key={category.id} value={category.id}>{category.name}</option>
+                      ))}
+                    </select>
+                    {errors.categoryId && <p className="mt-1 text-sm text-red-600">{errors.categoryId.message}</p>}
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div>
+                    <label className="form-label" htmlFor="formCategoryId">Categoría</label>
+                    <select
+                      id="formCategoryId"
+                      className={cn(
+                        "form-input",
+                        errors.categoryId && "border-red-500"
+                      )}
+                      {...register('categoryId', { required: 'La categoría es requerida' })}
+                      value={watch('categoryId')}
+                      onChange={e => {
+                        setValue('categoryId', e.target.value);
+                        setValue('zoneId', '');
+                      }}
+                    >
+                      <option value="">Seleccionar categoría</option>
+                      {getCategoriesByLeague(watch('leagueId')).map(category => (
+                        <option key={category.id} value={category.id}>{category.name}</option>
+                      ))}
+                    </select>
+                    {errors.categoryId && <p className="mt-1 text-sm text-red-600">{errors.categoryId.message}</p>}
+                  </div>
+                  <div>
+                    <label className="form-label" htmlFor="formZoneId">Zona</label>
+                    <select
+                      id="formZoneId"
+                      className={cn(
+                        "form-input",
+                        errors.zoneId && "border-red-500"
+                      )}
+                      {...register('zoneId', { required: 'La zona es requerida' })}
+                      value={watch('zoneId')}
+                      onChange={e => setValue('zoneId', e.target.value)}
+                      disabled={!watch('categoryId')}
+                    >
+                      <option value="">Seleccionar zona</option>
+                      {getZonesByCategory(watch('categoryId')).map(zone => (
+                        <option key={zone.id} value={zone.id}>{zone.name}</option>
+                      ))}
+                    </select>
+                    {errors.zoneId && <p className="mt-1 text-sm text-red-600">{errors.zoneId.message}</p>}
+                  </div>
+                </>
+              )}
             </div>
             
             {/* Matches Section */}
@@ -637,7 +692,7 @@ const FixturesPage: React.FC = () => {
                         })}
                       >
                         <option value="">Seleccionar equipo local</option>
-                        {zoneTeams.map(team => (
+                        {formZoneTeams.map(team => (
                           <option key={team.id} value={team.id}>
                             {team.name}
                           </option>
@@ -664,7 +719,7 @@ const FixturesPage: React.FC = () => {
                         })}
                       >
                         <option value="">Seleccionar equipo visitante</option>
-                        {zoneTeams.map(team => (
+                        {formZoneTeams.map(team => (
                           <option key={team.id} value={team.id}>
                             {team.name}
                           </option>

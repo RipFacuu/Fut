@@ -56,11 +56,11 @@ const TeamsPage: React.FC = () => {
   const formLeagueCategories = getCategoriesByLeague(watchLeagueId);
   
   // Modificar la lógica de zonas de filtros
-  const filterZones = selectedLeague === 'liga_masculina' 
+  const filterZones = selectedLeague === 'liga_masculina'
   ? getZonesByLeague(selectedLeague)
   : getZonesByCategory(selectedCategory);
   
-  // Modificar la lógica de zonas del formulario - solo para liga masculina
+  // Modificar la lógica de zonas del formulario - solo para liga participando
   const formZones = watchLeagueId === 'liga_masculina' 
   ? getZonesByLeague(watchLeagueId) 
   : getZonesByCategory(watchCategoryId);
@@ -139,29 +139,6 @@ const TeamsPage: React.FC = () => {
       zoneName: zone?.name || `Zona no encontrada (ID: ${team.zoneId})`
     };
   };
-  
-  // EFECTOS CORREGIDOS - Comentar para evitar auto-selección automática
-  /*
-  React.useEffect(() => {
-    if (leagueCategories.length > 0 && !selectedCategory && !showAllTeams) {
-      setSelectedCategory(leagueCategories[0].id);
-    }
-  }, [selectedLeague, showAllTeams]); 
-  
-  React.useEffect(() => {
-    if (categoryZones.length > 0 && !selectedZone && !showAllTeams) {
-      setSelectedZone(categoryZones[0].id);
-    }
-  }, [selectedCategory, showAllTeams]); 
-  */
-  
-  // Reset category when league changes in form
-  // React.useEffect(() => {
-  //   if (formLeagueCategories.length > 0 && (isAdding || editingId)) {
-  //     setValue('categoryId', formLeagueCategories[0].id);
-  //     setValue('zoneId', ''); // Reset zone when league changes
-  //   }
-  // }, [watchLeagueId, isAdding, editingId]);
   
   // Reset zone when category changes in form
   React.useEffect(() => {
@@ -471,10 +448,10 @@ const TeamsPage: React.FC = () => {
                 )}
               </div>
               
-              {/* ORDEN CONDICIONAL: Si es Liga Masculina, solo mostrar Zona */}
+              {/* ORDEN CONDICIONAL: Si es Liga Participando, solo mostrar Zona */}
               {watchLeagueId === 'liga_masculina' ? (
                 <>
-                  {/* Solo Zona para Liga Masculina */}
+                  {/* Solo Zona para Liga Participando */}
                   <div>
                     <label className="form-label" htmlFor="zoneId">
                       Zona
@@ -583,6 +560,8 @@ const TeamsPage: React.FC = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {filteredTeams.map(team => {
               const teamDetails = getTeamDetails(team);
+              const isLigaMasculina = String(team.leagueId) === 'liga_masculina';
+              
               return (
                 <div 
                   key={team.id} 
@@ -632,8 +611,18 @@ const TeamsPage: React.FC = () => {
                     {showAllTeams && (
                       <div className="text-sm text-gray-600 space-y-1">
                         <div><strong>Liga:</strong> {teamDetails.leagueName}</div>
-                        <div><strong>Categoría:</strong> {teamDetails.categoryName}</div>
-                        <div><strong>Zona:</strong> {teamDetails.zoneName}</div>
+                        {/* CAMBIO PRINCIPAL: Orden diferente para Liga Masculina */}
+                        {isLigaMasculina ? (
+                          <>
+                            <div><strong>Zona:</strong> {teamDetails.zoneName}</div>
+                            <div><strong>Categoría:</strong> {teamDetails.categoryName}</div>
+                          </>
+                        ) : (
+                          <>
+                            <div><strong>Categoría:</strong> {teamDetails.categoryName}</div>
+                            <div><strong>Zona:</strong> {teamDetails.zoneName}</div>
+                          </>
+                        )}
                       </div>
                     )}
                   </div>
@@ -667,4 +656,3 @@ const TeamsPage: React.FC = () => {
 };
 
 export default TeamsPage;
-// Agregar este botón temporal en el componente TeamsPage para debugging

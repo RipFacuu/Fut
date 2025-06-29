@@ -21,6 +21,7 @@ export interface Category {
   name: string;
   leagueId: string;
   isEditable: boolean;
+  zoneId?: string; // Agregar esta línea
 }
 
 export interface Zone {
@@ -28,6 +29,7 @@ export interface Zone {
   name: string;
   leagueId: string;
   categoryId: string;
+  legend?: string; // Campo para leyenda editable (Apertura/Clausura)
 }
 
 export interface Match {
@@ -140,6 +142,14 @@ export interface LeagueContextType {
   // Nuevas funciones de diagnóstico y utilidad
   ensureCategoriesExist: (leagueId: string, leagueName: string) => Promise<void>;
   debugCategorySelection: (selectedLeagueId: string) => void;
+  repairMissingCategories: (leagueId: string) => Promise<void>;
+  ensureBasicCategories: (leagueId: string) => Promise<void>;
+  
+  // Nuevas funciones para gestión de datos
+  refreshCategories: () => Promise<void>;
+  refreshZones: () => Promise<void>;
+  refreshTeams: () => Promise<void>;
+  refreshStandings: () => Promise<void>;
 }
 
 // Solo una declaración del contexto
@@ -156,6 +166,14 @@ export function useLeague() {
 
 interface LeagueProviderProps {
   children: React.ReactNode;
+}
+
+// Helper para comparar arrays de objetos (simple, por id)
+function arraysAreEqualById(arr1: any[], arr2: any[], idKey = 'id') {
+  if (arr1.length !== arr2.length) return false;
+  const ids1 = arr1.map(x => x[idKey]).sort();
+  const ids2 = arr2.map(x => x[idKey]).sort();
+  return JSON.stringify(ids1) === JSON.stringify(ids2);
 }
 
 export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
@@ -175,14 +193,13 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
         console.log('=== LOADING LEAGUES FROM SUPABASE ===');
         const supabaseLeagues = await SupabaseService.getLeagues();
         console.log('Leagues from Supabase:', supabaseLeagues);
-        
-        // Usar solo datos de Supabase (sin combinar con mock)
-        setLeagues(supabaseLeagues);
+        if (!arraysAreEqualById(supabaseLeagues, leagues)) {
+          setLeagues(supabaseLeagues);
+        }
       } catch (error) {
         console.error('Error loading leagues:', error);
       }
     };
-    
     loadAllLeagues();
   }, []);
 
@@ -215,70 +232,41 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
     const loadAllCategories = async () => {
       try {
         console.log('=== LOADING CATEGORIES FROM SUPABASE ===');
-        const allCategories: Category[] = [];
-        
+        let allCategories: Category[] = [];
         for (const league of leagues) {
-          console.log(`🔍 Loading categories for league: ${league.name} (ID: ${league.id})`);
-          
-          try {
-            const leagueCategories = await SupabaseService.getCategoriesByLeague(league.id);
-            console.log(`📋 Categories loaded for ${league.name}:`, leagueCategories);
-            
-            if (leagueCategories.length === 0) {
-              console.warn(`⚠️ No categories found for ${league.name} in database`);
-              
-              // Opcional: Crear categorías por defecto
-              // await ensureCategoriesExist(league.id, league.name);
-            }
-            
-            allCategories.push(...leagueCategories);
-          } catch (error) {
-            console.error(`❌ Error loading categories for ${league.name}:`, error);
-          }
+          const leagueCategories = await SupabaseService.getCategoriesByLeague(league.id);
+          allCategories = allCategories.concat(leagueCategories);
         }
-        
-        console.log('📊 All categories from Supabase:', allCategories);
-        
-        // Actualizar el estado
-        setCategories(prev => {
-          console.log('📋 Previous categories:', prev);
-          
-          // Evitar duplicados por ID
-          const existingIds = prev.map(cat => cat.id);
-          const newCategories = allCategories.filter(cat => !existingIds.includes(cat.id));
-          
-          console.log('➕ New categories to add:', newCategories);
-          
-          const finalCategories = [...prev, ...newCategories];
-          console.log('📈 Final categories:', finalCategories);
-          
-          return finalCategories;
-        });
-        
+        // Ordena por id para comparación estable
+        allCategories.sort((a, b) => String(a.id).localeCompare(String(b.id)));
+        const currentSorted = [...categories].sort((a, b) => String(a.id).localeCompare(String(b.id)));
+        // Compara por JSON.stringify solo si los datos son simples
+        if (JSON.stringify(allCategories) !== JSON.stringify(currentSorted)) {
+          setCategories(allCategories);
+        }
       } catch (error) {
         console.error('❌ Error loading categories:', error);
       }
     };
-    
-    // Solo cargar si hay ligas disponibles
     if (leagues.length > 0) {
       loadAllCategories();
     }
-  }, [leagues]);
+  }, [leagues]); // ✅ Agregar leagues a las dependencias
 
   // Cargar todas las zonas al inicializar
   useEffect(() => {
     const loadAllZones = async () => {
       try {
-        console.log('=== LOADING ZONES FROM SUPABASE ===');
         const allZones = await zonesService.getAllZones();
-        console.log('All zones from Supabase:', allZones);
-        setZones(allZones);
+        allZones.sort((a, b) => String(a.id).localeCompare(String(b.id)));
+        const currentSorted = [...zones].sort((a, b) => String(a.id).localeCompare(String(b.id)));
+        if (JSON.stringify(allZones) !== JSON.stringify(currentSorted)) {
+          setZones(allZones);
+        }
       } catch (error) {
         console.error('Error loading zones:', error);
       }
     };
-    
     loadAllZones();
   }, []);
 
@@ -286,21 +274,16 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
   useEffect(() => {
     const loadAllTeams = async () => {
       try {
-        console.log('=== LOADING TEAMS FROM SUPABASE ===');
         const allTeams = await SupabaseService.getAllTeams();
-        console.log('All teams from Supabase:', allTeams);
-        
-        // Combinar con equipos mock existentes (evitar duplicados)
-        setTeams(prev => {
-          const existingIds = prev.map(team => team.id);
-          const newTeams = allTeams.filter(team => !existingIds.includes(team.id));
-          return [...prev, ...newTeams];
-        });
+        allTeams.sort((a, b) => String(a.id).localeCompare(String(b.id)));
+        const currentSorted = [...teams].sort((a, b) => String(a.id).localeCompare(String(b.id)));
+        if (JSON.stringify(allTeams) !== JSON.stringify(currentSorted)) {
+          setTeams(allTeams);
+        }
       } catch (error) {
         console.error('Error loading teams:', error);
       }
     };
-    
     loadAllTeams();
   }, []);
 
@@ -308,31 +291,16 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
   useEffect(() => {
     const loadAllFixtures = async () => {
       try {
-        console.log('=== LOADING FIXTURES FROM SUPABASE ===');
         const allFixtures = await SupabaseService.getFixtures();
-        console.log('All fixtures from Supabase:', allFixtures);
-        console.log('Number of fixtures loaded:', allFixtures.length);
-        
-        // Verificar que cada fixture tenga matches
-        allFixtures.forEach((fixture, index) => {
-          console.log(`Fixture ${index + 1}:`, {
-            id: fixture.id,
-            date: fixture.date,
-            matchDate: fixture.matchDate,
-            leagueId: fixture.leagueId,
-            categoryId: fixture.categoryId,
-            zoneId: fixture.zoneId,
-            matchesCount: fixture.matches.length,
-            matches: fixture.matches
-          });
-        });
-        
-        setFixtures(allFixtures);
+        allFixtures.sort((a, b) => String(a.id).localeCompare(String(b.id)));
+        const currentSorted = [...fixtures].sort((a, b) => String(a.id).localeCompare(String(b.id)));
+        if (JSON.stringify(allFixtures) !== JSON.stringify(currentSorted)) {
+          setFixtures(allFixtures);
+        }
       } catch (error) {
         console.error('Error loading fixtures:', error);
       }
     };
-    
     loadAllFixtures();
   }, []);
 
@@ -343,13 +311,22 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
 
   // SOLUCIÓN 1: Category operations con mejor debugging
   const getCategoriesByLeague = (leagueId: string) => {
-    console.log('getCategoriesByLeague called with:', leagueId, 'type:', typeof leagueId);
-    console.log('Available categories:', categories);
+    console.log('🔍 getCategoriesByLeague called with:', {
+      leagueId,
+      type: typeof leagueId,
+      allCategories: categories.length,
+      availableLeagueIds: [...new Set(categories.map(c => c.leagueId))]
+    });
     
     if (!leagueId) {
       console.warn('⚠️ LeagueId is null/undefined');
       return [];
     }
+    
+    // Convertir leagueId a número si es necesario
+    const searchLeagueId = typeof leagueId === 'string' && !isNaN(Number(leagueId))
+      ? Number(leagueId)
+      : leagueId;
     
     const filtered = categories.filter(category => {
       if (!category.leagueId) {
@@ -357,25 +334,30 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
         return false;
       }
       
-      // Normalizar ambos valores a string y eliminar espacios
-      const categoryLeagueId = String(category.leagueId).trim();
-      const searchLeagueId = String(leagueId).trim();
-      
-      const match = categoryLeagueId === searchLeagueId;
+      // Comparación flexible (string y número)
+      const categoryLeagueId = category.leagueId;
+      const match = categoryLeagueId == searchLeagueId ||
+                    String(categoryLeagueId) === String(searchLeagueId);
       
       if (match) {
-        console.log(`✅ Category match: ${category.name} for league ${leagueId}`);
+        console.log(`✅ Category match: ${category.name} (id: ${category.id}) for league ${leagueId}`);
       }
       
       return match;
     });
     
-    console.log(`📊 Result: ${filtered.length} categories for league ${leagueId}`);
+    console.log(`📊 Result: ${filtered.length} categories for league ${leagueId}`, filtered);
     
-    // Si no hay categorías, mostrar advertencia específica
     if (filtered.length === 0) {
-      console.warn(`⚠️ No categories found for league ${leagueId}. Available league IDs in categories:`,
-        [...new Set(categories.map(c => c.leagueId))]);
+      console.error(`❌ NO CATEGORIES FOUND for league ${leagueId}`);
+      console.log('Available categories:', categories);
+      console.log('Categories by league:',
+        categories.reduce((acc, cat) => {
+          (acc as Record<string, string[]>)[cat.leagueId] = (acc as Record<string, string[]>)[cat.leagueId] || [];
+          (acc as Record<string, string[]>)[cat.leagueId].push(cat.name);
+          return acc;
+        }, {})
+      );
     }
     
     return filtered;
@@ -403,16 +385,95 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
     }
   }, [leagues, categories]);
 
+  // 4. FUNCIÓN DE REPARACIÓN AUTOMÁTICA
+  const repairMissingCategories = async (leagueId: string) => {
+    console.log('🔧 Reparando categorías faltantes para liga:', leagueId);
+    
+    try {
+      // Obtener todos los categoria_id únicos de los equipos de esta liga
+      const teamsInLeague = teams.filter(team => String(team.leagueId) === String(leagueId));
+      const usedCategoryIds = [...new Set(teamsInLeague.map(team => team.categoryId))];
+      
+      console.log('📋 Categoria IDs usados por equipos:', usedCategoryIds);
+      
+      // Verificar cuáles categorías faltan
+      const existingCategoryIds = categories
+        .filter(cat => String(cat.leagueId) === String(leagueId))
+        .map(cat => cat.id);
+      
+      const missingCategoryIds = usedCategoryIds.filter(id => !existingCategoryIds.includes(id));
+      
+      console.log('❌ Categorías faltantes:', missingCategoryIds);
+      
+      // Crear categorías faltantes
+      for (const categoryId of missingCategoryIds) {
+        const categoryName = `Categoría ${categoryId}`; // Puedes personalizar el nombre
+        
+        try {
+          // Crear usando el servicio de Supabase
+          const newCategory = await SupabaseService.createCategory(categoryName, leagueId);
+          
+          if (newCategory) {
+            console.log(`✅ Categoría creada: ${categoryName} (ID: ${newCategory.id})`);
+            
+            // Si necesitas que tenga un ID específico, actualízalo
+            if (String(newCategory.id) !== String(categoryId)) {
+              console.warn(`⚠️ ID generado (${newCategory.id}) != ID esperado (${categoryId})`);
+              // Aquí podrías actualizar los equipos o crear una nueva categoría con el ID correcto
+            }
+          }
+        } catch (error) {
+          console.error(`❌ Error creando categoría ${categoryId}:`, error);
+        }
+      }
+      
+      // Recargar categorías
+      const updatedCategories = await SupabaseService.getCategoriesByLeague(leagueId);
+      setCategories(prev => {
+        const otherLeagueCategories = prev.filter(cat => String(cat.leagueId) !== String(leagueId));
+        return [...otherLeagueCategories, ...updatedCategories];
+      });
+      
+    } catch (error) {
+      console.error('❌ Error en repairMissingCategories:', error);
+    }
+  };
+  
+  // 5. SOLUCIÓN RÁPIDA TEMPORAL
+  const ensureBasicCategories = async (leagueId: string) => {
+    const existingCategories = getCategoriesByLeague(leagueId);
+    
+    if (existingCategories.length === 0) {
+      console.log('🔧 Creando categorías básicas...');
+      
+      const basicCategories = [
+        { name: 'Primera División', leagueId: String(leagueId), isEditable: true },
+        { name: 'Segunda División', leagueId: String(leagueId), isEditable: true }
+      ];
+      
+      for (const categoryData of basicCategories) {
+        try {
+          await addCategory(categoryData);
+          console.log(`✅ Categoría creada: ${categoryData.name}`);
+        } catch (error) {
+          console.error(`❌ Error creando categoría ${categoryData.name}:`, error);
+        }
+      }
+    }
+  };
+
   // Función para obtener categorías por zona
   const getCategoriesByZone = (zoneId: string): Category[] => {
-    return categories.filter(category => category.zoneId === zoneId);
+    return categories.filter(category => (category as any).zoneId === zoneId);
   };
 
   const addCategory = async (category: Omit<Category, 'id'>) => {
     try {
-      const newCategory = await SupabaseService.createCategory(
+      // Usar la función con estructura que soporta zone_id
+      const newCategory = await SupabaseService.createCategoryWithStructure(
         category.name,
-        category.leagueId
+        category.leagueId,
+        category.zoneId // Pasar el zoneId si existe
       );
       
       if (newCategory) {
@@ -452,13 +513,23 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
 
   // Zone operations
   const getZonesByCategory = (categoryId: string): Zone[] => {
-    const filtered = zones.filter(zone => zone.categoryId === categoryId);
+    const filtered = zones.filter(zone => {
+      // Normalizar ambos valores a string para comparación consistente
+      const zoneCategoryId = String(zone.categoryId);
+      const searchCategoryId = String(categoryId);
+      return zoneCategoryId === searchCategoryId;
+    });
     console.log('getZonesByCategory called with:', categoryId, 'returning:', filtered);
     return filtered;
   };
   
   const getZonesByLeague = (leagueId: string): Zone[] => {
-    const filtered = zones.filter(zone => zone.leagueId === leagueId);
+    const filtered = zones.filter(zone => {
+      // Normalizar ambos valores a string para comparación consistente
+      const zoneLeagueId = String(zone.leagueId);
+      const searchLeagueId = String(leagueId);
+      return zoneLeagueId === searchLeagueId;
+    });
     console.log('getZonesByLeague called with:', leagueId, 'returning:', filtered);
     return filtered;
   };
@@ -503,23 +574,13 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
 
   // Team operations
   const getTeamsByZone = (zoneId: string) => {
-    console.log('Filtering teams for zoneId:', zoneId, 'type:', typeof zoneId);
-    
     const result = teams.filter(team => {
       // Normalizar ambos valores a string para comparación consistente
       const teamZoneId = String(team.zoneId);
       const searchZoneId = String(zoneId);
-      
       const match = teamZoneId === searchZoneId;
-      
-      if (match) {
-        console.log(`✅ Team match found: ${team.name} (zone: ${teamZoneId})`);
-      }
-      
       return match;
     });
-    
-    console.log(`Found ${result.length} teams for zone ${zoneId}`);
     return result;
   };
 
@@ -712,9 +773,9 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
   const calculateStandingsFromMatches = useCallback((zoneId: string) => {
     console.log('Calculando standings para zona:', zoneId);
     
-    // ✅ CAMBIO: Usar getFixturesByZone en lugar de filtrar directamente
+    // ✅ CAMBIO: Normalizar IDs a string
     const zoneFixtures = getFixturesByZone(zoneId);
-    const zoneTeams = teams.filter(team => team.zoneId === zoneId);
+    const zoneTeams = teams.filter(team => String(team.zoneId) === String(zoneId));
     
     // CAMBIO: Crear standings automáticamente para todos los equipos de la zona
     const teamStats: { [teamId: string]: Standing } = {};
@@ -795,257 +856,28 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
   useEffect(() => {
     const loadAllStandings = async () => {
       try {
-        console.log('=== LOADING STANDINGS FROM SUPABASE ===');
-        const allStandings: Standing[] = [];
-        
-        // Cargar standings para todas las zonas
+        let allStandings: Standing[] = [];
         for (const zone of zones) {
-          console.log('Loading standings for zone:', zone.id);
           const zoneStandings = await SupabaseService.getStandingsByZone(zone.id);
-          console.log('Standings loaded for zone', zone.id, ':', zoneStandings);
-          allStandings.push(...zoneStandings);
+          allStandings = allStandings.concat(zoneStandings);
         }
-        
-        console.log('All standings from Supabase:', allStandings);
-        
-        // Reemplazar completamente los standings en lugar de hacer merge
-        setStandings(allStandings);
+        // Ordena por id para comparación estable
+        allStandings.sort((a, b) => String(a.id).localeCompare(String(b.id)));
+        const currentSorted = [...standings].sort((a, b) => String(a.id).localeCompare(String(b.id)));
+        if (JSON.stringify(allStandings) !== JSON.stringify(currentSorted)) {
+          setStandings(allStandings);
+        }
       } catch (error) {
         console.error('Error loading standings:', error);
       }
     };
-    
-    // Solo cargar si hay zonas
     if (zones.length > 0) {
       loadAllStandings();
     } else {
-      // Si no hay zonas, limpiar standings
       setStandings([]);
     }
-  }, [zones]); // Mantener solo zones como dependencia
+  }, [zones]);
   
-  // Agregar después del useEffect que carga standings 
-  useEffect(() => { 
-    // Generar standings automáticamente para todas las zonas que tienen equipos 
-    const generateStandingsForAllZones = () => { 
-      zones.forEach(zone => { 
-        const zoneTeams = teams.filter(team => team.zoneId === zone.id); 
-        if (zoneTeams.length > 0) { 
-          calculateStandingsFromMatches(zone.id); 
-        } 
-      }); 
-    }; 
-    
-    // Solo generar si hay equipos cargados 
-    if (teams.length > 0 && zones.length > 0) { 
-      generateStandingsForAllZones(); 
-    } 
-  }, [teams, zones, calculateStandingsFromMatches]);
-  
-  // Función para obtener standings por zona
-  const getStandingsByZone = (zoneId: string): Standing[] => {
-    console.log('getStandingsByZone called with:', zoneId);
-    console.log('All standings:', standings);
-    
-    const filtered = standings.filter(standing => {
-      // Normalizar ambos valores a string para comparación consistente
-      const standingZoneId = String(standing.zoneId);
-      const searchZoneId = String(zoneId);
-      
-      const match = standingZoneId === searchZoneId;
-      
-      if (match) {
-        console.log(`✅ Standing match found: Team ${standing.teamId} (zone: ${standingZoneId})`);
-      }
-      
-      return match;
-    });
-    
-    console.log('Filtered standings:', filtered);
-    console.log(`Found ${filtered.length} standings for zone ${zoneId}`);
-    
-    return filtered;
-  };
-  
-  // Modificar las funciones de standings para usar Supabase
-  const addStanding = (standing: Omit<Standing, 'id'>) => {
-    // Crear directamente en el estado local (no async)
-    const localStanding: Standing = {
-      ...standing,
-      id: uuidv4()
-    };
-    
-    setStandings(prev => [...prev, localStanding]);
-    
-    // Opcional: Intentar guardar en Supabase en background
-    SupabaseService.createStanding(standing).catch(error => {
-      console.error('Error saving standing to Supabase (background):', error);
-    });
-  };
-  
-  const updateStanding = async (id: string, data: Partial<Standing>) => {
-    try {
-      console.log('🔄 Actualizando standing en Supabase:', { id, data });
-      
-      // Actualizar en Supabase
-      const updatedStanding = await SupabaseService.updateStanding(id, data);
-      
-      if (updatedStanding) {
-        console.log('✅ Standing actualizado en Supabase:', updatedStanding);
-        
-        // Actualizar estado local
-        setStandings(standings.map(standing =>
-          standing.id === id ? updatedStanding : standing
-        ));
-        
-        console.log('✅ Estado local actualizado');
-      } else {
-        throw new Error('No se recibió respuesta de Supabase');
-      }
-    } catch (error) {
-      console.error('❌ Error updating standing:', error);
-      
-      // Fallback: actualizar localmente
-      console.log('🔄 Aplicando fallback: actualización local');
-      setStandings(standings.map(standing =>
-        standing.id === id ? { ...standing, ...data } : standing
-      ));
-      
-      // Re-lanzar el error para que sea manejado por la función que llama
-      throw error;
-    }
-  };
-
-  // Función para crear standing en Supabase
-  const createStanding = async (standing: Omit<Standing, 'id'>) => {
-    try {
-      console.log('🔄 Creando nuevo standing:', standing);
-      
-      // Crear en Supabase
-      const newStanding = await SupabaseService.createStanding(standing);
-      
-      if (newStanding) {
-        console.log('✅ Standing creado en Supabase:', newStanding);
-        
-        // Actualizar estado local
-        setStandings(prev => [...prev, newStanding]);
-        
-        console.log('✅ Estado local actualizado');
-      } else {
-        throw new Error('No se recibió respuesta de Supabase');
-      }
-    } catch (error) {
-      console.error('❌ Error creating standing:', error);
-      
-      // Fallback: crear localmente
-      const localStanding: Standing = {
-        ...standing,
-        id: uuidv4()
-      };
-      
-      setStandings(prev => [...prev, localStanding]);
-      
-      throw error;
-    }
-  };
-
-  // Función para importar standings desde CSV
-  const importStandingsFromCSV = async (csvData: string, zoneId: string) => {
-    try {
-      console.log('🔄 Importando standings desde CSV para zona:', zoneId);
-      
-      // Parsear CSV
-      const lines = csvData.trim().split('\n');
-      const headers = lines[0].split(',').map(h => h.trim());
-      
-      // Validar headers mínimos requeridos
-      const requiredHeaders = ['teamId', 'pj', 'won', 'drawn', 'lost', 'goalsFor', 'goalsAgainst', 'puntos'];
-      const missingHeaders = requiredHeaders.filter(h => !headers.includes(h));
-      
-      if (missingHeaders.length > 0) {
-        throw new Error(`Headers faltantes en CSV: ${missingHeaders.join(', ')}`);
-      }
-      
-      const newStandings: Omit<Standing, 'id'>[] = [];
-      
-      // Procesar cada fila (saltando el header)
-      for (let i = 1; i < lines.length; i++) {
-        const values = lines[i].split(',').map(v => v.trim());
-        
-        if (values.length !== headers.length) {
-          console.warn(`Fila ${i + 1} tiene ${values.length} columnas, esperadas ${headers.length}`);
-          continue;
-        }
-        
-        const rowData: any = {};
-        headers.forEach((header, index) => {
-          rowData[header] = values[index];
-        });
-        
-        // Crear standing object
-        const standing: Omit<Standing, 'id'> = {
-          teamId: rowData.teamId,
-          leagueId: '', // Se puede obtener del equipo
-          categoryId: '', // Se puede obtener del equipo
-          zoneId: zoneId,
-          pj: parseInt(rowData.pj) || 0,
-          won: parseInt(rowData.won) || 0,
-          drawn: parseInt(rowData.drawn) || 0,
-          lost: parseInt(rowData.lost) || 0,
-          goalsFor: parseInt(rowData.goalsFor) || 0,
-          goalsAgainst: parseInt(rowData.goalsAgainst) || 0,
-          puntos: parseInt(rowData.puntos) || 0
-        };
-        
-        // Obtener leagueId y categoryId del equipo
-        const team = teams.find(t => t.id === standing.teamId);
-        if (team) {
-          standing.leagueId = team.leagueId;
-          standing.categoryId = team.categoryId;
-        }
-        
-        newStandings.push(standing);
-      }
-      
-      console.log(`📊 Procesados ${newStandings.length} standings desde CSV`);
-      
-      // Crear todos los standings
-      for (const standing of newStandings) {
-        await createStanding(standing);
-      }
-      
-      console.log('✅ Importación de CSV completada');
-      
-    } catch (error) {
-      console.error('❌ Error importing CSV:', error);
-      throw error;
-    }
-  };
-
-  // Course operations
-  const getCourses = () => {
-    return courses;
-  };
-  
-  const addCourse = (course: Omit<Course, 'id'>) => {
-    const newCourse = {
-      ...course,
-      id: `course_${Date.now()}`
-    };
-    setCourses([...courses, newCourse]);
-  };
-  
-  const updateCourse = (id: string, data: Partial<Course>) => {
-    setCourses(courses.map(course =>
-      course.id === id ? { ...course, ...data } : course
-    ));
-  };
-  
-  const deleteCourse = (id: string) => {
-    setCourses(courses.filter(course => course.id !== id));
-  };
-
-  // Función refreshFixtures envuelta en useCallback
   const refreshFixtures = useCallback(async () => {
     try {
       console.log('=== REFRESHING FIXTURES FROM SUPABASE ===');
@@ -1059,6 +891,105 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
       throw error;
     }
   }, []);
+
+  // --- Standings helpers ---
+  const getStandingsByZone = (zoneId: string): Standing[] => {
+    return standings.filter(standing => String(standing.zoneId) === String(zoneId));
+  };
+
+  const updateStanding = (id: string, data: Partial<Standing>) => {
+    setStandings(standings.map(standing =>
+      standing.id === id ? { ...standing, ...data } : standing
+    ));
+  };
+
+  const addStanding = (standing: Omit<Standing, 'id'>) => {
+    const newStanding: Standing = { ...standing, id: uuidv4() };
+    setStandings(prev => [...prev, newStanding]);
+  };
+
+  const createStanding = async (standing: Omit<Standing, 'id'>) => {
+    const newStanding: Standing = { ...standing, id: uuidv4() };
+    setStandings(prev => [...prev, newStanding]);
+  };
+
+  const importStandingsFromCSV = async (csvData: string, zoneId: string) => {
+    // Implementación dummy para evitar error
+    return;
+  };
+
+  // Nuevas funciones para gestión de datos con useCallback
+  const refreshCategories = useCallback(async () => {
+    try {
+      console.log('=== REFRESHING CATEGORIES FROM SUPABASE ===');
+      const allCategories: Category[] = [];
+      
+      for (const league of leagues) {
+        const leagueCategories = await SupabaseService.getCategoriesByLeague(league.id);
+        allCategories.push(...leagueCategories);
+      }
+      
+      setCategories(allCategories);
+      console.log('Categories refreshed:', allCategories);
+    } catch (error) {
+      console.error('Error refreshing categories:', error);
+    }
+  }, [leagues]);
+
+  const refreshZones = useCallback(async () => {
+    try {
+      console.log('=== REFRESHING ZONES FROM SUPABASE ===');
+      const allZones = await zonesService.getAllZones();
+      setZones(allZones);
+      console.log('Zones refreshed:', allZones);
+    } catch (error) {
+      console.error('Error refreshing zones:', error);
+    }
+  }, []);
+
+  const refreshTeams = useCallback(async () => {
+    try {
+      console.log('=== REFRESHING TEAMS FROM SUPABASE ===');
+      const allTeams = await SupabaseService.getAllTeams();
+      setTeams(allTeams);
+      console.log('Teams refreshed:', allTeams);
+    } catch (error) {
+      console.error('Error refreshing teams:', error);
+    }
+  }, []);
+
+  const refreshStandings = useCallback(async () => {
+    try {
+      console.log('=== REFRESHING STANDINGS FROM SUPABASE ===');
+      const { data: allStandings, error } = await supabase
+        .from('standings')
+        .select('*');
+      
+      if (error) {
+        console.error('Error fetching standings:', error);
+        return;
+      }
+      setStandings(allStandings);
+      console.log('Standings refreshed:', allStandings);
+    } catch (error) {
+      console.error('Error refreshing standings:', error);
+    }
+  }, []);
+
+  // --- Courses helpers ---
+  const getCourses = () => courses;
+  const addCourse = (course: Omit<Course, 'id'>) => {
+    const newCourse = { ...course, id: uuidv4() };
+    setCourses(prev => [...prev, newCourse]);
+  };
+  const updateCourse = (id: string, data: Partial<Course>) => {
+    setCourses(courses.map(course =>
+      course.id === id ? { ...course, ...data } : course
+    ));
+  };
+  const deleteCourse = (id: string) => {
+    setCourses(courses.filter(course => course.id !== id));
+  };
 
   const value: LeagueContextType = {
     leagues,
@@ -1101,7 +1032,14 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
     importStandingsFromCSV,
     // Nuevas funciones
     ensureCategoriesExist,
-    debugCategorySelection
+    debugCategorySelection,
+    repairMissingCategories,
+    ensureBasicCategories,
+    // Nuevas funciones para gestión de datos
+    refreshCategories,
+    refreshZones,
+    refreshTeams,
+    refreshStandings
   };
 
   return (

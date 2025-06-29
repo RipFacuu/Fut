@@ -10,36 +10,36 @@ interface ImportCSVButtonProps {
 const ImportCSVButton: React.FC<ImportCSVButtonProps> = ({ zoneId, onImportComplete }) => {
   const { importStandingsFromCSV } = useLeague();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  
+
   const handleImportClick = () => {
     if (fileInputRef.current) {
       fileInputRef.current.click();
     }
   };
-  
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    
+
     const reader = new FileReader();
     reader.onload = (event) => {
       const csvData = event.target?.result as string;
       if (csvData) {
-        const success = importStandingsFromCSV(csvData, zoneId);
+        importStandingsFromCSV(csvData, zoneId);
         if (onImportComplete) {
           onImportComplete();
         }
-        
-        // Limpiar el input para permitir cargar el mismo archivo nuevamente
+
+        // Clear the input to allow re-uploading the same file
         if (fileInputRef.current) {
           fileInputRef.current.value = '';
         }
       }
     };
-    
+
     reader.readAsText(file);
   };
-  
+
   return (
     <>
       <button

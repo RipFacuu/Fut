@@ -8,16 +8,26 @@ import TeamList from '../components/league/TeamList';
 import { Trophy, Users, ClipboardList, Newspaper } from 'lucide-react';
 import { cn } from '../utils/cn';
 import ZonePanel from '../components/league/ZonePanel';
+import PublicStandingsTable from '../components/league/PublicStandingsTable';
 
 type Tab = 'fixtures' | 'results' | 'standings' | 'teams';
 
 const LeaguePage: React.FC = () => {
   const { leagueId } = useParams<{ leagueId: string }>();
-  const { getLeague, getCategoriesByLeague, refreshFixtures } = useLeague();
+  const { getLeague, getCategoriesByLeague, getZonesByLeague, refreshFixtures, refreshCategories, refreshZones } = useLeague();
   const [activeTab, setActiveTab] = useState<Tab>('fixtures');
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
   const [selectedZoneId, setSelectedZoneId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  
+  // Refrescar zonas y categorías al montar la página
+  useEffect(() => {
+    const refreshData = async () => {
+      await refreshCategories();
+      await refreshZones();
+    };
+    refreshData();
+  }, [refreshCategories, refreshZones]); // ❌ Estas funciones se recrean en cada render
   
   // Cargar fixtures al montar el componente
   useEffect(() => {
@@ -42,6 +52,41 @@ const LeaguePage: React.FC = () => {
   // Get categories for this league
   const categories = getCategoriesByLeague(leagueId || '');
   
+  // Get zones for this league
+  const zones = getZonesByLeague(leagueId || '');
+  
+  // CÓDIGO DE DEBUGGING TEMPORAL - Agregar después de obtener categories y zones
+  useEffect(() => {
+    if (leagueId === 'liga_masculina') {
+      console.log('=== DEBUGGING LIGA PARTICIPANDO ===');
+      console.log('League ID:', leagueId);
+      console.log('Todas las categorías:', categories);
+      console.log('Todas las zonas:', zones);
+      
+      // Verificar qué categorías tienen zoneId
+      const categoriesWithZone = categories.filter(cat => (cat as any).zoneId);
+      const categoriesWithoutZone = categories.filter(cat => !(cat as any).zoneId);
+      
+      console.log('Categorías CON zoneId:', categoriesWithZone);
+      console.log('Categorías SIN zoneId:', categoriesWithoutZone);
+      
+      // Para cada zona, mostrar qué categorías le corresponden
+      zones.forEach(zone => {
+        const zoneCategories = categories.filter(cat => (cat as any).zoneId === zone.id);
+        console.log(`Zona "${zone.name}" (ID: ${zone.id}) tiene ${zoneCategories.length} categorías:`, zoneCategories);
+      });
+      
+      // Verificar si las categorías tienen el campo zoneId
+      categories.forEach(cat => {
+        console.log(`Categoría "${cat.name}" (ID: ${cat.id}):`, {
+          leagueId: cat.leagueId,
+          zoneId: (cat as any).zoneId,
+          hasZoneId: !!(cat as any).zoneId
+        });
+      });
+    }
+  }, [categories, zones, leagueId]);
+  
   // Set initial selected category if not set and categories exist
   React.useEffect(() => {
     if (!selectedCategoryId && categories.length > 0) {
@@ -52,6 +97,17 @@ const LeaguePage: React.FC = () => {
   if (!league) {
     return <div className="text-center py-12">Liga no encontrada</div>;
   }
+  
+  // Sort categories based on league
+  const sortedCategories = [...categories].sort((a) => {
+    if (league.id === 'liga_masculina') {
+      // Para Liga Masculina, las categorías vienen primero
+      return a.name.toLowerCase().includes('zona') ? 1 : -1;
+    } else {
+      // Para otras ligas, las zonas vienen primero
+      return a.name.toLowerCase().includes('zona') ? -1 : 1;
+    }
+  });
   
   const renderContent = () => {
     if (!selectedCategoryId || !selectedZoneId) {
@@ -80,11 +136,19 @@ const LeaguePage: React.FC = () => {
         return <FixtureList zoneId={selectedZoneId} resultsOnly={true} />;
       case 'standings':
         return (
-          <StandingsTable
-            zoneId={selectedZoneId}
-            // Remove leagueId prop since it's not defined in StandingsTableProps
-            // Removed categoryId prop since it's not defined in StandingsTableProps
-          />
+          selectedZoneId && selectedCategoryId ? (
+            <PublicStandingsTable
+              leagueId={league.id}
+              zoneId={selectedZoneId}
+              categoryId={selectedCategoryId}
+            />
+          ) : (
+            <div className="text-center py-12 text-gray-500">
+              {league.id === 'liga_masculina'
+                ? 'Selecciona una zona y categoría para ver la información'
+                : 'Selecciona una categoría y zona para ver la información'}
+            </div>
+          )
         );
       case 'teams':
         return <TeamList zoneId={selectedZoneId} />;
@@ -106,17 +170,6 @@ const LeaguePage: React.FC = () => {
     }
   };
   
-  // Sort categories based on league
-  const sortedCategories = [...categories].sort((a) => {
-    if (league.id === 'liga_masculina') {
-      // Para Liga Masculina, las categorías vienen primero
-      return a.name.toLowerCase().includes('zona') ? 1 : -1;
-    } else {
-      // Para otras ligas, las zonas vienen primero
-      return a.name.toLowerCase().includes('zona') ? -1 : 1;
-    }
-  });
-  
   return (
     <div className="space-y-6">
       {/* League header */}
@@ -129,11 +182,10 @@ const LeaguePage: React.FC = () => {
           <p className="text-gray-600">{league.description}</p>
         </div>
       </header>
-      
-      {/* Categories */}
+
+      {/* Categories/Zones */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {isLigaMasculina ? (
-          // Para Liga Masculina: mostrar ZonePanels
+        {league.id === 'liga_masculina' ? (
           zones.map((zone) => (
             <ZonePanel
               key={zone.id}

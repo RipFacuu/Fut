@@ -5,8 +5,8 @@ import { League, Category, Zone, Team, Fixture, Standing, Match } from '../conte
 const leagues: League[] = [
   {
     id: 'liga_masculina',
-    name: 'Liga Masculina',
-    description: 'Competición de fútbol masculino',
+    name: 'Liga Participando',
+    description: 'Competición de fútbol participando',
     logo: '/images/liga-masculina.svg'
   },
   {
@@ -185,8 +185,8 @@ const standings: Standing[] = [
     leagueId: 'liga_masculina',
     categoryId: 'cat_liga_masc_primera',
     zoneId: 'zone_liga_masc_primera_norte',
-    points: 3,
-    played: 1,
+    puntos: 3,
+    pj: 1,
     won: 1,
     drawn: 0,
     lost: 0,
@@ -199,8 +199,8 @@ const standings: Standing[] = [
     leagueId: 'liga_masculina',
     categoryId: 'cat_liga_masc_primera',
     zoneId: 'zone_liga_masc_primera_norte',
-    points: 0,
-    played: 1,
+    puntos: 0,
+    pj: 1,
     won: 0,
     drawn: 0,
     lost: 1,
@@ -213,8 +213,8 @@ const standings: Standing[] = [
     leagueId: 'liga_masculina',
     categoryId: 'cat_liga_masc_primera',
     zoneId: 'zone_liga_masc_primera_norte',
-    points: 1,
-    played: 1,
+    puntos: 1,
+    pj: 1,
     won: 0,
     drawn: 1,
     lost: 0,
@@ -227,8 +227,8 @@ const standings: Standing[] = [
     leagueId: 'liga_masculina',
     categoryId: 'cat_liga_masc_primera',
     zoneId: 'zone_liga_masc_primera_norte',
-    points: 1,
-    played: 1,
+    puntos: 1,
+    pj: 1,
     won: 0,
     drawn: 1,
     lost: 0,
@@ -265,4 +265,12 @@ export const mockLeagueData = {
   teams: teams,
   fixtures: fixtures,
   standings: standings
+};
+export const mockData = {
+  leagues,
+  categories,
+  zones,
+  teams,
+  fixtures,
+  standings
 };

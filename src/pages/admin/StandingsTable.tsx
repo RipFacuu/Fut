@@ -1,9 +1,11 @@
 import React from 'react';
 import { useState, useEffect } from 'react';
 import { useLeague, Standing, Team } from '../../contexts/LeagueContext';
-import { Trash2, Save, Plus, X, Download, Upload, RefreshCw } from 'lucide-react';
+import { Trash2, Save, Plus, X, Download, Upload, RefreshCw, Pencil } from 'lucide-react';
 import { cn } from '../../utils/cn';
 import { useForm } from 'react-hook-form';
+import { useAuth } from '../../contexts/AuthContext';
+import { standingsLegendService } from '../../services/standingsLegendService';
 
 interface EditableCellProps {
   value: number | string;
@@ -77,6 +79,7 @@ const EditableCell: React.FC<EditableCellProps> = ({
             fontSize: 'inherit',
             fontFamily: 'inherit'
           }}
+          data-row-id={standing.id}
         />
       ) : (
         <span>{value}</span>
@@ -110,13 +113,22 @@ const StandingsTable: React.FC<{ zoneId: string; leagueId: string; categoryId: s
     updateTeam,
     getStandingsByZone,
     importStandingsFromCSV,
-    createStanding
+    createStanding,
+    zones,
+    updateZone
   } = useLeague();
+  const { isAuthenticated, user } = useAuth();
   
   const [isAddingTeam, setIsAddingTeam] = useState(false);
   const [modifiedRows, setModifiedRows] = useState<Set<string>>(new Set());
   const [refreshKey, setRefreshKey] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
+  const [editingLegend, setEditingLegend] = useState(false);
+  const [legendValue, setLegendValue] = useState('');
+  const [savingLegend, setSavingLegend] = useState(false);
+  const [legend, setLegend] = useState('');
+  const [legendLoading, setLegendLoading] = useState(false);
+  const [legendDirty, setLegendDirty] = useState(false);
   
   const zoneStandings = getStandingsByZone(zoneId);
   
@@ -243,18 +255,56 @@ const StandingsTable: React.FC<{ zoneId: string; leagueId: string; categoryId: s
     }
   };
 
-  const handleSaveRow = (id: string) => {
-    // Remover de filas modificadas
-    setModifiedRows(prev => {
-      const newSet = new Set(prev);
-      newSet.delete(id);
-      return newSet;
-    });
+  // Forzar blur de inputs de la fila antes de guardar
+  const forceRowBlur = (rowId: string) => {
+    const rowInputs = document.querySelectorAll<HTMLInputElement>(`input[data-row-id='${rowId}']`);
+    rowInputs.forEach(input => input.blur());
   };
 
-  const handleSaveAll = () => {
-    // Limpiar todas las filas modificadas
-    setModifiedRows(new Set());
+  // Guardar fila: forzar blur y esperar un tick antes de guardar
+  const handleSaveRow = (id: string) => {
+    forceRowBlur(id);
+    setTimeout(() => {
+      // Remover de filas modificadas (esto dispara el guardado real en StandingsPage)
+      setModifiedRows(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(id);
+        return newSet;
+      });
+    }, 0);
+  };
+
+  const handleSaveAll = async () => {
+    if (modifiedRows.size === 0 && !legendDirty) return;
+    setIsLoading(true);
+    try {
+      // Guardar leyenda si fue modificada
+      if (legendDirty) {
+        await standingsLegendService.upsertLegend(zoneId, categoryId, legend);
+        setLegendDirty(false);
+      }
+      // Guardar todos los standings modificados en Supabase
+      const updates = Array.from(modifiedRows).map(async (id) => {
+        const standing = zoneStandings.find(s => s.id === id);
+        if (!standing) return;
+        await updateStanding(id, {
+          pj: standing.pj,
+          puntos: standing.puntos,
+          won: standing.won,
+          drawn: standing.drawn,
+          lost: standing.lost,
+          goalsFor: standing.goalsFor,
+          goalsAgainst: standing.goalsAgainst
+        });
+      });
+      await Promise.all(updates);
+      setModifiedRows(new Set());
+    } catch (error) {
+      console.error('Error guardando standings:', error);
+      alert('Error al guardar los datos. Intenta de nuevo.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleDeleteTeam = async (standing: Standing) => {
@@ -388,16 +438,62 @@ const StandingsTable: React.FC<{ zoneId: string; leagueId: string; categoryId: s
     input.click();
   };
 
+  // Obtener la zona actual
+  const currentZone = zones.find(z => z.id === zoneId);
+  useEffect(() => {
+    setLegendValue(currentZone?.legend || '');
+  }, [currentZone?.legend]);
+
+  // Cargar leyenda al cambiar zona/categoría
+  useEffect(() => {
+    if (!zoneId || !categoryId) return;
+    setLegendLoading(true);
+    standingsLegendService.getLegend(zoneId, categoryId)
+      .then(data => setLegend(data?.leyenda || ''))
+      .finally(() => setLegendLoading(false));
+    setLegendDirty(false);
+  }, [zoneId, categoryId]);
+
+  // Guardar leyenda
+  const handleSaveLegend = async () => {
+    setLegendLoading(true);
+    await standingsLegendService.upsertLegend(zoneId, categoryId, legend);
+    setLegendDirty(false);
+    setLegendLoading(false);
+  };
+
   return (
     <div key={refreshKey} className="bg-white shadow overflow-hidden sm:rounded-lg">
-      <div className="p-4 flex justify-between items-center border-b">
-        <h3 className="text-lg font-medium text-gray-900">
-          Tabla de Posiciones
-          {/* DEBUG: Mostrar IDs actuales */}
-          <span className="text-xs text-gray-500 ml-2">
-            (Zone: {zoneId}, League: {leagueId}, Category: {categoryId})
-          </span>
-        </h3>
+      {/* Campo de leyenda editable */}
+      <div className="px-4 pt-4 pb-2">
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          📝 Leyenda de la Tabla de Posiciones
+        </label>
+        <div className="flex items-center space-x-2">
+          <input
+            type="text"
+            className="form-input w-full max-w-lg text-sm"
+            value={legend}
+            onChange={e => { setLegend(e.target.value); setLegendDirty(true); }}
+            disabled={!isAuthenticated || user?.username !== 'admin' || legendLoading}
+            placeholder="Ej: Clausura 2024 - Zona 1 Sub 17/18"
+          />
+          {legendDirty && (
+            <button
+              className="btn btn-xs btn-success flex items-center"
+              onClick={handleSaveLegend}
+              disabled={legendLoading}
+              title="Guardar leyenda"
+            >
+              <Save size={14} />
+            </button>
+          )}
+        </div>
+      </div>
+      <div className="p-4 flex flex-col md:flex-row md:justify-between md:items-center border-b space-y-2 md:space-y-0">
+        <div>
+          <h3 className="text-lg font-medium text-gray-900">Tabla de Posiciones</h3>
+        </div>
         <div className="flex space-x-2">
           <button
             onClick={() => setIsAddingTeam(true)}

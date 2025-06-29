@@ -19,10 +19,9 @@ const CategoryPanel: React.FC<CategoryPanelProps> = ({
   const [expanded, setExpanded] = useState(isSelected);
   const [zones, setZones] = useState<Zone[]>([]);
   const [loading, setLoading] = useState(false);
-  
-  const league = getLeague(category.leagueId);
 
-  // Cargar zonas cuando se expande la categoría
+  const league = getLeague(category.leagueId); // ✅ Usado abajo para mostrar el nombre
+
   useEffect(() => {
     if (expanded) {
       loadZones();
@@ -34,8 +33,6 @@ const CategoryPanel: React.FC<CategoryPanelProps> = ({
       setLoading(true);
       const categoryZones = await zonesService.getZonesByCategory(category.id);
       setZones(categoryZones);
-      
-      // Set the first zone as active if none is selected and zones exist
       if (!activeZoneId && categoryZones.length > 0) {
         setActiveZoneId(categoryZones[0].id);
       }
@@ -45,27 +42,25 @@ const CategoryPanel: React.FC<CategoryPanelProps> = ({
       setLoading(false);
     }
   };
-  
-  // Update expanded state based on isSelected prop
+
   useEffect(() => {
     setExpanded(isSelected);
   }, [isSelected]);
-  
+
   const handleCategoryClick = () => {
     setExpanded(!expanded);
     if (!expanded && activeZoneId) {
       onSelect(category.id, activeZoneId);
     }
   };
-  
+
   const handleZoneClick = (zoneId: string) => {
     setActiveZoneId(zoneId);
     onSelect(category.id, zoneId);
   };
-  
-  // En el return, mejorar la responsividad:
+
   return (
-    <div 
+    <div
       className={cn(
         "league-panel",
         isSelected && "ring-2 ring-primary-500"
@@ -74,16 +69,27 @@ const CategoryPanel: React.FC<CategoryPanelProps> = ({
       <button
         className="w-full flex items-center justify-between font-semibold text-base sm:text-lg p-3 sm:p-2 rounded-md hover:bg-gray-50 transition-colors touch-manipulation"
         onClick={handleCategoryClick}
+        aria-expanded={expanded}
       >
         <span className="text-left">{category.name}</span>
         <span className="text-gray-400 text-lg">
           {expanded ? '▲' : '▼'}
         </span>
       </button>
-      
+
       {expanded && (
         <div className="mt-3 space-y-2">
-          <h4 className="text-xs sm:text-sm font-medium text-gray-500 uppercase px-1">Zonas</h4>
+          {/* ✅ Mostrar nombre de liga */}
+          {league && (
+            <div className="text-xs text-gray-500 px-3 italic">
+              Liga: {league.name}
+            </div>
+          )}
+
+          <h4 className="text-xs sm:text-sm font-medium text-gray-500 uppercase px-1">
+            Zonas
+          </h4>
+
           <div className="space-y-1">
             {loading ? (
               <div className="text-center py-3 text-gray-500 text-sm">
@@ -92,6 +98,7 @@ const CategoryPanel: React.FC<CategoryPanelProps> = ({
             ) : zones.length > 0 ? (
               zones.map((zone: Zone) => (
                 <button
+                  type="button"
                   key={zone.id}
                   className={cn(
                     "w-full text-left px-3 py-3 sm:py-2 text-sm rounded-md transition-colors touch-manipulation",
@@ -100,6 +107,7 @@ const CategoryPanel: React.FC<CategoryPanelProps> = ({
                       : "text-gray-700 hover:bg-gray-100"
                   )}
                   onClick={() => handleZoneClick(zone.id)}
+                  aria-pressed={activeZoneId === zone.id}
                 >
                   {zone.name}
                 </button>

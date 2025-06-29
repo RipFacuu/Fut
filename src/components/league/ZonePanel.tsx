@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useLeague, Zone, Category } from '../../contexts/LeagueContext';
 import { cn } from '../../utils/cn';
+import { categoriesService } from '../../services/categoriesService';
 
 interface ZonePanelProps {
   zone: Zone;
@@ -13,7 +14,6 @@ const ZonePanel: React.FC<ZonePanelProps> = ({
   isSelected, 
   onSelect 
 }) => {
-  const { getCategoriesByZone } = useLeague();
   const [activeCategoryId, setActiveCategoryId] = useState<string | null>(null);
   const [expanded, setExpanded] = useState(isSelected);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -29,7 +29,7 @@ const ZonePanel: React.FC<ZonePanelProps> = ({
   const loadCategories = async () => {
     try {
       setLoading(true);
-      const zoneCategories = getCategoriesByZone(zone.id);
+      const zoneCategories = await categoriesService.getCategoriesByZone(zone.id);
       setCategories(zoneCategories);
       
       // Set the first category as active if none is selected and categories exist

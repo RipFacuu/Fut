@@ -29,7 +29,7 @@ const Footer: React.FC = () => {
             <ul className="space-y-2">
               <li>
                 <Link to="/league/liga_masculina" className="text-primary-100 hover:text-white transition-colors">
-                  Liga Masculina
+                  Liga Participando
                 </Link>
               </li>
               <li>

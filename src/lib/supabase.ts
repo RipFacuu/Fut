@@ -647,84 +647,61 @@ export async function obtenerPosicionesPorZona(zonaId: string) {
   return validData;
 }
 
+// Nueva función: obtenerPosicionesPorZonaYCategoria
+export async function obtenerPosicionesPorZonaYCategoria(zonaId: string, categoriaId: string) {
+  const { data, error } = await supabase
+    .from('posiciones_editable')
+    .select('*')
+    .eq('zona_id', zonaId)
+    .eq('categoria_id', categoriaId)
+    .order('puntos', { ascending: false })
+    .order('pj', { ascending: true });
+
+  if (error) throw error;
+  return data || [];
+}
+
 // Crear nueva posición
 export async function crearPosicion(posicion: {
   equipo_id: string;
   zona_id: string;
+  categoria_id: string;
   equipo_nombre?: string;
   puntos?: number;
   pj?: number;
 }) {
-  try {
-    console.log('🔄 Creando nueva posición:', posicion);
-    
-    const { data, error } = await supabase
-      .from('posiciones_editable')
-      .insert([{
-        equipo_id: posicion.equipo_id,
-        zona_id: posicion.zona_id,
-        equipo_nombre: posicion.equipo_nombre,
-        puntos: posicion.puntos || 0,
-        pj: posicion.pj || 0
-      }])
-      .select();
+  const { data, error } = await supabase
+    .from('posiciones_editable')
+    .insert([{
+      equipo_id: posicion.equipo_id,
+      zona_id: posicion.zona_id,
+      categoria_id: posicion.categoria_id,
+      equipo_nombre: posicion.equipo_nombre,
+      puntos: posicion.puntos || 0,
+      pj: posicion.pj || 0
+    }])
+    .select();
 
-    if (error) {
-      console.error('❌ Error creando posición:', error);
-      throw error;
-    }
-
-    console.log('✅ Posición creada:', data);
-    return data;
-  } catch (error) {
-    console.error('❌ Error en crearPosicion:', error);
-    throw error;
-  }
+  if (error) throw error;
+  return data;
 }
 
 // Actualizar posición existente
-export async function actualizarPosicion(posicionId: string, updates: {
+export async function actualizarPosicion(equipo_id: string, zona_id: string, categoria_id: string, updates: {
   puntos?: number;
   pj?: number;
   equipo_nombre?: string;
 }) {
-  console.log('🔄 Actualizando posición en Supabase:', { posicionId, updates });
-  
-  try {
-    // Validar que los datos sean números válidos
-    const cleanUpdates: any = {};
-    
-    if (updates.puntos !== undefined) {
-      cleanUpdates.puntos = Number(updates.puntos) || 0;
-    }
-    
-    if (updates.pj !== undefined) {
-      cleanUpdates.pj = Number(updates.pj) || 0;
-    }
-    
-    if (updates.equipo_nombre !== undefined) {
-      cleanUpdates.equipo_nombre = updates.equipo_nombre;
-    }
-    
-    console.log('📤 Datos limpios a enviar:', cleanUpdates);
-    
-    const { data, error } = await supabase
-      .from('posiciones_editable')
-      .update(cleanUpdates)
-      .eq('equipo_id', posicionId) // Usar equipo_id como identificador
-      .select();
+  const { data, error } = await supabase
+    .from('posiciones_editable')
+    .update(updates)
+    .eq('equipo_id', equipo_id)
+    .eq('zona_id', zona_id)
+    .eq('categoria_id', categoria_id)
+    .select();
 
-    if (error) {
-      console.error('❌ Error actualizando posición:', error);
-      throw error;
-    }
-
-    console.log('✅ Posición actualizada:', data);
-    return data;
-  } catch (error) {
-    console.error('❌ Error en actualizarPosicion:', error);
-    throw error;
-  }
+  if (error) throw error;
+  return data;
 }
 
 export async function eliminarPosicion(posicionId: string) {
@@ -888,7 +865,7 @@ export async function crearCategoriaConEstructura(name: string, leagueId: string
 }
 
 // Función para crear zona con estructura
-export async function crearZonaConEstructura(name: string, leagueId: string, categoryId?: string) {
+export async function crearZonaConEstructura(name: string, leagueId: string, categoryId?: string, legend?: string) {
   const numericLeagueId = getNumericLeagueId(leagueId);
   
   const insertData: any = {
@@ -898,6 +875,10 @@ export async function crearZonaConEstructura(name: string, leagueId: string, cat
   
   if (categoryId) {
     insertData.categoria_id = parseInt(categoryId);
+  }
+  
+  if (legend) {
+    insertData.legend = legend;
   }
   
   const { data, error } = await supabase

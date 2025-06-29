@@ -4,10 +4,29 @@ import { Plus, Edit, Trash2, Save, X } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { supabase } from '../../lib/supabase';
 
+// Definir el tipo Course
+interface Course {
+  id: string;
+  title: string;
+  description: string;
+  imageUrl: string;
+  date: string;
+  active: boolean;
+}
+
 interface CourseFormData {
   title: string;
   description: string;
-  imageFile: FileList; // Cambiar de imageUrl a imageFile
+  imageFile: FileList;
+  date: string;
+  active: boolean;
+}
+
+// Tipo para los datos del curso sin archivo
+interface CourseData {
+  title: string;
+  description: string;
+  imageUrl: string;
   date: string;
   active: boolean;
 }
@@ -16,6 +35,7 @@ const AdminCoursesPage: React.FC = () => {
   const { getCourses, addCourse, updateCourse, deleteCourse } = useLeague();
   const [isAdding, setIsAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
   const courses = getCourses();
 
   const {
@@ -23,21 +43,28 @@ const AdminCoursesPage: React.FC = () => {
     handleSubmit,
     reset,
     setValue,
+    watch,
     formState: { errors }
   } = useForm<CourseFormData>();
 
   const handleAddClick = () => {
     setIsAdding(true);
     setEditingId(null);
-    reset();
+    reset({
+      title: '',
+      description: '',
+      date: '',
+      active: true
+    });
   };
 
   const handleEditClick = (course: Course) => {
     setIsAdding(false);
     setEditingId(course.id);
-    Object.keys(course).forEach(key => {
-      setValue(key as keyof CourseFormData, course[key as keyof Course]);
-    });
+    setValue('title', course.title);
+    setValue('description', course.description);
+    setValue('date', course.date);
+    setValue('active', course.active);
   };
 
   const handleCancelClick = () => {
@@ -46,45 +73,11 @@ const AdminCoursesPage: React.FC = () => {
     reset();
   };
 
-  const onSubmit = async (data: CourseFormData) => {
+  const handleImageUpload = async (file: File): Promise<string> => {
     try {
-      const courseData = {
-        title: data.title,
-        description: data.description,
-        imageFile: data.imageFile[0], // Obtener el primer archivo
-        date: data.date
-      };
-
-      if (isAdding) {
-        await addCourse(courseData);
-      } else if (editingId) {
-        await updateCourse(editingId, courseData);
-      }
-      setIsAdding(false);
-      setEditingId(null);
-      reset();
-    } catch (error) {
-      console.error('Error saving course:', error);
-    }
-  };
-
-  // Eliminar la función handleImageUpload ya que no la necesitamos
-
-  const handleDeleteCourse = async (id: string) => {
-    if (window.confirm('¿Estás seguro de eliminar este curso?')) {
-      try {
-        await deleteCourse(id);
-      } catch (error) {
-        console.error('Error deleting course:', error);
-        // Aquí puedes agregar un mensaje de error para el usuario
-      }
-    }
-  };
-
-  const handleImageUpload = async (file: File) => {
-    try {
+      setIsUploading(true);
       const fileExt = file.name.split('.').pop();
-      const fileName = `${Math.random()}.${fileExt}`;
+      const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
       const filePath = `courses/${fileName}`;
 
       const { error: uploadError } = await supabase.storage
@@ -99,10 +92,71 @@ const AdminCoursesPage: React.FC = () => {
         .from('images')
         .getPublicUrl(filePath);
 
-      setValue('imageUrl', publicUrl);
+      return publicUrl;
     } catch (error) {
       console.error('Error uploading image:', error);
-      // Mostrar mensaje de error al usuario
+      throw new Error('Error al subir la imagen');
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const onSubmit = async (data: CourseFormData) => {
+    try {
+      let imageUrl = '';
+      
+      // Si hay un archivo de imagen, subirlo
+      if (data.imageFile && data.imageFile.length > 0) {
+        imageUrl = await handleImageUpload(data.imageFile[0]);
+      } else if (editingId) {
+        // Si estamos editando y no hay nueva imagen, mantener la existente
+        const existingCourse = courses.find(c => c.id === editingId);
+        imageUrl = existingCourse?.imageUrl || '';
+      }
+
+      const courseData: CourseData = {
+        title: data.title,
+        description: data.description,
+        imageUrl: imageUrl,
+        date: data.date,
+        active: data.active
+      };
+
+      if (isAdding) {
+        await addCourse(courseData);
+      } else if (editingId) {
+        await updateCourse(editingId, courseData);
+      }
+      
+      setIsAdding(false);
+      setEditingId(null);
+      reset();
+    } catch (error) {
+      console.error('Error saving course:', error);
+      alert('Error al guardar el curso. Por favor, intenta de nuevo.');
+    }
+  };
+
+  const handleDeleteCourse = async (id: string) => {
+    if (window.confirm('¿Estás seguro de eliminar este curso?')) {
+      try {
+        await deleteCourse(id);
+      } catch (error) {
+        console.error('Error deleting course:', error);
+        alert('Error al eliminar el curso. Por favor, intenta de nuevo.');
+      }
+    }
+  };
+
+  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      try {
+        const imageUrl = await handleImageUpload(file);
+        setValue('imageUrl' as any, imageUrl); // Temporal para preview
+      } catch (error) {
+        alert('Error al subir la imagen');
+      }
     }
   };
 
@@ -173,24 +227,37 @@ const AdminCoursesPage: React.FC = () => {
               </div>
 
               <div className="md:col-span-2">
-                <label className="form-label" htmlFor="imageUrl">
+                <label className="form-label" htmlFor="imageFile">
                   Imagen
                 </label>
                 <input
-                  id="imageUrl"
+                  id="imageFile"
                   type="file"
                   accept="image/*"
                   className="form-input"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) {
-                      handleImageUpload(file);
-                    }
-                  }}
+                  {...register('imageFile', { 
+                    required: isAdding ? 'La imagen es requerida' : false 
+                  })}
+                  onChange={handleFileChange}
+                  disabled={isUploading}
                 />
-                {errors.imageUrl && (
-                  <p className="text-red-500 text-sm mt-1">{errors.imageUrl.message}</p>
+                {isUploading && (
+                  <p className="text-blue-500 text-sm mt-1">Subiendo imagen...</p>
                 )}
+                {errors.imageFile && (
+                  <p className="text-red-500 text-sm mt-1">{errors.imageFile.message}</p>
+                )}
+              </div>
+
+              <div className="md:col-span-2">
+                <label className="form-label">
+                  <input
+                    type="checkbox"
+                    className="mr-2"
+                    {...register('active')}
+                  />
+                  Curso activo
+                </label>
               </div>
             </div>
 
@@ -199,6 +266,7 @@ const AdminCoursesPage: React.FC = () => {
                 type="button"
                 className="btn btn-outline flex items-center space-x-2"
                 onClick={handleCancelClick}
+                disabled={isUploading}
               >
                 <X size={18} />
                 <span>Cancelar</span>
@@ -207,6 +275,7 @@ const AdminCoursesPage: React.FC = () => {
               <button
                 type="submit"
                 className="btn btn-primary flex items-center space-x-2"
+                disabled={isUploading}
               >
                 <Save size={18} />
                 <span>{isAdding ? 'Crear Curso' : 'Guardar Cambios'}</span>
@@ -220,11 +289,16 @@ const AdminCoursesPage: React.FC = () => {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {courses.map(course => (
           <div key={course.id} className="bg-white rounded-lg shadow-md overflow-hidden">
-            <img
-              src={course.imageUrl}
-              alt={course.title}
-              className="w-full h-48 object-cover"
-            />
+            {course.imageUrl && (
+              <img
+                src={course.imageUrl}
+                alt={course.title}
+                className="w-full h-48 object-cover"
+                onError={(e) => {
+                  (e.target as HTMLImageElement).src = '/placeholder-image.jpg';
+                }}
+              />
+            )}
             <div className="p-4">
               <div className="flex justify-between items-start mb-2">
                 <h3 className="text-xl font-semibold">{course.title}</h3>
@@ -246,11 +320,25 @@ const AdminCoursesPage: React.FC = () => {
                 </div>
               </div>
               <p className="text-gray-600 mb-2">{course.description}</p>
-              <p className="text-sm text-gray-500">{course.date}</p>
+              <div className="flex justify-between items-center">
+                <p className="text-sm text-gray-500">{course.date}</p>
+                {course.active && (
+                  <span className="bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs">
+                    Activo
+                  </span>
+                )}
+              </div>
             </div>
           </div>
         ))}
       </div>
+
+      {courses.length === 0 && (
+        <div className="text-center py-12">
+          <p className="text-gray-500 text-lg">No hay cursos registrados</p>
+          <p className="text-gray-400">Haz clic en "Agregar Curso" para comenzar</p>
+        </div>
+      )}
     </div>
   );
 };

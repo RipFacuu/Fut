@@ -22,7 +22,7 @@ const App: React.FC = () => {
   return (
     <AuthProvider>
       <LeagueProvider>
-        <Router>
+        <Router future={{ v7_relativeSplatPath: true }}>
           <Routes>
             <Route path="/" element={<Layout />}>
               <Route index element={<HomePage />} />

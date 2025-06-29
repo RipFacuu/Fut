@@ -34,18 +34,21 @@ export interface Database {
           nombre: string
           liga_id: string   // ← Asegúrate de que sea string
           categoria_id: string // ← Asegúrate de que sea string
+          legend?: string   // ← Nuevo campo para leyenda editable
         }
         Insert: {
           id?: string
           nombre: string
           liga_id: string
           categoria_id?: string  // ← Hacer opcional
+          legend?: string   // ← Nuevo campo para leyenda editable
         }
         Update: {
           id?: string
           nombre?: string
           liga_id?: string
           categoria_id?: string
+          legend?: string   // ← Nuevo campo para leyenda editable
         }
       }
       ligas: {
@@ -199,4 +202,11 @@ export interface PosicionesEditable {
   equipo_nombre: string;
   puntos: number | null;
   pj: number | null; // partidos jugados
+}
+
+export interface StandingsLegend {
+  id: number;
+  zona_id: string;
+  categoria_id: string;
+  leyenda: string;
 }

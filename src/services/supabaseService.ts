@@ -17,7 +17,6 @@ import {
   obtenerFixtures,
   obtenerPartidosPorFixture,
   eliminarFixture,
-  crearStanding,
   obtenerPosicionesPorZona,
   actualizarStanding,
   eliminarStanding,
@@ -90,7 +89,8 @@ export const mapSupabaseToZone = (supabaseZone: any): Zone => {
     id: supabaseZone.id || '',
     name: supabaseZone.nombre || '',
     leagueId: idMap[numericId] || String(numericId),
-    categoryId: String(supabaseZone.categoria_id || '')
+    categoryId: String(supabaseZone.categoria_id || ''),
+    legend: supabaseZone.legend || undefined
   };
 };
 
@@ -100,22 +100,27 @@ export const mapSupabaseToCategory = (supabaseCategory: any): Category => {
 
   const idMap: { [key: number]: string } = {
     1: 'liga_masculina',
-    2: 'lifufe',
+    2: 'lifufe', 
     3: 'mundialito'
   };
 
-  const numericId =
-    typeof supabaseCategory.liga_id === 'string'
-      ? parseInt(supabaseCategory.liga_id)
-      : supabaseCategory.liga_id;
+  const numericId = typeof supabaseCategory.liga_id === 'string' 
+    ? parseInt(supabaseCategory.liga_id) 
+    : supabaseCategory.liga_id;
 
-  return {
-    id: supabaseCategory.id || '',
+  const category: Category & { zoneId?: string } = {
+    id: String(supabaseCategory.id || ''),
     name: supabaseCategory.nombre || '',
     leagueId: idMap[numericId] || String(numericId),
-    // Zone ID is not part of Category type, removing this property
-    isEditable: true
+    isEditable: supabaseCategory.is_editable !== false
   };
+
+  // Incluir zoneId si existe
+  if (supabaseCategory.zona_id) {
+    (category as any).zoneId = String(supabaseCategory.zona_id);
+  }
+
+  return category;
 };
 
 // Obtener categorías por liga (estructura dinámica)
@@ -153,10 +158,10 @@ export async function createCategoryWithStructure(
   zoneId?: string
 ): Promise<Category | null> {
   try {
-    const supabaseCategory = await crearCategoriaConEstructura(name, leagueId, zoneId);
-    return supabaseCategory ? mapSupabaseToCategory(supabaseCategory) : null;
+    const data = await crearCategoriaConEstructura(name, leagueId, zoneId);
+    return data ? mapSupabaseToCategory(data) : null;
   } catch (error) {
-    console.error('Error creating category:', error);
+    console.error('Error creating category with structure:', error);
     return null;
   }
 }
@@ -165,9 +170,10 @@ export async function createCategoryWithStructure(
 export async function createZoneWithStructure(
   name: string,
   leagueId: string,
-  categoryId?: string
+  categoryId?: string,
+  legend?: string
 ): Promise<Zone | null> {
-  const supabaseZone = await crearZonaConEstructura(name, leagueId, categoryId);
+  const supabaseZone = await crearZonaConEstructura(name, leagueId, categoryId, legend);
   return supabaseZone ? mapSupabaseToZone(supabaseZone) : null;
 }
 
@@ -367,6 +373,20 @@ export class SupabaseService {
       return data ? mapSupabaseToCategory(data[0]) : null;
     } catch (error) {
       console.error('Error creating category:', error);
+      return null;
+    }
+  }
+
+  static async createCategoryWithStructure(
+    name: string,
+    leagueId: string,
+    zoneId?: string
+  ): Promise<Category | null> {
+    try {
+      const data = await crearCategoriaConEstructura(name, leagueId, zoneId);
+      return data ? mapSupabaseToCategory(data) : null;
+    } catch (error) {
+      console.error('Error creating category with structure:', error);
       return null;
     }
   }

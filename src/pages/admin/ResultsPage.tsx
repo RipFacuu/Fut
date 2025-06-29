@@ -10,7 +10,9 @@ const ResultsPage: React.FC = () => {
     teams,
     updateMatchResult, 
     getCategoriesByLeague, 
-    getZonesByCategory 
+    getZonesByCategory,
+    getZonesByLeague,
+    getCategoriesByZone
   } = useLeague();
   
   const [selectedLeague, setSelectedLeague] = useState<string>('');
@@ -116,21 +118,19 @@ const ResultsPage: React.FC = () => {
   const handleLeagueChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const leagueId = e.target.value;
     setSelectedLeague(leagueId);
-    // Reset dependent selections when league changes
+    setSelectedZone('');
     setSelectedCategory('');
-    setSelectedZone('');
-  };
-  
-  const handleCategoryChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const categoryId = e.target.value;
-    setSelectedCategory(categoryId);
-    // Reset zone when category changes
-    setSelectedZone('');
   };
   
   const handleZoneChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const zoneId = e.target.value;
     setSelectedZone(zoneId);
+    setSelectedCategory('');
+  };
+  
+  const handleCategoryChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const categoryId = e.target.value;
+    setSelectedCategory(categoryId);
   };
   
   const getTeamName = (teamId: string): string => {
@@ -158,6 +158,11 @@ const ResultsPage: React.FC = () => {
     filteredFixtures: filteredFixtures.length
   });
   
+  // Filtros para Liga Participando (liga_masculina): primero zona, luego categoría
+  const isLigaMasculina = selectedLeague === 'liga_masculina';
+  const availableZones = isLigaMasculina ? getZonesByLeague(selectedLeague) : getZonesByCategory(selectedCategory);
+  const availableCategories = isLigaMasculina && selectedZone ? getCategoriesByZone(selectedZone) : getCategoriesByLeague(selectedLeague);
+  
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
@@ -167,9 +172,7 @@ const ResultsPage: React.FC = () => {
       {/* Filters */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
         <div>
-          <label htmlFor="leagueFilter" className="form-label">
-            Liga
-          </label>
+          <label htmlFor="leagueFilter" className="form-label">Liga</label>
           <select
             id="leagueFilter"
             className="form-input"
@@ -178,52 +181,77 @@ const ResultsPage: React.FC = () => {
           >
             <option value="">Seleccionar liga</option>
             {leagues.map(league => (
-              <option key={league.id} value={league.id}>
-                {league.name}
-              </option>
+              <option key={league.id} value={league.id}>{league.name}</option>
             ))}
           </select>
         </div>
-        
-        <div>
-          <label htmlFor="categoryFilter" className="form-label">
-            Categoría
-          </label>
-          <select
-            id="categoryFilter"
-            className="form-input"
-            value={selectedCategory}
-            onChange={handleCategoryChange}
-            disabled={!selectedLeague}
-          >
-            <option value="">Seleccionar categoría</option>
-            {leagueCategories.map(category => (
-              <option key={category.id} value={category.id}>
-                {category.name}
-              </option>
-            ))}
-          </select>
-        </div>
-        
-        <div>
-          <label htmlFor="zoneFilter" className="form-label">
-            Zona
-          </label>
-          <select
-            id="zoneFilter"
-            className="form-input"
-            value={selectedZone}
-            onChange={handleZoneChange}
-            disabled={!selectedCategory}
-          >
-            <option value="">Seleccionar zona</option>
-            {categoryZones.map(zone => (
-              <option key={zone.id} value={zone.id}>
-                {zone.name}
-              </option>
-            ))}
-          </select>
-        </div>
+        {isLigaMasculina ? (
+          <>
+            <div>
+              <label htmlFor="zoneFilter" className="form-label">Zona</label>
+              <select
+                id="zoneFilter"
+                className="form-input"
+                value={selectedZone}
+                onChange={handleZoneChange}
+                disabled={!selectedLeague}
+              >
+                <option value="">Seleccionar zona</option>
+                {availableZones.map(zone => (
+                  <option key={zone.id} value={zone.id}>{zone.name}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label htmlFor="categoryFilter" className="form-label">Categoría</label>
+              <select
+                id="categoryFilter"
+                className="form-input"
+                value={selectedCategory}
+                onChange={handleCategoryChange}
+                disabled={!selectedZone}
+              >
+                <option value="">Seleccionar categoría</option>
+                {availableCategories.map(category => (
+                  <option key={category.id} value={category.id}>{category.name}</option>
+                ))}
+              </select>
+            </div>
+          </>
+        ) : (
+          <>
+            <div>
+              <label htmlFor="categoryFilter" className="form-label">Categoría</label>
+              <select
+                id="categoryFilter"
+                className="form-input"
+                value={selectedCategory}
+                onChange={handleCategoryChange}
+                disabled={!selectedLeague}
+              >
+                <option value="">Seleccionar categoría</option>
+                {availableCategories.map(category => (
+                  <option key={category.id} value={category.id}>{category.name}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label htmlFor="zoneFilter" className="form-label">Zona</label>
+              <select
+                id="zoneFilter"
+                className="form-input"
+                value={selectedZone}
+                onChange={handleZoneChange}
+                disabled={!selectedCategory}
+              >
+                <option value="">Seleccionar zona</option>
+                {availableZones.map(zone => (
+                  <option key={zone.id} value={zone.id}>{zone.name}</option>
+                ))}
+              </select>
+            </div>
+          </>
+        )}
       </div>
       
       {/* Loading State */}
