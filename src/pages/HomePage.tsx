@@ -21,7 +21,7 @@ const HomePage: React.FC = () => {
           </p>
           <div className="flex flex-col sm:flex-row flex-wrap gap-3">
             <Link 
-              to="/league/1" 
+              to="/league/liga_masculina"
               className="btn bg-primary-600 hover:bg-primary-700 text-white text-center"
             >
               Liga Masculina

@@ -17,8 +17,6 @@ const medalIcons = [
 const PublicStandingsTable: React.FC<PublicStandingsTableProps> = ({ leagueId, zoneId, categoryId }) => {
   const { teams } = useLeague();
   const [standings, setStandings] = useState<Standing[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [legend, setLegend] = useState('');
 
   useEffect(() => {
@@ -32,8 +30,6 @@ const PublicStandingsTable: React.FC<PublicStandingsTableProps> = ({ leagueId, z
       setStandings([]);
       return;
     }
-    setLoading(true);
-    setError(null);
     // Aquí deberías usar tu función real para obtener standings
     // Simulación:
     import('../../lib/supabase').then(({ obtenerPosicionesPorZonaYCategoria }) => {
@@ -54,8 +50,8 @@ const PublicStandingsTable: React.FC<PublicStandingsTableProps> = ({ leagueId, z
             goalsAgainst: 0
           })));
         })
-        .catch(() => setError('Error al cargar la tabla de posiciones.'))
-        .finally(() => setLoading(false));
+        // .catch(() => setError('Error al cargar la tabla de posiciones.'))
+        // .finally(() => setLoading(false));
     });
   }, [zoneId, categoryId, leagueId]);
 
@@ -95,7 +91,8 @@ const PublicStandingsTable: React.FC<PublicStandingsTableProps> = ({ leagueId, z
             </button>
           </div>
         </div>
-        <div className="overflow-x-auto rounded-lg shadow">
+        {/* Tabla tradicional para desktop */}
+        <div className="overflow-x-auto rounded-lg shadow hidden md:block">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gradient-to-r from-primary-600 to-primary-700">
               <tr>
@@ -135,6 +132,42 @@ const PublicStandingsTable: React.FC<PublicStandingsTableProps> = ({ leagueId, z
               })}
             </tbody>
           </table>
+        </div>
+        {/* Vista tipo lista para mobile */}
+        <div className="md:hidden space-y-3">
+          {sortedStandings.map((s, idx) => {
+            const team = teams.find(t => t.id === s.teamId);
+            return (
+              <div
+                key={s.id}
+                className={
+                  'flex items-center justify-between rounded-lg p-3 border ' +
+                  (idx < 3
+                    ? 'bg-green-50 border-green-200'
+                    : idx >= sortedStandings.length - 3
+                    ? 'bg-red-50 border-red-200'
+                    : 'bg-gray-50 border-gray-200')
+                }
+              >
+                <div className="flex items-center space-x-3">
+                  <div className="flex flex-col items-center">
+                    <span className="font-bold text-lg">{idx + 1}</span>
+                    {idx < 3 && <span>{medalIcons[idx]}</span>}
+                  </div>
+                  <div className="w-8 h-8 bg-primary-100 rounded-full flex items-center justify-center border-2 border-primary-200">
+                    <span className="text-xs font-bold text-primary-700">{team?.name?.charAt(0) || '?'}</span>
+                  </div>
+                  <div>
+                    <div className="text-sm font-medium text-gray-900">{team?.name || s.teamId}</div>
+                    <div className="flex space-x-2 mt-1">
+                      <span className="bg-gray-200 text-gray-700 px-2 py-0.5 rounded text-xs font-semibold">PJ: {s.pj}</span>
+                      <span className="bg-blue-200 text-blue-800 px-2 py-0.5 rounded text-xs font-semibold">PTS: {s.puntos}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
         </div>
         <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
           <div className="bg-green-50 p-3 rounded-lg border border-green-200">
