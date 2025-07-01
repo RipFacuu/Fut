@@ -250,15 +250,14 @@ const TeamsPage: React.FC = () => {
   
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center space-x-4">
-          <h1 className="text-2xl font-bold">Equipos</h1>
-          
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6 space-y-3 sm:space-y-0">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-4 w-full">
+          <h1 className="text-2xl font-bold mb-2 sm:mb-0">Equipos</h1>
           {/* Toggle buttons for view mode */}
-          <div className="flex border rounded-lg overflow-hidden">
+          <div className="flex border rounded-lg overflow-hidden w-full sm:w-auto mb-2 sm:mb-0">
             <button
               className={cn(
-                "px-3 py-2 flex items-center space-x-2 text-sm transition-colors",
+                "px-3 py-2 flex-1 sm:flex-none flex items-center space-x-2 text-sm transition-colors",
                 showAllTeams 
                   ? "bg-primary-600 text-white" 
                   : "bg-white text-gray-700 hover:bg-gray-50"
@@ -270,7 +269,7 @@ const TeamsPage: React.FC = () => {
             </button>
             <button
               className={cn(
-                "px-3 py-2 flex items-center space-x-2 text-sm transition-colors",
+                "px-3 py-2 flex-1 sm:flex-none flex items-center space-x-2 text-sm transition-colors",
                 !showAllTeams 
                   ? "bg-primary-600 text-white" 
                   : "bg-white text-gray-700 hover:bg-gray-50"
@@ -282,9 +281,8 @@ const TeamsPage: React.FC = () => {
             </button>
           </div>
         </div>
-        
         <button
-          className="btn btn-primary flex items-center space-x-2"
+          className="btn btn-primary flex items-center space-x-2 w-full sm:w-auto"
           onClick={handleAddClick}
           disabled={isAdding || !!editingId || (!selectedZone && !showAllTeams)}
         >
@@ -532,7 +530,7 @@ const TeamsPage: React.FC = () => {
               )}
             </div>
             
-            <div className="flex justify-end space-x-3">
+            <div className="flex flex-col sm:flex-row justify-end space-y-2 sm:space-y-0 sm:space-x-3">
               <button
                 type="button"
                 className="btn btn-outline flex items-center space-x-2"
@@ -568,9 +566,9 @@ const TeamsPage: React.FC = () => {
                   className="bg-white border rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-shadow"
                 >
                   <div className="p-4">
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="flex items-center space-x-4">
-                        <div className="w-12 h-12 bg-primary-100 rounded-full flex items-center justify-center">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-3 space-y-3 sm:space-y-0">
+                      <div className="flex flex-col xs:flex-row xs:items-center xs:space-x-4 space-y-2 xs:space-y-0">
+                        <div className="w-12 h-12 bg-primary-100 rounded-full flex items-center justify-center mx-auto xs:mx-0">
                           {team.logo ? (
                             <img 
                               src={team.logo} 
@@ -583,22 +581,20 @@ const TeamsPage: React.FC = () => {
                             </span>
                           )}
                         </div>
-                        
-                        <div>
-                          <h3 className="font-medium text-lg">{team.name}</h3>
+                        <div className="text-center xs:text-left">
+                          <h3 className="font-medium text-lg break-words">{team.name}</h3>
                         </div>
                       </div>
-                      
-                      <div className="flex space-x-2">
+                      <div className="flex flex-row justify-center sm:justify-end space-x-2">
                         <button
-                          className="p-2 text-indigo-600 hover:bg-indigo-50 rounded-md transition-colors"
+                          className="p-2 text-indigo-600 hover:bg-indigo-50 rounded-md transition-colors min-w-[40px]"
                           onClick={() => handleEditClick(team)}
                           disabled={isAdding || !!editingId}
                         >
                           <Edit size={18} />
                         </button>
                         <button
-                          className="p-2 text-red-600 hover:bg-red-50 rounded-md transition-colors"
+                          className="p-2 text-red-600 hover:bg-red-50 rounded-md transition-colors min-w-[40px]"
                           onClick={() => handleDeleteTeam(team.id)}
                           disabled={isAdding || !!editingId}
                         >

@@ -111,21 +111,17 @@ const FixturesPage: React.FC = () => {
     }
   }, [leagues]); // Solo depende de leagues
   
-  // 2. Auto-selección de categoría cuando cambia la liga - COMENTADO
-  /*
+  // 2. Auto-selección de categoría cuando cambia la liga
   useEffect(() => {
     if (selectedLeague) {
       const categories = getCategoriesByLeague(selectedLeague);
       if (categories.length > 0 && !selectedCategory) {
         setSelectedCategory(categories[0].id);
-        setSelectedZone(''); // Reset zona
       }
     }
-  }, [selectedLeague, getCategoriesByLeague]); // Incluir la función
-  */
+  }, [selectedLeague, getCategoriesByLeague]);
   
-  // 3. Auto-selección de zona cuando cambia la categoría - COMENTADO
-  /*
+  // 3. Auto-selección de zona cuando cambia la categoría
   useEffect(() => {
     if (selectedCategory) {
       const zones = getZonesByCategory(selectedCategory);
@@ -134,7 +130,6 @@ const FixturesPage: React.FC = () => {
       }
     }
   }, [selectedCategory, getZonesByCategory]);
-  */
   
   // Forzar valores vacíos al cargar la página
   useEffect(() => {
@@ -361,7 +356,7 @@ const FixturesPage: React.FC = () => {
   const handleZoneChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const zoneId = e.target.value;
     setSelectedZone(zoneId);
-    setSelectedCategory(''); // Resetear categoría al cambiar zona
+    // Ya no se resetea la categoría al cambiar zona
   };
   
   // Get team name by ID
@@ -836,10 +831,10 @@ const FixturesPage: React.FC = () => {
             <div className="space-y-4">
               {filteredFixtures.map(fixture => (
                 <div key={fixture.id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center space-x-4">
-                      <h3 className="font-semibold text-lg">{fixture.date}</h3>
-                      <span className="text-sm text-gray-600">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-3 space-y-2 sm:space-y-0">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-4 space-y-1 sm:space-y-0 w-full">
+                      <h3 className="font-semibold text-lg break-words">{fixture.date}</h3>
+                      <span className="text-sm text-gray-600 break-words">
                         {new Date(fixture.matchDate).toLocaleDateString('es-ES', {
                           weekday: 'long',
                           year: 'numeric',
@@ -848,10 +843,10 @@ const FixturesPage: React.FC = () => {
                         })}
                       </span>
                     </div>
-                    <div className="flex space-x-2">
+                    <div className="flex flex-col sm:flex-row w-full sm:w-auto space-y-2 sm:space-y-0 sm:space-x-2 mt-2 sm:mt-0">
                       <button
                         onClick={() => handleEditClick(fixture.id)}
-                        className="btn btn-secondary btn-sm flex items-center space-x-1"
+                        className="btn btn-secondary btn-sm flex items-center justify-center space-x-1 w-full sm:w-auto"
                         disabled={isAdding || !!editingId}
                       >
                         <Edit size={16} />
@@ -859,7 +854,7 @@ const FixturesPage: React.FC = () => {
                       </button>
                       <button
                         onClick={() => handleDeleteFixture(fixture.id)}
-                        className="btn btn-danger btn-sm flex items-center space-x-1"
+                        className="btn btn-danger btn-sm flex items-center justify-center space-x-1 w-full sm:w-auto"
                         disabled={isAdding || !!editingId}
                       >
                         <Trash2 size={16} />
@@ -871,14 +866,14 @@ const FixturesPage: React.FC = () => {
                   <div className="space-y-2">
                     {fixture.matches.map((match, index) => (
                       <div key={match.id || index} className="bg-gray-50 p-3 rounded-md">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center space-x-4">
-                            <span className="font-medium">{getTeamName(match.homeTeamId)}</span>
+                        <div className="flex flex-col xs:flex-row xs:items-center xs:justify-between space-y-2 xs:space-y-0">
+                          <div className="flex flex-col xs:flex-row xs:items-center xs:space-x-4 space-y-1 xs:space-y-0">
+                            <span className="font-medium break-words">{getTeamName(match.homeTeamId)}</span>
                             <span className="text-gray-500">vs</span>
-                            <span className="font-medium">{getTeamName(match.awayTeamId)}</span>
+                            <span className="font-medium break-words">{getTeamName(match.awayTeamId)}</span>
                           </div>
                           {match.played && (
-                            <div className="flex items-center space-x-2">
+                            <div className="flex items-center space-x-2 mt-1 xs:mt-0">
                               <span className="font-bold text-lg">
                                 {match.homeScore} - {match.awayScore}
                               </span>
