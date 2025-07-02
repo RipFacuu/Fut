@@ -654,9 +654,9 @@ export async function obtenerPosicionesPorZonaYCategoria(zonaId: string, categor
     .select('*')
     .eq('zona_id', zonaId)
     .eq('categoria_id', categoriaId)
+    .order('orden', { ascending: true })
     .order('puntos', { ascending: false })
     .order('pj', { ascending: true });
-
   if (error) throw error;
   return data || [];
 }

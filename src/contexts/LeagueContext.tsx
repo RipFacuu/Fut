@@ -53,7 +53,7 @@ export interface Fixture {
 }
 
 export interface Standing {
-  id: string;
+  id: string | number;
   teamId: string;
   leagueId: string;
   categoryId: string;
@@ -65,6 +65,7 @@ export interface Standing {
   lost: number;
   goalsFor: number;
   goalsAgainst: number;
+  orden?: number;
 }
 
 export interface League {

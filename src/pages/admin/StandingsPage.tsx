@@ -2,13 +2,8 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useLeague, Standing, Team } from '../../contexts/LeagueContext';
 import { Download, Edit, Save, X, Plus } from 'lucide-react';
 import { cn } from '../../utils/cn';
-import { 
-  obtenerPosicionesPorZonaYCategoria, 
-  crearPosicion, 
-  actualizarPosicion, 
-  eliminarPosicion 
-} from '../../lib/supabase';
-import { standingsLegendService } from '../../services/standingsLegendService';
+import { obtenerPosicionesPorZonaYCategoria, crearPosicion, actualizarPosicion, eliminarPosicion } from '../../lib/supabase';
+import { standingsLegendService, updateEditablePositionsOrder } from '../../services/standingsLegendService';
 import { useAuth } from '../../contexts/AuthContext';
 
 type PosicionRow = {
@@ -76,7 +71,7 @@ const EditableCell: React.FC<EditableCellProps> = React.memo(({
     }
     
     if (finalValue !== value) {
-      onUpdate(standing.id, field, finalValue);
+      onUpdate(String(standing.id), field, finalValue);
     }
   }, [tempValue, value, standing.id, field, onUpdate, type, min]);
 
@@ -108,7 +103,7 @@ const EditableCell: React.FC<EditableCellProps> = React.memo(({
 
   const handleTeamChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
     const selectedTeamId = e.target.value;
-    onUpdate(standing.id, 'teamId', selectedTeamId);
+    onUpdate(String(standing.id), 'teamId', selectedTeamId);
     setIsEditing(false);
   }, [standing.id, onUpdate]);
 
@@ -168,6 +163,9 @@ const EditableCell: React.FC<EditableCellProps> = React.memo(({
     </td>
   );
 });
+
+// Extender el tipo Standing para permitir la propiedad 'orden'
+type StandingWithOrder = Standing & { orden?: number };
 
 const StandingsPage: React.FC = () => {
   const { 
@@ -278,6 +276,7 @@ const StandingsPage: React.FC = () => {
         zoneId: pos.zona_id,
         puntos: pos.puntos || 0,
         pj: pos.pj || 0,
+        orden: typeof pos.orden === 'number' ? pos.orden : 0,
         won: 0,
         drawn: 0,
         lost: 0,
@@ -440,7 +439,7 @@ const StandingsPage: React.FC = () => {
     setError(null);
     try {
       const teamName = getTeamName(standingToSave.teamId);
-      if (standingToSave.id.startsWith('temp-')) {
+      if (String(standingToSave.id).startsWith('temp-')) {
         // Crear nueva posición con categoria_id y valores editados
         const posicionData = {
           equipo_id: standingToSave.teamId,
@@ -480,7 +479,7 @@ const StandingsPage: React.FC = () => {
       }
       setModifiedRows(prev => {
         const newSet = new Set(prev);
-        newSet.delete(standing.id);
+        newSet.delete(String(standing.id));
         return newSet;
       });
       setError(null);
@@ -599,7 +598,7 @@ const StandingsPage: React.FC = () => {
   
   // 5. DEPURACIÓN: Agregar useEffect para monitorear cambios 
   useEffect(() => { 
-    console.log('�� Estado actual:'); 
+    console.log(' Estado actual:'); 
     console.log('- selectedZone:', selectedZone); 
     console.log('- localStandings:', localStandings); 
     console.log('- completeStandings:', completeStandings); 
@@ -642,8 +641,8 @@ const StandingsPage: React.FC = () => {
     if (!selectedTeamId || !selectedZone || !selectedCategory) return;
     const alreadyExists = localStandings.some(
       s => s.teamId === selectedTeamId &&
-           String(s.zoneId) === String(selectedZone) &&
-           String(s.categoryId) === String(selectedCategory)
+          String(s.zoneId) === String(selectedZone) &&
+          String(s.categoryId) === String(selectedCategory)
     );
     if (alreadyExists) {
       setError('Ese equipo ya está en la zona y categoría seleccionada.');
@@ -737,13 +736,13 @@ const StandingsPage: React.FC = () => {
 
     try {
       // Si tiene ID y no es temporal, eliminar de la base de datos
-      if (standing.id && !standing.id.startsWith('temp-')) {
-        await eliminarPosicion(standing.id);
+      if (String(standing.id).startsWith('temp-')) {
+        await eliminarPosicion(String(standing.id));
         console.log('✅ Posición eliminada de la base de datos');
       }
       // Eliminar del estado local por ID si existe, si no por combinación de teamId, zoneId, leagueId, categoryId
       setLocalStandings(prev => prev.filter(s => {
-        if (standing.id) {
+        if (String(standing.id)) {
           return s.id !== standing.id;
         } else {
           return !(
@@ -756,7 +755,7 @@ const StandingsPage: React.FC = () => {
       }));
       setModifiedRows(prev => {
         const newSet = new Set(prev);
-        if (standing.id) newSet.delete(standing.id);
+        if (String(standing.id)) newSet.delete(String(standing.id));
         return newSet;
       });
       setError(null);
@@ -771,16 +770,16 @@ const StandingsPage: React.FC = () => {
   const filteredEquipos = useMemo(() => {
     return teams.filter(
       e => String(e.leagueId) === String(selectedLeague) &&
-           String(e.zoneId) === String(selectedZone) &&
-           String(e.categoryId) === String(selectedCategory)
+          String(e.zoneId) === String(selectedZone) &&
+          String(e.categoryId) === String(selectedCategory)
     );
   }, [teams, selectedLeague, selectedZone, selectedCategory]);
 
   const filteredStandings = useMemo(() => {
     return localStandings.filter(
       s => String(s.leagueId) === String(selectedLeague) &&
-           String(s.zoneId) === String(selectedZone) &&
-           String(s.categoryId) === String(selectedCategory)
+          String(s.zoneId) === String(selectedZone) &&
+          String(s.categoryId) === String(selectedCategory)
     );
   }, [localStandings, selectedLeague, selectedZone, selectedCategory]);
   
@@ -878,6 +877,82 @@ const StandingsPage: React.FC = () => {
 
   // Validación para habilitar guardado
   const canSave = !!selectedZone && !!selectedCategory && modifiedRows.size > 0 && !loading;
+
+  // 1. Añadir campo 'orden' si no existe en los standings locales
+  const getOrderedStandings = (): StandingWithOrder[] => {
+    // Ordenar primero por 'orden', luego por puntos (descendente)
+    return [...(uniqueStandings as StandingWithOrder[])]
+      .sort((a, b) => {
+        if (typeof a.orden === 'number' && typeof b.orden === 'number' && a.orden !== b.orden) {
+          return a.orden - b.orden;
+        }
+        return b.puntos - a.puntos;
+      });
+  };
+  const [manualOrder, setManualOrder] = useState<StandingWithOrder[]>(getOrderedStandings());
+
+  // Sincronizar manualOrder cuando cambian los standings
+  useEffect(() => {
+    setManualOrder(getOrderedStandings());
+  }, [uniqueStandings]);
+
+  // 2. Funciones para mover arriba/abajo
+  const moveStanding = (index: number, direction: 'up' | 'down') => {
+    setManualOrder(prev => {
+      const newOrder: StandingWithOrder[] = [...prev];
+      if (direction === 'up' && index > 0) {
+        [newOrder[index - 1], newOrder[index]] = [newOrder[index], newOrder[index - 1]];
+      } else if (direction === 'down' && index < newOrder.length - 1) {
+        [newOrder[index], newOrder[index + 1]] = [newOrder[index + 1], newOrder[index]];
+      }
+      // Actualizar campo 'orden'
+      return newOrder.map((s, idx) => ({ ...s, orden: idx }));
+    });
+  };
+
+  // Estado para saber si hay cambios de orden no guardados
+  const [orderDirty, setOrderDirty] = useState(false);
+  const [savingOrder, setSavingOrder] = useState(false);
+  const [orderSaved, setOrderSaved] = useState(false);
+
+  // Marcar como dirty cuando cambia el orden manual
+  useEffect(() => {
+    setOrderDirty(true);
+    setOrderSaved(false);
+  }, [manualOrder]);
+
+  // Guardar el orden en Supabase
+  const handleSaveOrder = async () => {
+    setSavingOrder(true);
+    setOrderSaved(false);
+    const payload = manualOrder
+      .filter(s => !!s.teamId && !!s.zoneId && !!s.categoryId)
+      .map((s, idx) => ({
+        equipo_id: Number(s.teamId),
+        zona_id: Number(s.zoneId),
+        categoria_id: Number(s.categoryId),
+        orden: typeof s.orden === 'number' ? s.orden : idx
+      }));
+    // Log detallado para depuración
+    console.log('Payload a actualizar:', JSON.stringify(payload, null, 2));
+    if (payload.length === 0) {
+      alert('No hay datos válidos para guardar el orden.');
+      setSavingOrder(false);
+      return;
+    }
+    try {
+      await updateEditablePositionsOrder(payload);
+      setOrderDirty(false);
+      setOrderSaved(true);
+      await loadStandings(); // Recargar standings desde Supabase
+      alert('¡Orden guardado en Supabase!');
+    } catch (e) {
+      alert('Error al guardar el orden');
+      console.error('Error al guardar el orden en Supabase:', e);
+    } finally {
+      setSavingOrder(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-100">
@@ -1124,125 +1199,181 @@ const StandingsPage: React.FC = () => {
                   </button>
                 </div>
 
-                {/* Tabla responsive mejorada */}
-                <div className="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden">
-                  <div className="overflow-x-auto">
-                    <table className="min-w-full divide-y divide-gray-200">
-                      <thead className="bg-gradient-to-r from-gray-50 to-gray-100">
-                        <tr>
-                          <th className="px-4 lg:px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">
-                            <div className="flex items-center">
-                              <span className="w-6 h-6 bg-violet-100 rounded-full flex items-center justify-center text-violet-600 text-xs font-bold mr-2">
-                                #
-                              </span>
-                              Posición
-                            </div>
-                          </th>
-                          <th className="px-4 lg:px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">
-                            Equipo
-                          </th>
-                          <th className="px-4 lg:px-6 py-4 text-center text-xs font-bold text-gray-600 uppercase tracking-wider">PJ</th>
-                          <th className="px-4 lg:px-6 py-4 text-center text-xs font-bold text-gray-600 uppercase tracking-wider">PTS</th>
-                          <th className="px-4 lg:px-6 py-4 text-center text-xs font-bold text-gray-600 uppercase tracking-wider">Acciones</th>
-                        </tr>
-                      </thead>
-                      <tbody className="bg-white divide-y divide-gray-100">
-                        {uniqueStandings.map((standing, index) => (
-                          <tr 
-                            key={standing.id} 
-                            className={cn(
-                              "hover:bg-gradient-to-r hover:from-violet-50 hover:to-purple-50 transition-all duration-200",
-                              modifiedRows.has(standing.id) && "bg-gradient-to-r from-yellow-50 to-amber-50 border-l-4 border-yellow-400",
-                              index < 3 && "bg-gradient-to-r from-green-50 to-emerald-50"
-                            )}
-                          >
-                            <td className="px-4 lg:px-6 py-4 whitespace-nowrap">
-                              <div className="flex items-center">
-                                <div className={cn(
-                                  "w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold mr-3",
-                                  index === 0 && "bg-gradient-to-r from-yellow-400 to-yellow-500 text-white shadow-lg",
-                                  index === 1 && "bg-gradient-to-r from-gray-400 to-gray-500 text-white shadow-lg",
-                                  index === 2 && "bg-gradient-to-r from-orange-400 to-orange-500 text-white shadow-lg",
-                                  index > 2 && "bg-gradient-to-r from-violet-100 to-purple-100 text-violet-700"
-                                )}>
-                                  {index + 1}
-                                </div>
-                                {index < 3 && (
-                                  <div className="text-xs font-medium text-green-600 bg-green-100 px-2 py-1 rounded-full">
-                                    Top {index + 1}
-                                  </div>
-                                )}
-                              </div>
-                            </td>
-                            <EditableCell
-                              value={getTeamName(standing.teamId)}
-                              standing={standing}
-                              field="teamName"
-                              onUpdate={handleUpdate}
-                              setEditingCell={setEditingCell}
-                            />
-                            <EditableCell
-                              value={standing.pj}
-                              standing={standing}
-                              field="pj"
-                              onUpdate={handleUpdate}
-                              setEditingCell={setEditingCell}
-                            />
-                            <EditableCell
-                              value={standing.puntos}
-                              standing={standing}
-                              field="puntos"
-                              onUpdate={handleUpdate}
-                              setEditingCell={setEditingCell}
-                            />
-                            <td className="px-4 lg:px-6 py-4 whitespace-nowrap text-center">
-                              <div className="flex justify-center space-x-2">
-                                <button
-                                  onClick={() => handleSaveRow(standing)}
-                                  disabled={loading || !modifiedRows.has(standing.id)}
-                                  title={modifiedRows.has(standing.id) ? "Guardar cambios" : "No hay cambios para guardar"}
-                                  className={cn(
-                                    "inline-flex items-center p-2.5 border border-transparent rounded-lg text-xs transition-all duration-200 transform hover:scale-110",
-                                    modifiedRows.has(standing.id) && !loading
-                                      ? "text-white bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 shadow-lg hover:shadow-xl"
-                                      : "text-gray-400 bg-gray-100 cursor-not-allowed"
-                                  )}
-                                >
-                                  <Save className="h-4 w-4" />
-                                </button>
-                                <button
-                                  onClick={() => handleDeleteTeam(standing)}
-                                  disabled={loading}
-                                  title="Eliminar de las posiciones"
-                                  className="inline-flex items-center p-2.5 border border-transparent rounded-lg text-xs text-white bg-gradient-to-r from-red-600 to-pink-600 hover:from-red-700 hover:to-pink-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-110"
-                                >
-                                  <X className="h-4 w-4" />
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                  
-                  {/* Footer de la tabla */}
-                  <div className="bg-gray-50 px-6 py-4 border-t border-gray-200">
-                    <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center text-sm text-gray-600">
-                      <div className="mb-2 sm:mb-0">
-                        Total de equipos: <span className="font-semibold text-gray-900">{uniqueStandings.length}</span>
-                      </div>
-                      <div className="flex items-center space-x-4">
-                        {modifiedRows.size > 0 && (
-                          <div className="flex items-center text-amber-600">
-                            <div className="w-2 h-2 bg-amber-400 rounded-full mr-2 animate-pulse"></div>
-                            {modifiedRows.size} cambio{modifiedRows.size !== 1 ? 's' : ''} pendiente{modifiedRows.size !== 1 ? 's' : ''}
+                {/* Tabla tradicional para desktop */}
+                <div className="overflow-x-auto hidden md:block">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gradient-to-r from-gray-50 to-gray-100">
+                      <tr>
+                        <th className="px-4 lg:px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">
+                          <div className="flex items-center">
+                            <span className="w-6 h-6 bg-violet-100 rounded-full flex items-center justify-center text-violet-600 text-xs font-bold mr-2">
+                              #
+                            </span>
+                            Posición
                           </div>
-                        )}
+                        </th>
+                        <th className="px-4 lg:px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">
+                          Equipo
+                        </th>
+                        <th className="px-4 lg:px-6 py-4 text-center text-xs font-bold text-gray-600 uppercase tracking-wider">PJ</th>
+                        <th className="px-4 lg:px-6 py-4 text-center text-xs font-bold text-gray-600 uppercase tracking-wider">PTS</th>
+                        <th className="px-4 lg:px-6 py-4 text-center text-xs font-bold text-gray-600 uppercase tracking-wider">Acciones</th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-100">
+                      {manualOrder.map((standing, index) => (
+                        <tr 
+                          key={standing.id} 
+                          className={cn(
+                            "hover:bg-gradient-to-r hover:from-violet-50 hover:to-purple-50 transition-all duration-200",
+                            modifiedRows.has(String(standing.id)) && "bg-gradient-to-r from-yellow-50 to-amber-50 border-l-4 border-yellow-400",
+                            index < 3 && "bg-gradient-to-r from-green-50 to-emerald-50"
+                          )}
+                        >
+                          <td className="px-4 lg:px-6 py-4 whitespace-nowrap">
+                            <div className="flex items-center">
+                              <div className={cn(
+                                "w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold mr-3",
+                                index === 0 && "bg-gradient-to-r from-yellow-400 to-yellow-500 text-white shadow-lg",
+                                index === 1 && "bg-gradient-to-r from-gray-400 to-gray-500 text-white shadow-lg",
+                                index === 2 && "bg-gradient-to-r from-orange-400 to-orange-500 text-white shadow-lg",
+                                index > 2 && "bg-gradient-to-r from-violet-100 to-purple-100 text-violet-700"
+                              )}>
+                                {index + 1}
+                              </div>
+                              {index < 3 && (
+                                <div className="text-xs font-medium text-green-600 bg-green-100 px-2 py-1 rounded-full">
+                                  Top {index + 1}
+                                </div>
+                              )}
+                            </div>
+                          </td>
+                          <EditableCell
+                            value={getTeamName(standing.teamId)}
+                            standing={standing}
+                            field="teamName"
+                            onUpdate={handleUpdate}
+                            setEditingCell={setEditingCell}
+                          />
+                          <EditableCell
+                            value={standing.pj}
+                            standing={standing}
+                            field="pj"
+                            onUpdate={handleUpdate}
+                            setEditingCell={setEditingCell}
+                          />
+                          <EditableCell
+                            value={standing.puntos}
+                            standing={standing}
+                            field="puntos"
+                            onUpdate={handleUpdate}
+                            setEditingCell={setEditingCell}
+                          />
+                          <td className="px-4 lg:px-6 py-4 whitespace-nowrap text-center">
+                            <div className="flex justify-center space-x-2">
+                              {/* Flechas de orden */}
+                              <button onClick={() => moveStanding(index, 'up')} disabled={index === 0} title="Subir" className="text-gray-500 hover:text-violet-600 disabled:opacity-30"><span>▲</span></button>
+                              <button onClick={() => moveStanding(index, 'down')} disabled={index === manualOrder.length - 1} title="Bajar" className="text-gray-500 hover:text-violet-600 disabled:opacity-30"><span>▼</span></button>
+                              <button
+                                onClick={() => handleSaveRow(standing)}
+                                disabled={loading || !modifiedRows.has(String(standing.id))}
+                                title={modifiedRows.has(String(standing.id)) ? "Guardar cambios" : "No hay cambios para guardar"}
+                                className={cn(
+                                  "inline-flex items-center p-2.5 border border-transparent rounded-lg text-xs transition-all duration-200 transform hover:scale-110",
+                                  modifiedRows.has(String(standing.id)) && !loading
+                                    ? "text-white bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 shadow-lg hover:shadow-xl"
+                                    : "text-gray-400 bg-gray-100 cursor-not-allowed"
+                                )}
+                              >
+                                <Save className="h-4 w-4" />
+                              </button>
+                              <button
+                                onClick={() => handleDeleteTeam(standing)}
+                                disabled={loading}
+                                title="Eliminar de las posiciones"
+                                className="inline-flex items-center p-2.5 border border-transparent rounded-lg text-xs text-white bg-gradient-to-r from-red-600 to-pink-600 hover:from-red-700 hover:to-pink-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-110"
+                              >
+                                <X className="h-4 w-4" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                {/* Vista tipo lista para mobile */}
+                <div className="md:hidden space-y-3 p-2">
+                  {manualOrder.map((standing, idx) => (
+                    <div
+                      key={standing.id}
+                      className={
+                        'flex flex-col rounded-lg p-3 border ' +
+                        (modifiedRows.has(String(standing.id))
+                          ? 'bg-yellow-50 border-yellow-200'
+                          : idx < 3
+                          ? 'bg-green-50 border-green-200'
+                          : 'bg-gray-50 border-gray-200')
+                      }
+                    >
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center space-x-2">
+                          <span className="font-bold text-lg">{idx + 1}</span>
+                          {idx < 3 && (
+                            <span className="text-xs font-medium text-green-600 bg-green-100 px-2 py-1 rounded-full">Top {idx + 1}</span>
+                          )}
+                        </div>
+                        <div className="flex flex-row space-x-2">
+                          {/* Flechas de orden */}
+                          <button onClick={() => moveStanding(idx, 'up')} disabled={idx === 0} title="Subir" className="text-gray-500 hover:text-violet-600 disabled:opacity-30"><span>▲</span></button>
+                          <button onClick={() => moveStanding(idx, 'down')} disabled={idx === manualOrder.length - 1} title="Bajar" className="text-gray-500 hover:text-violet-600 disabled:opacity-30"><span>▼</span></button>
+                          <button
+                            onClick={() => handleSaveRow(standing)}
+                            className="text-indigo-600 hover:text-indigo-900"
+                            title="Editar"
+                            disabled={loading}
+                          >
+                            <Edit size={18} />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteTeam(standing)}
+                            className="text-red-600 hover:text-red-900"
+                            title="Eliminar"
+                            disabled={loading}
+                          >
+                            <X size={18} />
+                          </button>
+                        </div>
+                      </div>
+                      <div className="flex flex-col space-y-1">
+                        <div className="text-base font-semibold text-gray-900">{getTeamName(standing.teamId)}</div>
+                        <div className="flex flex-wrap gap-2 mt-1">
+                          <span className="bg-gray-200 text-gray-700 px-2 py-0.5 rounded text-xs font-semibold">PJ: {standing.pj}</span>
+                          <span className="bg-indigo-200 text-indigo-800 px-2 py-0.5 rounded text-xs font-semibold">PTS: {standing.puntos}</span>
+                        </div>
                       </div>
                     </div>
-                  </div>
+                  ))}
+                  {manualOrder.length === 0 && (
+                    <div className="text-center py-8 text-gray-500 bg-gray-50 rounded-md">
+                      No hay equipos en esta zona. Agrega el primer equipo para comenzar.
+                    </div>
+                  )}
                 </div>
+
+                {/* Botón Guardar Orden */}
+                {orderDirty && manualOrder.length > 1 && (
+                  <div className="flex justify-end mb-2">
+                    <button
+                      onClick={handleSaveOrder}
+                      className="px-4 py-2 bg-violet-600 text-white rounded shadow hover:bg-violet-700 disabled:opacity-50"
+                      disabled={savingOrder}
+                    >
+                      {savingOrder ? 'Guardando...' : 'Guardar Orden'}
+                    </button>
+                    {orderSaved && <span className="ml-3 text-green-600 font-medium">¡Orden guardado!</span>}
+                  </div>
+                )}
               </div>
             )}
 

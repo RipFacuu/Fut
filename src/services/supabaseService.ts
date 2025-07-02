@@ -729,9 +729,15 @@ static async updateTeam(
   // Standings
   static async getStandingsByZone(zoneId: string): Promise<Standing[]> {
     try {
-      // Usar posiciones_editable en lugar de standings
-      const posicionesData = await obtenerPosicionesPorZona(zoneId);
-      return posicionesData.map(mapPosicionEditableToStanding);
+      // Usar la tabla 'standings' real, traer todos los campos incluyendo 'id' y 'orden'
+      const { data, error } = await supabase
+        .from('standings')
+        .select('*')
+        .eq('zona_id', zoneId)
+        .order('orden', { ascending: true })
+        .order('points', { ascending: false });
+      if (error) throw error;
+      return data || [];
     } catch (error) {
       console.error('Error getting standings by zone:', error);
       return [];

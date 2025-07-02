@@ -1,7 +1,6 @@
-import React from 'react';
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useLeague, Standing, Team } from '../../contexts/LeagueContext';
-import { Trash2, Save, Plus, X, Download, Upload, RefreshCw, Pencil } from 'lucide-react';
+import { Trash2, Save, Plus, X, Download, Upload, RefreshCw } from 'lucide-react';
 import { cn } from '../../utils/cn';
 import { useForm } from 'react-hook-form';
 import { useAuth } from '../../contexts/AuthContext';
@@ -34,7 +33,7 @@ const EditableCell: React.FC<EditableCellProps> = ({
   const handleBlur = () => {
     setIsEditing(false);
     if (tempValue !== value) {
-      onUpdate(standing.id, field, tempValue);
+      onUpdate(String(standing.id), field, tempValue);
     }
   };
 
@@ -79,7 +78,7 @@ const EditableCell: React.FC<EditableCellProps> = ({
             fontSize: 'inherit',
             fontFamily: 'inherit'
           }}
-          data-row-id={standing.id}
+          data-row-id={String(standing.id)}
         />
       ) : (
         <span>{value}</span>
@@ -544,7 +543,8 @@ const StandingsTable: React.FC<{ zoneId: string; leagueId: string; categoryId: s
         </div>
       )}
       
-      <div className="overflow-x-auto">
+      {/* Tabla tradicional para desktop */}
+      <div className="overflow-x-auto hidden md:block">
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
             <tr>
@@ -691,7 +691,7 @@ const StandingsTable: React.FC<{ zoneId: string; leagueId: string; categoryId: s
             
             {sortedStandings.map((standing, index) => {
               const team = teams.find(t => t.id === standing.teamId);
-              const isModified = modifiedRows.has(standing.id);
+              const isModified = modifiedRows.has(String(standing.id));
               
               return (
                 <tr 
@@ -725,7 +725,7 @@ const StandingsTable: React.FC<{ zoneId: string; leagueId: string; categoryId: s
                     <div className="flex justify-end space-x-2">
                       {isModified && (
                         <button
-                          onClick={() => handleSaveRow(standing.id)}
+                          onClick={() => handleSaveRow(String(standing.id))}
                           className="text-green-600 hover:text-green-900"
                           title="Confirmar cambios"
                           disabled={isLoading}
@@ -756,6 +756,66 @@ const StandingsTable: React.FC<{ zoneId: string; leagueId: string; categoryId: s
             )}
           </tbody>
         </table>
+      </div>
+      {/* Vista tipo lista para mobile */}
+      <div className="md:hidden space-y-3">
+        {sortedStandings.map((standing, idx) => {
+          const team = teams.find(t => t.id === standing.teamId);
+          const isModified = modifiedRows.has(String(standing.id));
+          return (
+            <div
+              key={standing.id}
+              className={
+                'flex flex-col rounded-lg p-3 border ' +
+                (isModified ? 'bg-yellow-50 border-yellow-200' : 'bg-gray-50 border-gray-200')
+              }
+            >
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center space-x-2">
+                  <span className="font-bold text-lg">{idx + 1}</span>
+                </div>
+                <div className="flex flex-row space-x-2">
+                  {isModified && (
+                    <button
+                      onClick={() => handleSaveRow(String(standing.id))}
+                      className="text-green-600 hover:text-green-900"
+                      title="Confirmar cambios"
+                      disabled={isLoading}
+                    >
+                      <Save size={18} />
+                    </button>
+                  )}
+                  <button
+                    onClick={() => handleDeleteTeam(standing)}
+                    className="text-red-600 hover:text-red-900"
+                    title="Eliminar equipo"
+                    disabled={isLoading}
+                  >
+                    <Trash2 size={18} />
+                  </button>
+                </div>
+              </div>
+              <div className="flex flex-col space-y-1">
+                <div className="text-base font-semibold text-gray-900">{team?.name || 'Equipo desconocido'}</div>
+                <div className="flex flex-wrap gap-2 mt-1">
+                  <span className="bg-gray-200 text-gray-700 px-2 py-0.5 rounded text-xs font-semibold">PJ: {standing.pj}</span>
+                  <span className="bg-green-200 text-green-800 px-2 py-0.5 rounded text-xs font-semibold">G: {standing.won}</span>
+                  <span className="bg-yellow-200 text-yellow-800 px-2 py-0.5 rounded text-xs font-semibold">E: {standing.drawn}</span>
+                  <span className="bg-red-200 text-red-800 px-2 py-0.5 rounded text-xs font-semibold">P: {standing.lost}</span>
+                  <span className="bg-blue-100 text-blue-800 px-2 py-0.5 rounded text-xs font-semibold">GF: {standing.goalsFor}</span>
+                  <span className="bg-blue-50 text-blue-800 px-2 py-0.5 rounded text-xs font-semibold">GC: {standing.goalsAgainst}</span>
+                  <span className="bg-purple-100 text-purple-800 px-2 py-0.5 rounded text-xs font-semibold">DIF: {standing.goalsFor - standing.goalsAgainst}</span>
+                  <span className="bg-indigo-200 text-indigo-800 px-2 py-0.5 rounded text-xs font-semibold">PTS: {standing.puntos}</span>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+        {sortedStandings.length === 0 && !isAddingTeam && (
+          <div className="text-center py-8 text-gray-500 bg-gray-50 rounded-md">
+            No hay equipos en esta zona. Agrega el primer equipo para comenzar.
+          </div>
+        )}
       </div>
     </div>
   );
