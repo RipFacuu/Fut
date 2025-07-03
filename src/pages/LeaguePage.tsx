@@ -99,14 +99,11 @@ const LeaguePage: React.FC = () => {
   }
   
   // Sort categories based on league
-  const sortedCategories = [...categories].sort((a) => {
-    if (league.id === 'liga_masculina') {
-      // Para Liga Masculina, las categorías vienen primero
-      return a.name.toLowerCase().includes('zona') ? 1 : -1;
-    } else {
-      // Para otras ligas, las zonas vienen primero
-      return a.name.toLowerCase().includes('zona') ? -1 : 1;
-    }
+  const getYear = (cat: { name: string }) => parseInt(cat.name.split('/')[0]);
+  const sortedCategories = [...categories].sort((a, b) => {
+    if (a.name === '09/10') return -1;
+    if (b.name === '09/10') return 1;
+    return getYear(b) - getYear(a);
   });
   
   const renderContent = () => {
@@ -228,21 +225,6 @@ const LeaguePage: React.FC = () => {
             <ClipboardList size={16} className="sm:w-[18px] sm:h-[18px]" />
             <span className="hidden sm:inline">Fixture</span>
             <span className="sm:hidden">Fix</span>
-          </button>
-          
-          {/* NUEVA PESTAÑA DE RESULTADOS */}
-          <button
-            className={cn(
-              "py-3 px-4 sm:px-6 font-medium text-xs sm:text-sm focus:outline-none whitespace-nowrap flex items-center space-x-1 sm:space-x-2 min-w-0 flex-shrink-0",
-              activeTab === 'results'
-                ? "border-b-2 border-primary-600 text-primary-700"
-                : "text-gray-500 hover:text-gray-700"
-            )}
-            onClick={() => setActiveTab('results')}
-          >
-            <Newspaper size={16} className="sm:w-[18px] sm:h-[18px]" />
-            <span className="hidden sm:inline">Resultados</span>
-            <span className="sm:hidden">Res</span>
           </button>
           
           <button

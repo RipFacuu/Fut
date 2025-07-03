@@ -221,20 +221,6 @@ const PublicStandingsTable: React.FC<PublicStandingsTableProps> = ({ leagueId, z
             );
           })}
         </div>
-        <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-          <div className="bg-green-50 p-3 rounded-lg border border-green-200">
-            <h4 className="font-medium text-green-800 mb-1">Clasificación</h4>
-            <p className="text-green-700">Equipos en posiciones de clasificación</p>
-          </div>
-          <div className="bg-gray-50 p-3 rounded-lg border border-gray-200">
-            <h4 className="font-medium text-gray-800 mb-1">Zona Media</h4>
-            <p className="text-gray-700">Equipos en posiciones intermedias</p>
-          </div>
-          <div className="bg-red-50 p-3 rounded-lg border border-red-200">
-            <h4 className="font-medium text-red-800 mb-1">Descenso</h4>
-            <p className="text-red-700">Equipos en riesgo de descenso</p>
-          </div>
-        </div>
       </div>
     </div>
   );

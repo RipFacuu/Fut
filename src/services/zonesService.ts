@@ -45,12 +45,15 @@ const mapZonaToZone = (zona: ZonaRow): Zone => {
 const mapZoneToZona = (zone: Omit<Zone, 'id'>): ZonaInsert => {
   // Mapear IDs de liga del formato de aplicación al formato de base de datos
   const getDbLeagueId = (appLeagueId: string): any => {
-    // Para Liga Masculina usar ID numérico como está en la DB
+    // Mapear todos los nombres a su ID numérico
     if (appLeagueId === 'liga_masculina') return 1;
-    // Para LIFUFE y Mundialito, usar strings como están en la DB
-    return appLeagueId;
+    if (appLeagueId === 'lifufe') return 2;
+    if (appLeagueId === 'mundialito') return 3;
+    // Si ya es número en string, convertir a número
+    if (!isNaN(Number(appLeagueId))) return Number(appLeagueId);
+    // Fallback: devolver null para evitar errores
+    return null;
   };
-  
   return {
     nombre: zone.name,
     liga_id: getDbLeagueId(zone.leagueId),

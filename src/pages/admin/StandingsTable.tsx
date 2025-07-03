@@ -199,16 +199,20 @@ const StandingsTable: React.FC<{ zoneId: string; leagueId: string; categoryId: s
     createTestData();
   }, [zoneId, leagueId, categoryId, zoneStandings.length, addTeam, createStanding]);
   
-  // Ordenar standings por puntos (descendente)
+  // Ordenar standings por puntos (descendente) de forma robusta
   const sortedStandings = [...zoneStandings].sort((a, b) => {
-    // Primero por puntos
-    if (b.puntos !== a.puntos) return b.puntos - a.puntos;
-    // Luego por diferencia de goles
-    const aDiff = a.goalsFor - a.goalsAgainst;
-    const bDiff = b.goalsFor - b.goalsAgainst;
+    // Asegurar que los valores sean números
+    const aPuntos = typeof a.puntos === 'number' ? a.puntos : parseInt(a.puntos) || 0;
+    const bPuntos = typeof b.puntos === 'number' ? b.puntos : parseInt(b.puntos) || 0;
+    if (bPuntos !== aPuntos) return bPuntos - aPuntos;
+    const aGoalsFor = typeof a.goalsFor === 'number' ? a.goalsFor : parseInt(a.goalsFor) || 0;
+    const aGoalsAgainst = typeof a.goalsAgainst === 'number' ? a.goalsAgainst : parseInt(a.goalsAgainst) || 0;
+    const bGoalsFor = typeof b.goalsFor === 'number' ? b.goalsFor : parseInt(b.goalsFor) || 0;
+    const bGoalsAgainst = typeof b.goalsAgainst === 'number' ? b.goalsAgainst : parseInt(b.goalsAgainst) || 0;
+    const aDiff = aGoalsFor - aGoalsAgainst;
+    const bDiff = bGoalsFor - bGoalsAgainst;
     if (bDiff !== aDiff) return bDiff - aDiff;
-    // Luego por goles a favor
-    return b.goalsFor - a.goalsFor;
+    return bGoalsFor - aGoalsFor;
   });
 
   const { register, handleSubmit, reset, formState: { errors }, watch } = useForm<NewTeamFormData>({
@@ -238,17 +242,25 @@ const StandingsTable: React.FC<{ zoneId: string; leagueId: string; categoryId: s
           updateTeam(standing.teamId, { name: value });
         }
       } else {
-        // Validar que los valores numéricos sean válidos
-        if (typeof value === 'number' && isNaN(value)) {
-          console.error('Valor inválido:', value);
-          return;
+        // Convertir a número si es un campo numérico
+        const numericFields = ['pj', 'won', 'drawn', 'lost', 'goalsFor', 'goalsAgainst', 'puntos'];
+        let processedValue = value;
+        if (numericFields.includes(field)) {
+          processedValue = Number(value);
+          if (isNaN(processedValue)) {
+            console.error('Valor inválido:', value);
+            return;
+          }
         }
         // Actualizar standing
-        updateStanding(id, { [field]: value });
+        updateStanding(id, { [field]: processedValue });
       }
-      
       // Marcar fila como modificada
       setModifiedRows(prev => new Set(prev).add(id));
+      // Forzar re-render si es campo crítico para el ordenamiento
+      if (["puntos", "goalsFor", "goalsAgainst"].includes(field)) {
+        setRefreshKey(prev => prev + 1);
+      }
     } catch (error) {
       console.error('Error actualizando:', error);
     }
