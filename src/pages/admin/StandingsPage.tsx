@@ -1230,7 +1230,7 @@ const StandingsPage: React.FC = () => {
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-100">
-                      {sortedStandings.map((standing, index) => (
+                      {completeStandings.map((standing: Standing, index: number) => (
                         <tr 
                           key={standing.id} 
                           className={cn(
@@ -1282,7 +1282,7 @@ const StandingsPage: React.FC = () => {
                             <div className="flex justify-center space-x-2">
                               {/* Flechas de orden */}
                               <button onClick={() => moveStanding(index, 'up')} disabled={index === 0} title="Subir" className="text-gray-500 hover:text-violet-600 disabled:opacity-30"><span>▲</span></button>
-                              <button onClick={() => moveStanding(index, 'down')} disabled={index === sortedStandings.length - 1} title="Bajar" className="text-gray-500 hover:text-violet-600 disabled:opacity-30"><span>▼</span></button>
+                              <button onClick={() => moveStanding(index, 'down')} disabled={index === completeStandings.length - 1} title="Bajar" className="text-gray-500 hover:text-violet-600 disabled:opacity-30"><span>▼</span></button>
                               <button
                                 onClick={() => handleSaveRow(standing)}
                                 disabled={loading || !modifiedRows.has(String(standing.id))}
@@ -1313,7 +1313,7 @@ const StandingsPage: React.FC = () => {
                 </div>
                 {/* Vista tipo lista para mobile */}
                 <div className="md:hidden space-y-3 p-2">
-                  {sortedStandings.map((standing, idx) => (
+                  {completeStandings.map((standing: Standing, idx: number) => (
                     <div
                       key={standing.id}
                       className={
@@ -1335,7 +1335,7 @@ const StandingsPage: React.FC = () => {
                         <div className="flex flex-row space-x-2">
                           {/* Flechas de orden */}
                           <button onClick={() => moveStanding(idx, 'up')} disabled={idx === 0} title="Subir" className="text-gray-500 hover:text-violet-600 disabled:opacity-30"><span>▲</span></button>
-                          <button onClick={() => moveStanding(idx, 'down')} disabled={idx === sortedStandings.length - 1} title="Bajar" className="text-gray-500 hover:text-violet-600 disabled:opacity-30"><span>▼</span></button>
+                          <button onClick={() => moveStanding(idx, 'down')} disabled={idx === completeStandings.length - 1} title="Bajar" className="text-gray-500 hover:text-violet-600 disabled:opacity-30"><span>▼</span></button>
                           <button
                             onClick={() => handleSaveRow(standing)}
                             className="text-indigo-600 hover:text-indigo-900"
@@ -1363,7 +1363,7 @@ const StandingsPage: React.FC = () => {
                       </div>
                     </div>
                   ))}
-                  {sortedStandings.length === 0 && (
+                  {completeStandings.length === 0 && (
                     <div className="text-center py-8 text-gray-500 bg-gray-50 rounded-md">
                       No hay equipos en esta zona. Agrega el primer equipo para comenzar.
                     </div>
@@ -1371,7 +1371,7 @@ const StandingsPage: React.FC = () => {
                 </div>
 
                 {/* Botón Guardar Orden */}
-                {orderDirty && sortedStandings.length > 1 && (
+                {orderDirty && completeStandings.length > 1 && (
                   <div className="flex justify-end mb-2">
                     <button
                       onClick={handleSaveOrder}

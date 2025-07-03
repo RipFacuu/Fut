@@ -605,6 +605,20 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
   
       if (savedTeam) {
         setTeams(prev => [...prev, savedTeam]);
+        // Crear posición inicial para el equipo
+        await createStanding({
+          teamId: savedTeam.id,
+          leagueId: savedTeam.leagueId,
+          categoryId: savedTeam.categoryId,
+          zoneId: savedTeam.zoneId,
+          puntos: 0,
+          pj: 0,
+          won: 0,
+          drawn: 0,
+          lost: 0,
+          goalsFor: 0,
+          goalsAgainst: 0
+        });
         return savedTeam;
       }
     } catch (error) {
@@ -615,6 +629,20 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
         id: `team_${Date.now()}`
       };
       setTeams(prev => [...prev, newTeam]);
+      // Crear posición inicial para el equipo localmente
+      await createStanding({
+        teamId: newTeam.id,
+        leagueId: newTeam.leagueId,
+        categoryId: newTeam.categoryId,
+        zoneId: newTeam.zoneId,
+        puntos: 0,
+        pj: 0,
+        won: 0,
+        drawn: 0,
+        lost: 0,
+        goalsFor: 0,
+        goalsAgainst: 0
+      });
       return newTeam;
     }
   };
@@ -917,9 +945,12 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
     setStandings(prev => [...prev, newStanding]);
   };
 
-  const createStanding = async (standing: Omit<Standing, 'id'>) => {
-    const newStanding: Standing = { ...standing, id: uuidv4() };
-    setStandings(prev => [...prev, newStanding]);
+  const createStanding = async (standing: Omit<Standing, 'id'>): Promise<void> => {
+    // Guardar en Supabase
+    const saved = await SupabaseService.createStanding(standing);
+    if (saved) {
+      await refreshStandings();
+    }
   };
 
   const importStandingsFromCSV = async (csvData: string, zoneId: string) => {
