@@ -295,7 +295,7 @@ const StandingsPage: React.FC = () => {
   // useEffect para cargar standings al cambiar zona/categoría
   useEffect(() => {
     loadStandings();
-  }, [loadStandings]);
+  }, [selectedZone, selectedCategory, selectedLeague]);
   
   // Create standings for teams that don't have them yet - MEJORADA
   const completeStandings = useMemo(() => {
@@ -400,11 +400,6 @@ const StandingsPage: React.FC = () => {
   };
   const [manualOrder, setManualOrder] = useState<StandingWithOrder[]>(getOrderedStandings());
 
-  // Sincronizar manualOrder cuando cambian los standings
-  useEffect(() => {
-    setManualOrder(getOrderedStandings());
-  }, [sortedStandings]);
-
   // 2. Funciones para mover arriba/abajo
   const moveStanding = (index: number, direction: 'up' | 'down') => {
     setManualOrder(prev => {
@@ -501,6 +496,11 @@ const StandingsPage: React.FC = () => {
   
   // Función para guardar una fila - ACTUALIZADA para el nuevo esquema
   const handleSaveRow = useCallback(async (standing: Standing) => {
+    forceAllRowsBlur();
+    if (editingCell !== null) {
+      setTimeout(() => handleSaveRow(standing), 0);
+      return;
+    }
     const currentStanding = completeStandings.find(s => s.id === standing.id);
     if (!currentStanding) {
       setError('Error: No se encontraron los datos actualizados.');
@@ -599,11 +599,16 @@ const StandingsPage: React.FC = () => {
 
   // Modificar handleSaveAll para guardar la leyenda si está dirty
   const handleSaveAllWithLegend = useCallback(async () => {
+    forceAllRowsBlur();
+    if (editingCell !== null) {
+      setTimeout(() => handleSaveAllWithLegend(), 0);
+      return;
+    }
     if (legendDirty) {
       await handleSaveLegend();
     }
     await handleSaveAllWithLegend();
-  }, [legendDirty, handleSaveLegend]);
+  }, [legendDirty, handleSaveLegend, editingCell]);
 
   // Recalculate standings from matches
   const handleRecalculateStandings = useCallback(() => {
@@ -712,12 +717,12 @@ const StandingsPage: React.FC = () => {
     } catch (error) { 
       console.error('❌ Error probando Supabase:', error); 
     } 
-  }, [selectedZone, selectedLeague, selectedCategory]); 
+  }, []);
   
   // Ejecutar test una vez al montar 
   useEffect(() => { 
     testSupabaseFunctions(); 
-  }, [testSupabaseFunctions]);
+  }, []);
   
   // Al agregar un equipo, solo agregarlo al estado local con id temporal, sin forzar edición
   const handleAddExistingTeam = useCallback(async () => {
@@ -853,12 +858,26 @@ const StandingsPage: React.FC = () => {
   
   // Filtrado de equipos y standings siempre por los tres IDs
   const filteredEquipos = useMemo(() => {
-    return teams.filter(
-      e => String(e.leagueId) === String(selectedLeague) &&
-          String(e.zoneId) === String(selectedZone) &&
-          String(e.categoryId) === String(selectedCategory)
+    const result = teams.filter(
+      e => String(e.zoneId) === String(selectedZone)
     );
-  }, [teams, selectedLeague, selectedZone, selectedCategory]);
+    // Log de depuración para ver qué equipos se filtran
+    if (selectedZone) {
+      console.log('🔎 filteredEquipos:', {
+        selectedLeague,
+        selectedZone,
+        selectedCategory,
+        equiposFiltrados: result.map(e => ({
+          id: e.id,
+          name: e.name,
+          leagueId: e.leagueId,
+          categoryId: e.categoryId,
+          zoneId: e.zoneId
+        }))
+      });
+    }
+    return result;
+  }, [teams, selectedZone]);
 
   const filteredStandings = useMemo(() => {
     return localStandings.filter(
