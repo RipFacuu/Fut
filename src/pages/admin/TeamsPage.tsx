@@ -147,6 +147,13 @@ const TeamsPage: React.FC = () => {
     }
   }, [watchCategoryId, isAdding, editingId]);
   
+  // Sincronizar zoneId del form con el filtro seleccionado
+  React.useEffect(() => {
+    if (isAdding && selectedZone) {
+      setValue('zoneId', selectedZone);
+    }
+  }, [selectedZone, isAdding, setValue]);
+  
   const handleAddClick = () => {
     setIsAdding(true);
     setEditingId(null);
@@ -422,14 +429,14 @@ const TeamsPage: React.FC = () => {
                 </div>
               )}
               {selectedCategory && (
-                <div>
+                <div className="hidden">
                   <label className="form-label">Categoría</label>
                   <div className="form-input bg-gray-100 cursor-not-allowed">{leagueCategories.find(c => c.id === selectedCategory)?.name || selectedCategory}</div>
                   <input type="hidden" style={{ display: 'none' }} {...register('categoryId')} value={selectedCategory} />
                 </div>
               )}
               {selectedZone && (
-                <div>
+                <div className="hidden">
                   <label className="form-label">Zona</label>
                   <div className="form-input bg-gray-100 cursor-not-allowed">{filterZones.find(z => z.id === selectedZone)?.name || selectedZone}</div>
                   <input type="hidden" style={{ display: 'none' }} {...register('zoneId')} value={selectedZone} />
