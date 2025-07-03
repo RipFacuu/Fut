@@ -856,28 +856,50 @@ const StandingsPage: React.FC = () => {
     }
   }, [getTeamName]);
   
-  // Filtrado de equipos y standings siempre por los tres IDs
+  // Filtrado de equipos y standings
   const filteredEquipos = useMemo(() => {
-    const result = teams.filter(
-      e => String(e.zoneId) === String(selectedZone)
-    );
-    // Log de depuración para ver qué equipos se filtran
-    if (selectedZone) {
-      console.log('🔎 filteredEquipos:', {
-        selectedLeague,
-        selectedZone,
-        selectedCategory,
-        equiposFiltrados: result.map(e => ({
-          id: e.id,
-          name: e.name,
-          leagueId: e.leagueId,
-          categoryId: e.categoryId,
-          zoneId: e.zoneId
-        }))
-      });
+    if (isMundialito) {
+      // Mostrar todos los equipos de la categoría seleccionada, sin importar la zona
+      const result = teams.filter(
+        e => String(e.leagueId) === String(selectedLeague) &&
+             String(e.categoryId) === String(selectedCategory)
+      );
+      if (selectedCategory) {
+        console.log('🔎 filteredEquipos (mundialito):', {
+          selectedLeague,
+          selectedCategory,
+          equiposFiltrados: result.map(e => ({
+            id: e.id,
+            name: e.name,
+            leagueId: e.leagueId,
+            categoryId: e.categoryId,
+            zoneId: e.zoneId
+          }))
+        });
+      }
+      return result;
+    } else {
+      // Filtro normal por zona
+      const result = teams.filter(
+        e => String(e.zoneId) === String(selectedZone)
+      );
+      if (selectedZone) {
+        console.log('🔎 filteredEquipos:', {
+          selectedLeague,
+          selectedZone,
+          selectedCategory,
+          equiposFiltrados: result.map(e => ({
+            id: e.id,
+            name: e.name,
+            leagueId: e.leagueId,
+            categoryId: e.categoryId,
+            zoneId: e.zoneId
+          }))
+        });
+      }
+      return result;
     }
-    return result;
-  }, [teams, selectedZone]);
+  }, [teams, selectedLeague, selectedCategory, selectedZone, isMundialito]);
 
   const filteredStandings = useMemo(() => {
     return localStandings.filter(

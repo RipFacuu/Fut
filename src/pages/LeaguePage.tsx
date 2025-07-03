@@ -19,6 +19,7 @@ const LeaguePage: React.FC = () => {
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
   const [selectedZoneId, setSelectedZoneId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [viewMode, setViewMode] = useState<'init' | 'fixture' | 'standings'>('init');
   
   // Refrescar zonas y categorías al montar la página
   useEffect(() => {
@@ -94,6 +95,13 @@ const LeaguePage: React.FC = () => {
     }
   }, [categories, selectedCategoryId]);
   
+  // NUEVO: Si es mundialito, ir directo a la tabla de posiciones
+  useEffect(() => {
+    if (league && league.id === 'mundialito') {
+      setViewMode('standings');
+    }
+  }, [league]);
+  
   if (!league) {
     return <div className="text-center py-12">Liga no encontrada</div>;
   }
@@ -106,54 +114,7 @@ const LeaguePage: React.FC = () => {
     return getYear(a) - getYear(b);
   });
   
-  const renderContent = () => {
-    if (!selectedCategoryId || !selectedZoneId) {
-      return (
-        <div className="text-center py-12 text-gray-500">
-          {league.id === 'liga_masculina'
-            ? 'Selecciona una zona y categoría para ver la información'
-            : 'Selecciona una categoría y zona para ver la información'}
-        </div>
-      );
-    }
-    
-    if (isLoading && activeTab === 'fixtures') {
-      return (
-        <div className="text-center py-12">
-          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
-          <p className="mt-2 text-gray-600">Cargando fixtures...</p>
-        </div>
-      );
-    }
-    
-    switch (activeTab) {
-      case 'fixtures':
-        return <FixtureList zoneId={selectedZoneId} />;
-      case 'results':
-        return <FixtureList zoneId={selectedZoneId} resultsOnly={true} />;
-      case 'standings':
-        return (
-          selectedZoneId && selectedCategoryId ? (
-            <PublicStandingsTable
-              leagueId={league.id}
-              zoneId={selectedZoneId}
-              categoryId={selectedCategoryId}
-            />
-          ) : (
-            <div className="text-center py-12 text-gray-500">
-              {league.id === 'liga_masculina'
-                ? 'Selecciona una zona y categoría para ver la información'
-                : 'Selecciona una categoría y zona para ver la información'}
-            </div>
-          )
-        );
-      case 'teams':
-        return <TeamList zoneId={selectedZoneId} />;
-      default:
-        return null;
-    }
-  };
-  
+  // Mover getLeagueIcon antes de cualquier uso
   const getLeagueIcon = () => {
     switch (league.id) {
       case 'liga_masculina':
@@ -166,6 +127,158 @@ const LeaguePage: React.FC = () => {
         return <Trophy size={32} className="text-primary-600" />;
     }
   };
+  
+  // NUEVO: Mostrar selector visual inicial SOLO si no es mundialito
+  if (viewMode === 'init' && league.id !== 'mundialito') {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-8">
+        <h2 className="text-2xl font-bold mb-4">¿Qué deseas ver de la liga?</h2>
+        <div className="flex flex-col md:flex-row gap-6">
+          <button
+            className="px-8 py-6 rounded-xl bg-gradient-to-r from-blue-500 to-indigo-600 text-white text-xl font-semibold shadow-lg hover:scale-105 transition-all"
+            onClick={() => setViewMode('fixture')}
+          >
+            Ver Fixture de la Liga
+          </button>
+          <button
+            className="px-8 py-6 rounded-xl bg-gradient-to-r from-green-500 to-emerald-600 text-white text-xl font-semibold shadow-lg hover:scale-105 transition-all"
+            onClick={() => setViewMode('standings')}
+          >
+            Ver Tabla de Posiciones
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // NUEVO: Botón para volver al selector (oculto en mundialito)
+  const SelectorBackButton = () => (
+    league.id !== 'mundialito' ? (
+      <div className="mb-6">
+        <button
+          className="px-4 py-2 rounded bg-gray-200 hover:bg-gray-300 text-gray-700 font-medium shadow"
+          onClick={() => setViewMode('init')}
+        >
+          ← Volver a elegir vista
+        </button>
+      </div>
+    ) : null
+  );
+
+  // NUEVO: Vista de todos los fixtures de la liga
+  if (viewMode === 'fixture') {
+    // Obtener todos los fixtures de la liga
+    const { fixtures } = useLeague();
+    const leagueFixtures = fixtures.filter(f => f.leagueId === leagueId);
+    return (
+      <div className="max-w-4xl mx-auto py-8">
+        <SelectorBackButton />
+        <h2 className="text-2xl font-bold mb-6 text-center">Fixture de la Liga</h2>
+        {leagueFixtures.length === 0 ? (
+          <div className="text-center py-12 text-gray-500">No hay fixtures cargados para esta liga.</div>
+        ) : (
+          <div className="space-y-8">
+            {leagueFixtures.map(fixture => (
+              <div key={fixture.id} className="fixture-card">
+                <div className="bg-gray-50 p-3 rounded-t-lg border-b">
+                  <h3 className="font-heading text-base sm:text-lg font-semibold text-gray-800">
+                    {fixture.date}
+                    <span className="ml-2 text-gray-500 text-xs sm:text-sm font-normal">
+                      {fixture.matchDate}
+                    </span>
+                  </h3>
+                </div>
+                <div className="p-2">
+                  {fixture.matches.length === 0 ? (
+                    <div className="text-gray-400 text-sm">No hay partidos para este fixture.</div>
+                  ) : (
+                    fixture.matches.map(match => (
+                      <div key={match.id} className="py-3 px-2 border-b last:border-0 flex items-center justify-between">
+                        <span className="font-medium">{(useLeague().teams.find(t => t.id === match.homeTeamId)?.name) || 'Equipo ' + match.homeTeamId}</span>
+                        {match.played ? (
+                          <span className="font-bold px-2 py-1 bg-gray-100 rounded-md min-w-[32px] text-center">{match.homeScore}</span>
+                        ) : (
+                          <span className="text-sm font-medium text-gray-500">VS</span>
+                        )}
+                        {match.played ? (
+                          <span className="mx-1">-</span>
+                        ) : null}
+                        {match.played ? (
+                          <span className="font-bold px-2 py-1 bg-gray-100 rounded-md min-w-[32px] text-center">{match.awayScore}</span>
+                        ) : null}
+                        <span className="font-medium">{(useLeague().teams.find(t => t.id === match.awayTeamId)?.name) || 'Equipo ' + match.awayTeamId}</span>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // NUEVO: Vista de tabla de posiciones (igual que antes, pero con botón de volver)
+  if (viewMode === 'standings') {
+    return (
+      <div className="max-w-5xl mx-auto py-8">
+        <SelectorBackButton />
+        {/* League header */}
+        <header className="flex items-center space-x-4 pb-4 border-b">
+          <div className="w-12 h-12 rounded-full bg-white shadow flex items-center justify-center">
+            {getLeagueIcon()}
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold">{league.name}</h1>
+            <p className="text-gray-600">{league.description}</p>
+          </div>
+        </header>
+        {/* Categories/Zones y lógica de selección */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 my-6">
+          {league.id === 'liga_masculina' ? (
+            zones.map((zone) => (
+              <ZonePanel
+                key={zone.id}
+                zone={zone}
+                isSelected={zone.id === selectedZoneId}
+                onSelect={(zoneId, categoryId) => {
+                  setSelectedZoneId(zoneId);
+                  setSelectedCategoryId(categoryId);
+                }}
+              />
+            ))
+          ) : (
+            sortedCategories.map((category) => (
+              <CategoryPanel
+                key={category.id}
+                category={category}
+                isSelected={category.id === selectedCategoryId}
+                onSelect={(categoryId, zoneId) => {
+                  setSelectedCategoryId(categoryId);
+                  setSelectedZoneId(zoneId);
+                }}
+              />
+            ))
+          )}
+        </div>
+        {/* Render de la tabla de posiciones */}
+        {selectedCategoryId && selectedZoneId ? (
+          <PublicStandingsTable
+            leagueId={league.id}
+            zoneId={selectedZoneId}
+            categoryId={selectedCategoryId}
+          />
+        ) : (
+          <div className="text-center py-12 text-gray-500">
+            {league.id === 'liga_masculina'
+              ? 'Selecciona una zona y categoría para ver la información'
+              : 'Selecciona una categoría y zona para ver la información'}
+          </div>
+        )}
+      </div>
+    );
+  }
   
   return (
     <div className="space-y-6">
@@ -245,7 +358,7 @@ const LeaguePage: React.FC = () => {
       
       {/* Content */}
       <div className="bg-white shadow rounded-lg p-6">
-        {renderContent()}
+        {/* Eliminar cualquier referencia a renderContent (ya no se usa) */}
       </div>
     </div>
   );
