@@ -150,20 +150,11 @@ const TeamsPage: React.FC = () => {
   const handleAddClick = () => {
     setIsAdding(true);
     setEditingId(null);
-    
-    // Inicializar formulario con valores vacíos para que el usuario seleccione
-    const targetLeague = showAllTeams ? leagues[0]?.id || '' : selectedLeague;
-    
-    console.log('Inicializando formulario con:', {
-      leagueId: targetLeague,
-      categoryId: '',
-      zoneId: ''
-    });
-    
+    // Usar los valores seleccionados en los filtros como valores por defecto
     reset({
-      leagueId: targetLeague,
-      categoryId: '', // Iniciar vacío
-      zoneId: '',     // Iniciar vacío
+      leagueId: selectedLeague,
+      categoryId: selectedCategory,
+      zoneId: selectedZone,
       name: '',
       logo: ''
     });
@@ -406,7 +397,6 @@ const TeamsPage: React.FC = () => {
                   <p className="mt-1 text-sm text-red-600">{errors.name.message}</p>
                 )}
               </div>
-              
               <div>
                 <label className="form-label" htmlFor="logo">
                   URL del Logo (opcional)
@@ -421,115 +411,100 @@ const TeamsPage: React.FC = () => {
                 />
               </div>
             </div>
-            
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-              <div>
-                <label className="form-label" htmlFor="leagueId">
-                  Liga
-                </label>
-                <select
-                  id="leagueId"
-                  className={cn(
-                    "form-input",
-                    errors.leagueId && "border-red-500"
+              {/* Mostrar Liga, Categoría y Zona como texto si ya están seleccionadas en los filtros */}
+              {selectedLeague && (
+                <div>
+                  <label className="form-label">Liga</label>
+                  <div className="form-input bg-gray-100 cursor-not-allowed">{leagues.find(l => l.id === selectedLeague)?.name || selectedLeague}</div>
+                  {/* Oculto visualmente la liga, pero dejo el input hidden funcional */}
+                  <input type="hidden" style={{ display: 'none' }} {...register('leagueId')} value={selectedLeague} />
+                </div>
+              )}
+              {selectedCategory && (
+                <div>
+                  <label className="form-label">Categoría</label>
+                  <div className="form-input bg-gray-100 cursor-not-allowed">{leagueCategories.find(c => c.id === selectedCategory)?.name || selectedCategory}</div>
+                  <input type="hidden" style={{ display: 'none' }} {...register('categoryId')} value={selectedCategory} />
+                </div>
+              )}
+              {selectedZone && (
+                <div>
+                  <label className="form-label">Zona</label>
+                  <div className="form-input bg-gray-100 cursor-not-allowed">{filterZones.find(z => z.id === selectedZone)?.name || selectedZone}</div>
+                  <input type="hidden" style={{ display: 'none' }} {...register('zoneId')} value={selectedZone} />
+                </div>
+              )}
+              {/* Si no hay valores seleccionados, mostrar los selects normales */}
+              {!selectedLeague && (
+                <div>
+                  <label className="form-label" htmlFor="leagueId">Liga</label>
+                  <select
+                    id="leagueId"
+                    className={cn(
+                      "form-input",
+                      errors.leagueId && "border-red-500"
+                    )}
+                    {...register('leagueId', { required: 'La liga es requerida' })}
+                  >
+                    {leagues.map(league => (
+                      <option key={league.id} value={league.id}>
+                        {league.name}
+                      </option>
+                    ))}
+                  </select>
+                  {errors.leagueId && (
+                    <p className="mt-1 text-sm text-red-600">{errors.leagueId.message}</p>
                   )}
-                  {...register('leagueId', { required: 'La liga es requerida' })}
-                >
-                  {leagues.map(league => (
-                    <option key={league.id} value={league.id}>
-                      {league.name}
-                    </option>
-                  ))}
-                </select>
-                {errors.leagueId && (
-                  <p className="mt-1 text-sm text-red-600">{errors.leagueId.message}</p>
-                )}
-              </div>
-              
-              {/* ORDEN CONDICIONAL: Si es Liga Participando, solo mostrar Zona */}
-              {watchLeagueId === 'liga_masculina' ? (
-                <>
-                  {/* Solo Zona para Liga Participando */}
-                  <div>
-                    <label className="form-label" htmlFor="zoneId">
-                      Zona
-                    </label>
-                    <select
-                      id="zoneId"
-                      className={cn(
-                        "form-input",
-                        errors.zoneId && "border-red-500"
-                      )}
-                      {...register('zoneId', { required: 'La zona es requerida' })}
-                    >
-                      <option value="">Seleccionar zona</option>
-                      {formZones.map(zone => (
-                        <option key={zone.id} value={zone.id}>
-                          {zone.name}
-                        </option>
-                      ))}
-                    </select>
-                    <input type="hidden" {...register('categoryId')} value="" />
-                    {errors.zoneId && (
-                      <p className="mt-1 text-sm text-red-600">{errors.zoneId.message}</p>
+                </div>
+              )}
+              {!selectedCategory && (
+                <div>
+                  <label className="form-label" htmlFor="categoryId">Categoría</label>
+                  <select
+                    id="categoryId"
+                    className={cn(
+                      "form-input",
+                      errors.categoryId && "border-red-500"
                     )}
-                  </div>
-                </>
-              ) : (
-                <>
-                  {/* Orden normal para otras ligas: Categoría primero */}
-                  <div>
-                    <label className="form-label" htmlFor="categoryId">
-                      Categoría
-                    </label>
-                    <select
-                      id="categoryId"
-                      className={cn(
-                        "form-input",
-                        errors.categoryId && "border-red-500"
-                      )}
-                      {...register('categoryId', { required: 'La categoría es requerida' })}
-                    >
-                      <option value="">Seleccionar categoría</option>
-                      {formLeagueCategories.map(category => (
-                        <option key={category.id} value={category.id}>
-                          {category.name}
-                        </option>
-                      ))}
-                    </select>
-                    {errors.categoryId && (
-                      <p className="mt-1 text-sm text-red-600">{errors.categoryId.message}</p>
+                    {...register('categoryId', { required: 'La categoría es requerida' })}
+                  >
+                    <option value="">Seleccionar categoría</option>
+                    {formLeagueCategories.map(category => (
+                      <option key={category.id} value={category.id}>
+                        {category.name}
+                      </option>
+                    ))}
+                  </select>
+                  {errors.categoryId && (
+                    <p className="mt-1 text-sm text-red-600">{errors.categoryId.message}</p>
+                  )}
+                </div>
+              )}
+              {!selectedZone && (
+                <div>
+                  <label className="form-label" htmlFor="zoneId">Zona</label>
+                  <select
+                    id="zoneId"
+                    className={cn(
+                      "form-input",
+                      errors.zoneId && "border-red-500"
                     )}
-                  </div>
-                  
-                  {/* Zona después para otras ligas */}
-                  <div>
-                    <label className="form-label" htmlFor="zoneId">
-                      Zona
-                    </label>
-                    <select
-                      id="zoneId"
-                      className={cn(
-                        "form-input",
-                        errors.zoneId && "border-red-500"
-                      )}
-                      {...register('zoneId', { required: 'La zona es requerida' })}
-                    >
-                      <option value="">Seleccionar zona</option>
-                      {formCategoryZones.map(zone => (
-                        <option key={zone.id} value={zone.id}>
-                          {zone.name}
-                        </option>
-                      ))}
-                    </select>
-                    {errors.zoneId && (
-                      <p className="mt-1 text-sm text-red-600">{errors.zoneId.message}</p>
-                    )}
-                  </div>
-                </>
+                    {...register('zoneId', { required: 'La zona es requerida' })}
+                  >
+                    <option value="">Seleccionar zona</option>
+                    {formCategoryZones.map(zone => (
+                      <option key={zone.id} value={zone.id}>
+                        {zone.name}
+                      </option>
+                    ))}
+                  </select>
+                  {errors.zoneId && (
+                    <p className="mt-1 text-sm text-red-600">{errors.zoneId.message}</p>
+                  )}
+                </div>
               )}
             </div>
-            
             <div className="flex flex-col sm:flex-row justify-end space-y-2 sm:space-y-0 sm:space-x-3">
               <button
                 type="button"
@@ -539,7 +514,6 @@ const TeamsPage: React.FC = () => {
                 <X size={18} />
                 <span>Cancelar</span>
               </button>
-              
               <button
                 type="submit"
                 className="btn btn-primary flex items-center space-x-2"

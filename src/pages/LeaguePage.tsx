@@ -101,9 +101,9 @@ const LeaguePage: React.FC = () => {
   // Sort categories based on league
   const getYear = (cat: { name: string }) => parseInt(cat.name.split('/')[0]);
   const sortedCategories = [...categories].sort((a, b) => {
-    if (a.name === '09/10') return -1;
-    if (b.name === '09/10') return 1;
-    return getYear(b) - getYear(a);
+    if (a.name === '2009/10') return -1;
+    if (b.name === '2009/10') return 1;
+    return getYear(a) - getYear(b);
   });
   
   const renderContent = () => {

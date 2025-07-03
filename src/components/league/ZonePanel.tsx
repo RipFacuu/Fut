@@ -86,7 +86,12 @@ const ZonePanel: React.FC<ZonePanelProps> = ({
                 Cargando categorías...
               </div>
             ) : categories.length > 0 ? (
-              categories.map((category: Category) => (
+              [...categories].sort((a, b) => {
+                if (a.name === '2009/10') return -1;
+                if (b.name === '2009/10') return 1;
+                const getYear = (cat: { name: string }) => parseInt(cat.name.split('/')[0]);
+                return getYear(a) - getYear(b);
+              }).map((category: Category) => (
                 <button
                   key={category.id}
                   className={cn(
