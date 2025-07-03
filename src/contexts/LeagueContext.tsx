@@ -112,7 +112,10 @@ export interface LeagueContextType {
   
   // Team operations
   getTeamsByZone: (zoneId: string) => Team[];
-  addTeam: (team: Omit<Team, 'id'>) => Promise<Team | undefined>;
+  addTeam: (
+    team: Omit<Team, 'id'>,
+    standingData?: Partial<Omit<Standing, 'id' | 'teamId' | 'leagueId' | 'categoryId' | 'zoneId'>>
+  ) => Promise<Team | undefined>;
   updateTeam: (id: string, data: Partial<Team>) => Promise<void>;
   deleteTeam: (id: string) => Promise<void>;
   
@@ -593,7 +596,10 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
     return result;
   };
 
-  const addTeam = async (team: Omit<Team, 'id'>): Promise<Team | undefined> => {
+  const addTeam = async (
+    team: Omit<Team, 'id'>,
+    standingData?: Partial<Omit<Standing, 'id' | 'teamId' | 'leagueId' | 'categoryId' | 'zoneId'>>
+  ): Promise<Team | undefined> => {
     try {
       const savedTeam = await SupabaseService.createTeam(
         team.name,
@@ -602,23 +608,9 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
         team.categoryId,
         team.logo
       );
-  
       if (savedTeam) {
         setTeams(prev => [...prev, savedTeam]);
-        // Crear posición inicial para el equipo
-        await createStanding({
-          teamId: savedTeam.id,
-          leagueId: savedTeam.leagueId,
-          categoryId: savedTeam.categoryId,
-          zoneId: savedTeam.zoneId,
-          puntos: 0,
-          pj: 0,
-          won: 0,
-          drawn: 0,
-          lost: 0,
-          goalsFor: 0,
-          goalsAgainst: 0
-        });
+        // Ya NO se crea el standing automáticamente aquí
         return savedTeam;
       }
     } catch (error) {
@@ -629,20 +621,7 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
         id: `team_${Date.now()}`
       };
       setTeams(prev => [...prev, newTeam]);
-      // Crear posición inicial para el equipo localmente
-      await createStanding({
-        teamId: newTeam.id,
-        leagueId: newTeam.leagueId,
-        categoryId: newTeam.categoryId,
-        zoneId: newTeam.zoneId,
-        puntos: 0,
-        pj: 0,
-        won: 0,
-        drawn: 0,
-        lost: 0,
-        goalsFor: 0,
-        goalsAgainst: 0
-      });
+      // Ya NO se crea el standing automáticamente aquí
       return newTeam;
     }
   };

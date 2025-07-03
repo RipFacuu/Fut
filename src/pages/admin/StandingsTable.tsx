@@ -26,19 +26,40 @@ const EditableCell: React.FC<EditableCellProps> = ({
   const [isEditing, setIsEditing] = useState(false);
   const [tempValue, setTempValue] = useState<number | string>(value);
 
+  // Sincronizar tempValue solo cuando no se está editando
   useEffect(() => {
-    setTempValue(value);
-  }, [value]);
+    if (!isEditing) {
+      setTempValue(value);
+    }
+  }, [value, isEditing]);
 
   const handleBlur = () => {
     setIsEditing(false);
-    if (tempValue !== value) {
-      onUpdate(String(standing.id), field, tempValue);
+    // Procesar el valor antes de enviarlo
+    let processedValue = tempValue;
+    if (type === 'number') {
+      // Si el input está vacío, forzar a 0
+      if (tempValue === '' || tempValue === undefined || tempValue === null) {
+        processedValue = 0;
+      } else {
+        const numValue = Number(tempValue);
+        if (isNaN(numValue) || numValue < min) {
+          processedValue = min;
+        } else {
+          processedValue = numValue;
+        }
+      }
     }
+    // Solo actualizar si el valor cambió
+    if (processedValue !== value) {
+      onUpdate(String(standing.id), field, processedValue);
+    }
+    setTempValue(processedValue);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
+      e.preventDefault();
       handleBlur();
     } else if (e.key === 'Escape') {
       setIsEditing(false);
@@ -49,10 +70,19 @@ const EditableCell: React.FC<EditableCellProps> = ({
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
     if (type === 'number') {
-      const numVal = val === '' ? min : Math.max(min, Number(val));
-      setTempValue(numVal);
+      // Permitir vacío durante la edición, pero nunca NaN
+      if (val === '' || !isNaN(Number(val))) {
+        setTempValue(val);
+      }
     } else {
       setTempValue(val);
+    }
+  };
+
+  const handleClick = () => {
+    if (!isEditing) {
+      setIsEditing(true);
+      setTempValue(value);
     }
   };
 
@@ -62,7 +92,7 @@ const EditableCell: React.FC<EditableCellProps> = ({
         "px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-center cursor-pointer",
         isEditing && "bg-violet-50/30"
       )}
-      onClick={() => !isEditing && setIsEditing(true)}
+      onClick={handleClick}
     >
       {isEditing ? (
         <input
@@ -128,6 +158,7 @@ const StandingsTable: React.FC<{ zoneId: string; leagueId: string; categoryId: s
   const [legend, setLegend] = useState('');
   const [legendLoading, setLegendLoading] = useState(false);
   const [legendDirty, setLegendDirty] = useState(false);
+  const [draftTeams, setDraftTeams] = useState<any[]>([]);
   
   const zoneStandings = getStandingsByZone(zoneId);
   
@@ -233,31 +264,30 @@ const StandingsTable: React.FC<{ zoneId: string; leagueId: string; categoryId: s
   const goalsAgainst = watch('goalsAgainst');
   const goalDifference = goalsFor - goalsAgainst;
 
-  const handleUpdate = (id: string, field: keyof Standing | 'teamName', value: any) => {
+  const handleUpdate = async (id: string, field: keyof Standing | 'teamName', value: any) => {
+    // Si es draft, actualizar en draftTeams
+    if (id.startsWith('draft_')) {
+      setDraftTeams(prev => prev.map(d => d.tempId === id ? { ...d, [field]: value } : d));
+      return;
+    }
     try {
       if (field === 'teamName') {
-        // Actualizar nombre del equipo
         const standing = zoneStandings.find(s => s.id === id);
         if (standing) {
-          updateTeam(standing.teamId, { name: value });
+          await updateTeam(standing.teamId, { name: value });
         }
       } else {
-        // Convertir a número si es un campo numérico
         const numericFields = ['pj', 'won', 'drawn', 'lost', 'goalsFor', 'goalsAgainst', 'puntos'];
         let processedValue = value;
         if (numericFields.includes(field)) {
           processedValue = Number(value);
-          if (isNaN(processedValue)) {
-            console.error('Valor inválido:', value);
-            return;
+          if (isNaN(processedValue) || processedValue < 0) {
+            processedValue = 0;
           }
         }
-        // Actualizar standing
-        updateStanding(id, { [field]: processedValue });
+        await updateStanding(id, { [field]: processedValue });
       }
-      // Marcar fila como modificada
       setModifiedRows(prev => new Set(prev).add(id));
-      // Forzar re-render si es campo crítico para el ordenamiento
       if (["puntos", "goalsFor", "goalsAgainst"].includes(field)) {
         setRefreshKey(prev => prev + 1);
       }
@@ -273,20 +303,40 @@ const StandingsTable: React.FC<{ zoneId: string; leagueId: string; categoryId: s
   };
 
   // Guardar fila: forzar blur y esperar un tick antes de guardar
-  const handleSaveRow = (id: string) => {
-    forceRowBlur(id);
-    setTimeout(() => {
-      // Remover de filas modificadas (esto dispara el guardado real en StandingsPage)
+  const handleSaveRow = async (id: string) => {
+    try {
+      // Encontrar el standing actual
+      const standing = zoneStandings.find(s => s.id === id);
+      if (!standing) return;
+      // Forzar blur de inputs de la fila
+      const rowInputs = document.querySelectorAll<HTMLInputElement>(`input[data-row-id='${id}']`);
+      rowInputs.forEach(input => input.blur());
+      // Esperar un tick para que el blur se procese
+      await new Promise(resolve => setTimeout(resolve, 0));
+      // Actualizar en la base de datos
+      await updateStanding(id, {
+        pj: Number(standing.pj),
+        puntos: Number(standing.puntos),
+        won: Number(standing.won),
+        drawn: Number(standing.drawn),
+        lost: Number(standing.lost),
+        goalsFor: Number(standing.goalsFor),
+        goalsAgainst: Number(standing.goalsAgainst)
+      });
+      // Remover de filas modificadas
       setModifiedRows(prev => {
         const newSet = new Set(prev);
         newSet.delete(id);
         return newSet;
       });
-    }, 0);
+    } catch (error) {
+      console.error('Error guardando fila:', error);
+      alert('Error al guardar. Inténtalo de nuevo.');
+    }
   };
 
   const handleSaveAll = async () => {
-    if (modifiedRows.size === 0 && !legendDirty) return;
+    if (modifiedRows.size === 0 && !legendDirty && draftTeams.length === 0) return;
     setIsLoading(true);
     try {
       // Guardar leyenda si fue modificada
@@ -294,7 +344,27 @@ const StandingsTable: React.FC<{ zoneId: string; leagueId: string; categoryId: s
         await standingsLegendService.upsertLegend(zoneId, categoryId, legend);
         setLegendDirty(false);
       }
-      // Guardar todos los standings modificados en Supabase
+      // 5.1 Guardar equipos nuevos y standings
+      for (const draft of draftTeams) {
+        // Crear equipo en Supabase
+        const createdTeam = await addTeam({
+          name: draft.name,
+          leagueId: draft.leagueId,
+          categoryId: draft.categoryId,
+          zoneId: draft.zoneId,
+          logo: draft.logo
+        }, {
+          pj: draft.pj,
+          won: draft.won,
+          drawn: draft.drawn,
+          lost: draft.lost,
+          goalsFor: draft.goalsFor,
+          goalsAgainst: draft.goalsAgainst,
+          puntos: draft.puntos
+        });
+      }
+      setDraftTeams([]);
+      // 5.2 Guardar standings editados
       const updates = Array.from(modifiedRows).map(async (id) => {
         const standing = zoneStandings.find(s => s.id === id);
         if (!standing) return;
@@ -310,6 +380,7 @@ const StandingsTable: React.FC<{ zoneId: string; leagueId: string; categoryId: s
       });
       await Promise.all(updates);
       setModifiedRows(new Set());
+      setRefreshKey(prev => prev + 1);
     } catch (error) {
       console.error('Error guardando standings:', error);
       alert('Error al guardar los datos. Intenta de nuevo.');
@@ -334,56 +405,26 @@ const StandingsTable: React.FC<{ zoneId: string; leagueId: string; categoryId: s
   };
 
   const onSubmitNewTeam = async (data: NewTeamFormData) => {
-    try {
-      setIsLoading(true);
-      
-      // Validar que los números sean consistentes
-      if (data.won + data.drawn + data.lost > data.played && data.played > 0) {
-        alert('La suma de partidos ganados, empatados y perdidos no puede ser mayor a los partidos jugados.');
-        return;
-      }
-      
-      // Crear nuevo equipo
-      const newTeamId = `team_${Date.now()}`;
-      const newTeam: Team = {
-        id: newTeamId,
+    setDraftTeams(prev => [
+      ...prev,
+      {
+        tempId: `draft_${Date.now()}`,
         name: data.teamName,
-        leagueId: leagueId,
-        categoryId: categoryId,
-        zoneId: zoneId,
-        logo: ''
-      };
-      
-      await addTeam(newTeam);
-      
-      // Crear standing para el nuevo equipo si existe la función
-      if (createStanding) {
-        const newStanding: Omit<Standing, 'id'> = {
-          leagueId,
-          categoryId,
-          teamId: newTeamId,
-          zoneId: zoneId,
-          pj: data.played,
-          won: data.won,
-          drawn: data.drawn,
-          lost: data.lost,
-          goalsFor: data.goalsFor,
-          goalsAgainst: data.goalsAgainst,
-          puntos: data.points
-        };
-        
-        await createStanding(newStanding);
+        leagueId,
+        categoryId,
+        zoneId,
+        logo: '',
+        pj: data.played,
+        won: data.won,
+        drawn: data.drawn,
+        lost: data.lost,
+        goalsFor: data.goalsFor,
+        goalsAgainst: data.goalsAgainst,
+        puntos: data.points
       }
-      
-      setIsAddingTeam(false);
-      reset();
-      setRefreshKey(prev => prev + 1);
-    } catch (error) {
-      console.error('Error creando equipo:', error);
-      alert('Error al crear el equipo. Inténtalo de nuevo.');
-    } finally {
-      setIsLoading(false);
-    }
+    ]);
+    setIsAddingTeam(false);
+    reset();
   };
 
   const exportToCSV = (zoneId: string) => {
@@ -472,6 +513,17 @@ const StandingsTable: React.FC<{ zoneId: string; leagueId: string; categoryId: s
     setLegendDirty(false);
     setLegendLoading(false);
   };
+
+  // En la tabla, muestro los draftTeams junto con los standings existentes
+  const allRows = [
+    ...draftTeams.map(draft => ({
+      ...draft,
+      id: draft.tempId,
+      teamId: draft.tempId,
+      isDraft: true
+    })),
+    ...sortedStandings
+  ];
 
   return (
     <div key={refreshKey} className="bg-white shadow overflow-hidden sm:rounded-lg">
@@ -701,7 +753,7 @@ const StandingsTable: React.FC<{ zoneId: string; leagueId: string; categoryId: s
               </tr>
             )}
             
-            {sortedStandings.map((standing, index) => {
+            {allRows.map((standing, index) => {
               const team = teams.find(t => t.id === standing.teamId);
               const isModified = modifiedRows.has(String(standing.id));
               
@@ -759,7 +811,7 @@ const StandingsTable: React.FC<{ zoneId: string; leagueId: string; categoryId: s
               );
             })}
             
-            {sortedStandings.length === 0 && !isAddingTeam && (
+            {allRows.length === 0 && !isAddingTeam && (
               <tr>
                 <td colSpan={11} className="px-6 py-8 text-center text-gray-500">
                   No hay equipos en esta zona. Agrega el primer equipo para comenzar.
@@ -771,7 +823,7 @@ const StandingsTable: React.FC<{ zoneId: string; leagueId: string; categoryId: s
       </div>
       {/* Vista tipo lista para mobile */}
       <div className="md:hidden space-y-3">
-        {sortedStandings.map((standing, idx) => {
+        {allRows.map((standing, idx) => {
           const team = teams.find(t => t.id === standing.teamId);
           const isModified = modifiedRows.has(String(standing.id));
           return (
@@ -823,7 +875,7 @@ const StandingsTable: React.FC<{ zoneId: string; leagueId: string; categoryId: s
             </div>
           );
         })}
-        {sortedStandings.length === 0 && !isAddingTeam && (
+        {allRows.length === 0 && !isAddingTeam && (
           <div className="text-center py-8 text-gray-500 bg-gray-50 rounded-md">
             No hay equipos en esta zona. Agrega el primer equipo para comenzar.
           </div>

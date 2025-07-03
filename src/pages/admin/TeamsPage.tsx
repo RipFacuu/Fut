@@ -147,12 +147,18 @@ const TeamsPage: React.FC = () => {
     }
   }, [watchCategoryId, isAdding, editingId]);
   
-  // Sincronizar zoneId del form con el filtro seleccionado
+  // Sincronizar zoneId, categoryId y leagueId del form con los filtros seleccionados también al editar
   React.useEffect(() => {
-    if (isAdding && selectedZone) {
+    if ((isAdding || editingId) && selectedZone) {
       setValue('zoneId', selectedZone);
     }
-  }, [selectedZone, isAdding, setValue]);
+    if ((isAdding || editingId) && selectedCategory) {
+      setValue('categoryId', selectedCategory);
+    }
+    if ((isAdding || editingId) && selectedLeague) {
+      setValue('leagueId', selectedLeague);
+    }
+  }, [selectedZone, selectedCategory, selectedLeague, isAdding, editingId, setValue]);
   
   const handleAddClick = () => {
     setIsAdding(true);
