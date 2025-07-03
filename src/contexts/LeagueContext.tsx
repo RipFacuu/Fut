@@ -487,10 +487,18 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
     }
   };
 
-  const updateCategory = (id: string, data: Partial<Category>) => {
-    setCategories(categories.map(cat =>
-      cat.id === id ? { ...cat, ...data } : cat
-    ));
+  const updateCategory = async (id: string, data: Partial<Category>) => {
+    try {
+      if (data.name) {
+        await SupabaseService.updateCategory(id, { name: data.name });
+      }
+      setCategories(categories.map(cat =>
+        cat.id === id ? { ...cat, ...data } : cat
+      ));
+    } catch (error) {
+      console.error('Error actualizando categoría en Supabase:', error);
+      // Opcional: muestra un mensaje de error al usuario
+    }
   };
 
   const deleteCategory = async (id: string) => {

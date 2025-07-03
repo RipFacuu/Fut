@@ -126,7 +126,7 @@ const CategoriesPage: React.FC = () => {
           isEditable: data.isEditable,
           ...(data.zoneId && { zoneId: String(Number(data.zoneId)) })
         };
-        updateCategory(editingId, updateData);
+        await updateCategory(editingId, updateData);
       }
       
       setIsAdding(false);

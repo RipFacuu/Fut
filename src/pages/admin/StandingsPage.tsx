@@ -653,7 +653,7 @@ const StandingsPage: React.FC = () => {
     setLoading(true);
     setError(null);
     try {
-      const newStanding: Standing = {
+      const newStanding: any = {
         id: `temp-${Date.now()}`,
         teamId: team.id,
         leagueId: selectedLeague,
@@ -665,7 +665,8 @@ const StandingsPage: React.FC = () => {
         drawn: 0,
         lost: 0,
         goalsFor: 0,
-        goalsAgainst: 0
+        goalsAgainst: 0,
+        equipo_nombre: team.name
       };
       setLocalStandings(prev => [...prev, newStanding]);
       addStanding(newStanding);
@@ -695,7 +696,7 @@ const StandingsPage: React.FC = () => {
         zoneId: selectedZone
       };
       await addTeam(newTeam);
-      const newStanding: Standing = {
+      const newStanding: any = {
         id: `temp-${Date.now()}`,
         teamId: newTeam.id,
         leagueId: selectedLeague,
@@ -707,7 +708,8 @@ const StandingsPage: React.FC = () => {
         drawn: 0,
         lost: 0,
         goalsFor: 0,
-        goalsAgainst: 0
+        goalsAgainst: 0,
+        equipo_nombre: newTeam.name
       };
       setLocalStandings(prev => [...prev, newStanding]);
       addStanding(newStanding);

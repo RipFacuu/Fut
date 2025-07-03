@@ -896,6 +896,14 @@ static async updateTeam(
       return [];
     }
   }
+
+  static async updateCategory(id: string, updates: { name: string }) {
+    const { error } = await supabase
+      .from('categorias')
+      .update({ nombre: updates.name })
+      .eq('id', id);
+    if (error) throw error;
+  }
 }
 
 // Exportación específica
