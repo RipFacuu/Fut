@@ -1,5 +1,5 @@
 import React from 'react';
-import { Trophy, User } from 'lucide-react';
+import { Trophy, User, Facebook, Instagram } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -8,65 +8,44 @@ const Footer: React.FC = () => {
   const { isAuthenticated } = useAuth();
   
   return (
-    <footer className="w-full mt-12 px-4 py-6 bg-primary-600 text-white">
-      <div className="container mx-auto px-4 py-8">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          {/* Logo and description */}
-          <div className="flex flex-col space-y-3">
-            <div className="flex items-center space-x-2">
-              <Trophy size={24} className="text-accent-300" />
-              <span className="font-heading text-xl font-semibold">Liga Participando</span>
+    <footer className="w-full mt-12 px-4 py-3 bg-primary-600 text-white">
+      <div className="container mx-auto px-4 py-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
+          {/* Ligas */}
+          <div>
+            <h3 className="text-sm font-semibold mb-1 tracking-wide uppercase text-primary-100">Ligas</h3>
+            <ul className="flex flex-wrap gap-3">
+              <li>
+                <Link to="/league/liga_masculina" className="hover:text-white transition-colors font-medium">Liga Participando</Link>
+              </li>
+              <li>
+                <Link to="/league/lifufe" className="hover:text-white transition-colors font-medium">LIFUFE</Link>
+              </li>
+              <li>
+                <Link to="/league/mundialito" className="hover:text-white transition-colors font-medium">Mundialito</Link>
+              </li>
+            </ul>
+          </div>
+          {/* Contacto y redes */}
+          <div className="flex flex-col items-start md:items-end space-y-1">
+            <h3 className="text-sm font-semibold mb-1 tracking-wide uppercase text-primary-100">Contacto</h3>
+            <span className="text-primary-100 font-medium">Tel: (+54) 3514594519</span>
+            <div className="flex space-x-3 mt-1">
+              <a href="https://www.facebook.com/liga.participando" target="_blank" rel="noopener noreferrer" className="hover:text-white flex items-center" title="Facebook Liga Participando">
+                <Facebook size={22} />
+              </a>
+              <a href="https://www.instagram.com/liga_participando/" target="_blank" rel="noopener noreferrer" className="hover:scale-110 transition-transform flex items-center" title="Instagram Liga Participando">
+                <Instagram size={22} />
+                <span className="ml-1 text-xs">Liga</span>
+              </a>
+              <a href="https://www.instagram.com/li.fu.fe_ligafem?igsh=MXUzeDhoMjRkb2xwYQ==" target="_blank" rel="noopener noreferrer" className="hover:scale-110 transition-transform flex items-center" title="Instagram LIFUFE">
+                <Instagram size={22} />
+                <span className="ml-1 text-xs">LIFUFE</span>
+              </a>
             </div>
-            <p className="text-primary-100 text-sm">
-              Organizando y promoviendo el deporte desde 2010, Liga Participando
-              es el hogar de múltiples competiciones deportivas.
-            </p>
-          </div>
-          
-          {/* Quick links */}
-          <div>
-            <h3 className="text-lg font-semibold mb-3">Ligas</h3>
-            <ul className="space-y-2">
-              <li>
-                <Link to="/league/liga_masculina" className="text-primary-100 hover:text-white transition-colors">
-                  Liga Participando
-                </Link>
-              </li>
-              <li>
-                <Link to="/league/lifufe" className="text-primary-100 hover:text-white transition-colors">
-                  LIFUFE
-                </Link>
-              </li>
-              <li>
-                <Link to="/league/mundialito" className="text-primary-100 hover:text-white transition-colors">
-                  Mundialito
-                </Link>
-              </li>
-            </ul>
-          </div>
-          
-          {/* Contact and Admin */}
-          <div>
-            <h3 className="text-lg font-semibold mb-3">Contacto</h3>
-            <ul className="space-y-2 text-primary-100">
-              <li>info@ligaparticipando.com</li>
-              <li>Tel: (123) 456-7890</li>
-              <li>Dirección: Av. Deportiva 123, Ciudad</li>
-            </ul>
-            
-            {!isAuthenticated && (
-              <Link
-                to="/admin/login"
-                className="inline-flex items-center space-x-2 mt-4 px-4 py-2 bg-accent-500 hover:bg-accent-600 rounded-md text-white text-sm font-medium transition-colors"
-              >
-                <User size={16} />
-                <span>Acceder como administrador</span>
-              </Link>
-            )}
           </div>
         </div>
-        
-        <div className="border-t border-primary-500 mt-8 pt-4 text-center text-primary-100 text-sm">
+        <div className="border-t border-primary-500 mt-4 pt-2 text-center text-primary-100 text-xs">
           <p>&copy; {currentYear} Liga Participando. Todos los derechos reservados.</p>
           <p className="mt-2 text-xs text-primary-200">
             Hecho con <span role="img" aria-label="laptop">💻</span> por{' '}

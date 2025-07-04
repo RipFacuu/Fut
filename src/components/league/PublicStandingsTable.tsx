@@ -163,12 +163,7 @@ const PublicStandingsTable: React.FC<PublicStandingsTableProps> = ({ leagueId, z
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center">
-                        <div className="w-8 h-8 mr-3 bg-primary-100 rounded-full flex items-center justify-center border-2 border-primary-200">
-                          <span className="text-xs font-bold text-primary-700">{team?.name?.charAt(0) || '?'}</span>
-                        </div>
-                        <span className="text-sm font-medium text-gray-900">{standing.equipo_nombre && standing.equipo_nombre.trim() !== '' ? standing.equipo_nombre : standing.teamId}</span>
-                      </div>
+                      <span className="text-lg font-bold text-gray-900">{standing.equipo_nombre && standing.equipo_nombre.trim() !== '' ? standing.equipo_nombre : standing.teamId}</span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700 text-center font-medium">{standing.pj}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-center"><span className="text-lg font-bold">{standing.puntos}</span></td>
@@ -199,11 +194,8 @@ const PublicStandingsTable: React.FC<PublicStandingsTableProps> = ({ leagueId, z
                     <span className="font-bold text-lg">{index + 1}</span>
                     {index < 3 && <span>{medalIcons[index]}</span>}
                   </div>
-                  <div className="w-8 h-8 bg-primary-100 rounded-full flex items-center justify-center border-2 border-primary-200">
-                    <span className="text-xs font-bold text-primary-700">{team?.name?.charAt(0) || '?'}</span>
-                  </div>
                   <div>
-                    <div className="text-sm font-medium text-gray-900">{standing.equipo_nombre && standing.equipo_nombre.trim() !== '' ? standing.equipo_nombre : standing.teamId}</div>
+                    <div className="text-lg font-bold text-gray-900">{standing.equipo_nombre && standing.equipo_nombre.trim() !== '' ? standing.equipo_nombre : standing.teamId}</div>
                     <div className="flex space-x-2 mt-1">
                       <span className="bg-gray-200 text-gray-700 px-2 py-0.5 rounded text-xs font-semibold">PJ: {standing.pj}</span>
                       <span className="bg-blue-200 text-blue-800 px-2 py-0.5 rounded text-xs font-semibold">PTS: {standing.puntos}</span>
