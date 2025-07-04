@@ -52,7 +52,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   // Mock login function (in a real app, this would call an API)
   const login = async (username: string, password: string): Promise<boolean> => {
     // Mock successful login for admin/admin
-    if (username === 'admin' && password === 'admin') {
+    if (username === 'Ferferchu' && password === 'Fer5378') {
       const mockUser = {
         id: '1',
         username: 'admin'
