@@ -109,9 +109,6 @@ const AdminLogin: React.FC = () => {
           </form>
           
           <div className="mt-4 text-center">
-            <p className="text-gray-600 text-sm">
-              Para acceder al demo: usuario <strong>admin</strong>, contraseña <strong>admin</strong>
-            </p>
           </div>
         </div>
       </div>
