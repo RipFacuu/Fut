@@ -160,6 +160,16 @@ const Header: React.FC = () => {
             >
               Mundialito
             </NavLink>
+            <NavLink
+              to="/courses"
+              className={({ isActive }) => cn(
+                "px-3 py-2 rounded-md text-sm font-medium",
+                isActive ? "bg-primary-800 text-white" : "text-primary-100 hover:bg-primary-800 hover:text-white"
+              )}
+              onClick={toggleMenu}
+            >
+              Cursos y Capacitaciones
+            </NavLink>
             
             {isAuthenticated ? (
               <>
