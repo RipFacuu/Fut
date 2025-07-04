@@ -159,7 +159,7 @@ const LeaguePage: React.FC = () => {
           className="px-4 py-2 rounded bg-gray-200 hover:bg-gray-300 text-gray-700 font-medium shadow"
           onClick={() => setViewMode('init')}
         >
-          ← Volver a elegir vista
+          ← Volver
         </button>
       </div>
     ) : null
@@ -169,52 +169,86 @@ const LeaguePage: React.FC = () => {
   if (viewMode === 'fixture') {
     // Obtener todos los fixtures de la liga
     const { fixtures } = useLeague();
-    const leagueFixtures = fixtures.filter(f => f.leagueId === leagueId);
+    // Ordenar fixtures por fecha_partido ascendente
+    const leagueFixtures = fixtures
+      .filter(f => f.leagueId === leagueId)
+      .sort((a, b) => new Date(a.matchDate).getTime() - new Date(b.matchDate).getTime());
     return (
-      <div className="max-w-4xl mx-auto py-8">
-        <SelectorBackButton />
-        <h2 className="text-2xl font-bold mb-6 text-center">Fixture de la Liga</h2>
-        {leagueFixtures.length === 0 ? (
-          <div className="text-center py-12 text-gray-500">No hay fixtures cargados para esta liga.</div>
-        ) : (
-          <div className="space-y-8">
-            {leagueFixtures.map(fixture => (
-              <div key={fixture.id} className="fixture-card">
-                <div className="bg-gray-50 p-3 rounded-t-lg border-b">
-                  <h3 className="font-heading text-base sm:text-lg font-semibold text-gray-800">
-                    {fixture.date}
-                    <span className="ml-2 text-gray-500 text-xs sm:text-sm font-normal">
-                      {fixture.matchDate}
-                    </span>
-                  </h3>
-                </div>
-                <div className="p-2">
-                  {fixture.matches.length === 0 ? (
-                    <div className="text-gray-400 text-sm">No hay partidos para este fixture.</div>
-                  ) : (
-                    fixture.matches.map(match => (
-                      <div key={match.id} className="py-3 px-2 border-b last:border-0 flex items-center justify-between">
-                        <span className="font-medium">{(useLeague().teams.find(t => t.id === match.homeTeamId)?.name) || 'Equipo ' + match.homeTeamId}</span>
-                        {match.played ? (
-                          <span className="font-bold px-2 py-1 bg-gray-100 rounded-md min-w-[32px] text-center">{match.homeScore}</span>
-                        ) : (
-                          <span className="text-sm font-medium text-gray-500">VS</span>
-                        )}
-                        {match.played ? (
-                          <span className="mx-1">-</span>
-                        ) : null}
-                        {match.played ? (
-                          <span className="font-bold px-2 py-1 bg-gray-100 rounded-md min-w-[32px] text-center">{match.awayScore}</span>
-                        ) : null}
-                        <span className="font-medium">{(useLeague().teams.find(t => t.id === match.awayTeamId)?.name) || 'Equipo ' + match.awayTeamId}</span>
+      <div className="min-h-[80vh] flex flex-col items-center justify-center bg-gradient-to-br from-gray-50 to-white py-10">
+        <div className="w-full max-w-2xl mx-auto">
+          <SelectorBackButton />
+          <h2 className="text-3xl font-bold mb-8 text-center text-primary-800">Fixture de la Liga</h2>
+          {leagueFixtures.length === 0 ? (
+            <div className="text-center py-12 text-gray-500 bg-white rounded-xl shadow">No hay fixtures cargados para esta liga.</div>
+          ) : (
+            <div className="space-y-8">
+              {leagueFixtures.map((fixture, fixtureIdx) => (
+                <div key={fixture.id} className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden mb-6">
+                  {/* Header visual mejorado */}
+                  <div className="bg-gradient-to-r from-indigo-600 to-blue-500 p-3 rounded-t-2xl flex flex-col items-center justify-center sm:flex-row sm:items-center sm:justify-between text-center sm:text-left">
+                    <div className="flex flex-col items-center sm:items-start w-full">
+                      <div className="flex items-center justify-center mb-1 sm:mb-0">
+                        <svg className="w-5 h-5 text-blue-100 mr-2" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="4"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+                        <h3 className="font-heading text-xl font-bold text-white text-center sm:text-left inline-block align-middle">
+                          {fixture.date}
+                          <span className="ml-2 text-blue-100 text-base font-normal align-middle">{fixture.matchDate ? new Date(fixture.matchDate).toLocaleDateString('es-AR') : ''}</span>
+                        </h3>
                       </div>
-                    ))
+                    </div>
+                    {fixture.leyenda && (
+                      <div className="mt-2 sm:mt-0 px-3 py-1 bg-white/20 rounded-full border border-white/30 flex items-center justify-center space-x-2 shadow mx-auto sm:mx-0">
+                        <Newspaper className="w-4 h-4 text-white" />
+                        <span className="text-white text-xs font-semibold text-center">{fixture.leyenda}</span>
+                      </div>
+                    )}
+                  </div>
+                  {/* Zona/Texto central en pastilla */}
+                  {fixture.texto_central && (
+                    <div className="flex justify-center items-center py-2 bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-blue-100">
+                      <div className="flex items-center px-3 py-1 rounded-full bg-white shadow border border-blue-200 justify-center mx-auto">
+                        <span className="text-indigo-700 font-semibold text-sm text-center">{fixture.texto_central}</span>
+                      </div>
+                    </div>
                   )}
+                  {/* Partidos */}
+                  <div className="p-3 bg-white">
+                    {fixture.matches.length === 0 ? (
+                      <div className="text-center py-6 text-blue-400 text-base font-semibold bg-blue-50 rounded-xl shadow-inner">
+                        <ClipboardList className="mx-auto mb-2 w-7 h-7 text-blue-300" />
+                        No hay partidos para este fixture.
+                      </div>
+                    ) : (
+                      <div className="grid gap-2">
+                        {fixture.matches.map((match, idx) => (
+                          <div key={match.id || idx} className="bg-gradient-to-r from-indigo-50 to-blue-50 rounded-xl shadow hover:shadow-lg transition-shadow p-2 group">
+                            <div className="grid grid-cols-12 items-center w-full">
+                              <div className="flex items-center justify-center col-span-1">
+                                <div className="flex items-center justify-center w-7 h-7 rounded-full bg-indigo-200 text-indigo-700 font-bold text-xs shadow-inner">
+                                  {idx + 1}
+                                </div>
+                              </div>
+                              <span className="font-medium text-gray-800 text-sm text-left col-span-4 truncate">
+                                {(useLeague().teams.find(t => t.id === match.homeTeamId)?.name) || 'Equipo ' + match.homeTeamId}
+                              </span>
+                              <span className="col-span-2 text-indigo-500 font-bold text-base text-center group-hover:scale-110 transition-transform">VS</span>
+                              <span className="font-medium text-gray-800 text-sm text-right col-span-5 truncate">
+                                {(useLeague().teams.find(t => t.id === match.awayTeamId)?.name) || 'Equipo ' + match.awayTeamId}
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {/* Footer informativo */}
+                    <div className="mt-4 text-center text-xs text-gray-400 border-t pt-2">
+                      Los horarios de los partidos pueden estar sujetos a cambios. Consulta siempre la información oficial.
+                    </div>
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
-        )}
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     );
   }

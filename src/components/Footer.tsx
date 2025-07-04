@@ -8,7 +8,7 @@ const Footer: React.FC = () => {
   const { isAuthenticated } = useAuth();
   
   return (
-    <footer className="bg-primary-600 text-white">
+    <footer className="w-full mt-12 px-4 py-6 bg-primary-600 text-white">
       <div className="container mx-auto px-4 py-8">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           {/* Logo and description */}
@@ -68,6 +68,17 @@ const Footer: React.FC = () => {
         
         <div className="border-t border-primary-500 mt-8 pt-4 text-center text-primary-100 text-sm">
           <p>&copy; {currentYear} Liga Participando. Todos los derechos reservados.</p>
+          <p className="mt-2 text-xs text-primary-200">
+            Hecho con <span role="img" aria-label="laptop">💻</span> por{' '}
+            <a
+              href="https://github.com/RipFacuu"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-white underline hover:text-accent-300 font-medium transition-colors"
+            >
+              Facundo Aguirre
+            </a>
+          </p>
         </div>
       </div>
     </footer>

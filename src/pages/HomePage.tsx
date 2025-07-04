@@ -55,17 +55,17 @@ const HomePage: React.FC = () => {
               <div className="flex justify-center mb-4">
                 {league.id === 'liga_masculina' && (
                   <div className="w-20 h-20 bg-primary-100 rounded-full flex items-center justify-center">
-                    <Trophy size={40} className="text-primary-600" />
+                    <img src="/liga_participando.jpeg" alt="Liga Masculina" className="w-20 h-20 object-cover rounded-full scale-110" />
                   </div>
                 )}
                 {league.id === 'lifufe' && (
                   <div className="w-20 h-20 bg-accent-100 rounded-full flex items-center justify-center">
-                    <Users size={40} className="text-accent-600" />
+                    <img src="/lifufe.jpeg" alt="LIFUFE" className="w-20 h-20 object-cover rounded-full scale-110" />
                   </div>
                 )}
                 {league.id === 'mundialito' && (
                   <div className="w-20 h-20 bg-secondary-100 rounded-full flex items-center justify-center">
-                    <ClipboardList size={40} className="text-secondary-600" />
+                    <img src="/mundialito.jpeg" alt="Mundialito" className="w-20 h-20 object-cover rounded-full scale-110" />
                   </div>
                 )}
               </div>

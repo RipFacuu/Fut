@@ -17,6 +17,7 @@ import ZonesPage from './pages/admin/ZonesPage';
 import NotFoundPage from './pages/NotFoundPage';
 import CoursesPage from './pages/CoursesPage';
 import AdminCoursesPage from './pages/admin/CoursesPage';
+import CourseDetailPage from './pages/CourseDetailPage';
 
 const App: React.FC = () => {
   return (
@@ -28,6 +29,7 @@ const App: React.FC = () => {
               <Route index element={<HomePage />} />
               <Route path="league/:leagueId" element={<LeaguePage />} />
               <Route path="courses" element={<CoursesPage />} /> {/* Ruta pública */}
+              <Route path="courses/:id" element={<CourseDetailPage />} />
               <Route path="admin/login" element={<AdminLogin />} />
               
               <Route path="admin" element={

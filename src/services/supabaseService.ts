@@ -244,6 +244,8 @@ export const mapSupabaseToFixture = (supabaseFixture: any): Fixture => {
     leagueId: leagueId,
     categoryId: categoryId,
     zoneId: zoneId,
+    leyenda: supabaseFixture.leyenda || '',
+    texto_central: supabaseFixture.texto_central || '',
     matches: []
   };
 };
@@ -317,23 +319,11 @@ export const mapPosicionEditableToStanding = (posicion: any): Standing & { teamN
 
 // Mapper para cursos
 export const mapSupabaseToCourse = (supabaseCourse: any): Course => {
-  // Convertir datos binarios a URL para mostrar en la interfaz
-  let imageUrl = '';
-  if (supabaseCourse.image_data && typeof window !== 'undefined') {
-    // Solo ejecutar en el navegador, no durante el build del servidor
-    try {
-      const blob = new Blob([supabaseCourse.image_data], { type: 'image/png' });
-      imageUrl = URL.createObjectURL(blob);
-    } catch (error) {
-      console.error('Error creating blob URL:', error);
-    }
-  }
-
   return {
     id: supabaseCourse.id || '',
     title: supabaseCourse.title || '',
     description: supabaseCourse.description || '',
-    imageUrl: imageUrl,
+    imageUrl: supabaseCourse.image_url || '',
     date: supabaseCourse.date || '',
     active: supabaseCourse.active !== undefined ? supabaseCourse.active : true
   };
@@ -632,6 +622,8 @@ static async updateTeam(
     ligaId: string;
     categoriaId: string;
     zonaId: string;
+    leyenda?: string;
+    texto_central?: string;
     matches: {
       homeTeamId: string;
       awayTeamId: string;
@@ -641,9 +633,11 @@ static async updateTeam(
       const fixtureResult = await crearFixture(
         fixtureData.nombre,
         fixtureData.fechaPartido,
-        fixtureData.ligaId,
-        fixtureData.categoriaId,
-        fixtureData.zonaId
+        Number(fixtureData.ligaId),
+        Number(fixtureData.categoriaId),
+        fixtureData.zonaId ? Number(fixtureData.zonaId) : null,
+        fixtureData.leyenda || null,
+        fixtureData.texto_central || null
       );
 
       if (!fixtureResult || fixtureResult.length === 0) {
@@ -654,11 +648,11 @@ static async updateTeam(
 
       for (const match of fixtureData.matches) {
         const matchResult = await crearPartidoConFixture(
-          match.homeTeamId,
-          match.awayTeamId,
-          fixtureData.zonaId,
+          Number(match.homeTeamId),
+          Number(match.awayTeamId),
+          Number(fixtureData.zonaId),
           fixtureData.fechaPartido,
-          fixtureId
+          Number(fixtureId)
         );
 
         if (!matchResult) {
@@ -831,21 +825,20 @@ static async updateTeam(
   static async createCourse(course: {
     title: string;
     description: string;
-    imageFile: File; // Cambiar para recibir archivo en lugar de URL
+    imageFile: File;
     date: string;
   }): Promise<Course> {
     try {
       // Convertir archivo a datos binarios
       const arrayBuffer = await course.imageFile.arrayBuffer();
       const imageData = new Uint8Array(arrayBuffer);
-  
+      console.log('🟣 [createCourse] imageData:', imageData, 'length:', imageData.length, 'type:', typeof imageData);
       const supabaseCourse = await crearCurso({
         title: course.title,
         description: course.description,
         image_data: imageData, // Usar datos binarios
         date: course.date,
       });
-  
       return mapSupabaseToCourse(supabaseCourse);
     } catch (error) {
       console.error('Error creating course:', error);
@@ -903,6 +896,129 @@ static async updateTeam(
       .update({ nombre: updates.name })
       .eq('id', id);
     if (error) throw error;
+  }
+
+  static async updateFixtureWithMatches(fixtureId: string, fixtureData: {
+    nombre: string;
+    fechaPartido: string;
+    ligaId: string;
+    categoriaId: string;
+    zonaId: string;
+    leyenda?: string;
+    texto_central?: string;
+    matches: {
+      homeTeamId: string;
+      awayTeamId: string;
+    }[];
+  }): Promise<{ success: boolean; error?: string }> {
+    try {
+      await supabase
+        .from('fixtures')
+        .update({
+          nombre: fixtureData.nombre,
+          fecha_partido: fixtureData.fechaPartido,
+          leyenda: fixtureData.leyenda || null,
+          texto_central: fixtureData.texto_central || null,
+          zona_id: fixtureData.zonaId ? Number(fixtureData.zonaId) : null
+        })
+        .eq('id', Number(fixtureId));
+
+      // Borrar partidos existentes
+      await supabase
+        .from('partidos')
+        .delete()
+        .eq('fixture_id', Number(fixtureId));
+
+      // Insertar nuevos partidos
+      for (const match of fixtureData.matches) {
+        await crearPartidoConFixture(
+          Number(match.homeTeamId),
+          Number(match.awayTeamId),
+          fixtureData.zonaId ? Number(fixtureData.zonaId) : null,
+          fixtureData.fechaPartido,
+          Number(fixtureId)
+        );
+      }
+      return { success: true };
+    } catch (error) {
+      console.error('Error actualizando fixture y partidos:', error);
+      return { success: false, error: 'Error actualizando fixture y partidos' };
+    }
+  }
+
+  static async uploadCourseImage(file: File): Promise<string> {
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+    const filePath = `courses/${fileName}`;
+
+    console.log('🟠 Subiendo archivo:', file, 'size:', file.size, 'type:', file.type, 'filePath:', filePath);
+
+    // Sube la imagen al bucket
+    const { error } = await supabase.storage
+      .from('courses-images')
+      .upload(filePath, file);
+
+    if (error) {
+      console.error('🔴 Error subiendo imagen a Storage:', error.message || error);
+      throw error;
+    }
+
+    // Obtiene la URL pública
+    const { data } = supabase.storage
+      .from('courses-images')
+      .getPublicUrl(filePath);
+
+    console.log('🟢 Imagen subida correctamente. URL pública:', data.publicUrl);
+    return data.publicUrl;
+  }
+
+  static async createCourseWithImageUrl(course: {
+    title: string;
+    description: string;
+    imageUrl: string;
+    date: string;
+  }): Promise<any> {
+    const { data, error } = await supabase
+      .from('courses')
+      .insert([{
+        title: course.title,
+        description: course.description,
+        image_url: course.imageUrl,
+        date: course.date,
+      }])
+      .select();
+
+    if (error) throw error;
+    return data[0];
+  }
+
+  static async updateCourseWithImageUrl(courseId: string, updates: {
+    title?: string;
+    description?: string;
+    imageUrl?: string;
+    date?: string;
+  }): Promise<any> {
+    // Solo incluir campos definidos
+    const updateData: any = {};
+    if (updates.title !== undefined) updateData.title = updates.title;
+    if (updates.description !== undefined) updateData.description = updates.description;
+    if (updates.imageUrl !== undefined) updateData.image_url = updates.imageUrl;
+    if (updates.date !== undefined) updateData.date = updates.date;
+
+    const { data, error } = await supabase
+      .from('courses')
+      .update(updateData)
+      .eq('id', courseId)
+      .select();
+
+    if (error) throw error;
+    return data[0];
+  }
+
+  static async getAllCourses(): Promise<Course[]> {
+    const { data, error } = await supabase.from('courses').select('*').order('created_at', { ascending: false });
+    if (error || !data) return [];
+    return data.map(mapSupabaseToCourse);
   }
 }
 

@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
-import { useLeague } from '../../contexts/LeagueContext';
+import React, { useState, useEffect } from 'react';
 import { Plus, Edit, Trash2, Save, X } from 'lucide-react';
 import { useForm } from 'react-hook-form';
+import { SupabaseService, mapSupabaseToCourse } from '../../services/supabaseService';
 import { supabase } from '../../lib/supabase';
 
 // Definir el tipo Course
@@ -32,11 +32,10 @@ interface CourseData {
 }
 
 const AdminCoursesPage: React.FC = () => {
-  const { getCourses, addCourse, updateCourse, deleteCourse } = useLeague();
   const [isAdding, setIsAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
-  const courses = getCourses();
+  const [courses, setCourses] = useState<Course[]>([]);
 
   const {
     register,
@@ -46,6 +45,20 @@ const AdminCoursesPage: React.FC = () => {
     watch,
     formState: { errors }
   } = useForm<CourseFormData>();
+
+  // Guardar temporalmente el archivo para el submit
+  const [selectedImageFile, setSelectedImageFile] = useState<File | null>(null);
+
+  // Cargar cursos al montar y tras cada cambio
+  const loadCourses = async () => {
+    const { data, error } = await supabase.from('courses').select('*').order('created_at', { ascending: false });
+    if (error) {
+      setCourses([]);
+      return;
+    }
+    setCourses(data.map(mapSupabaseToCourse));
+  };
+  useEffect(() => { loadCourses(); }, []);
 
   const handleAddClick = () => {
     setIsAdding(true);
@@ -73,89 +86,55 @@ const AdminCoursesPage: React.FC = () => {
     reset();
   };
 
-  const handleImageUpload = async (file: File): Promise<string> => {
-    try {
-      setIsUploading(true);
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
-      const filePath = `courses/${fileName}`;
-
-      const { error: uploadError } = await supabase.storage
-        .from('images')
-        .upload(filePath, file);
-
-      if (uploadError) {
-        throw uploadError;
-      }
-
-      const { data: { publicUrl } } = supabase.storage
-        .from('images')
-        .getPublicUrl(filePath);
-
-      return publicUrl;
-    } catch (error) {
-      console.error('Error uploading image:', error);
-      throw new Error('Error al subir la imagen');
-    } finally {
-      setIsUploading(false);
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      setSelectedImageFile(file);
     }
   };
 
   const onSubmit = async (data: CourseFormData) => {
     try {
+      setIsUploading(true);
       let imageUrl = '';
-      
-      // Si hay un archivo de imagen, subirlo
-      if (data.imageFile && data.imageFile.length > 0) {
-        imageUrl = await handleImageUpload(data.imageFile[0]);
-      } else if (editingId) {
-        // Si estamos editando y no hay nueva imagen, mantener la existente
-        const existingCourse = courses.find(c => c.id === editingId);
-        imageUrl = existingCourse?.imageUrl || '';
+      if (selectedImageFile) {
+        imageUrl = await SupabaseService.uploadCourseImage(selectedImageFile);
       }
-
-      const courseData: CourseData = {
-        title: data.title,
-        description: data.description,
-        imageUrl: imageUrl,
-        date: data.date,
-        active: data.active
-      };
-
       if (isAdding) {
-        await addCourse(courseData);
+        await SupabaseService.createCourseWithImageUrl({
+          title: data.title,
+          description: data.description,
+          imageUrl,
+          date: data.date,
+        });
       } else if (editingId) {
-        await updateCourse(editingId, courseData);
+        await SupabaseService.updateCourseWithImageUrl(editingId, {
+          title: data.title,
+          description: data.description,
+          imageUrl: imageUrl || undefined,
+          date: data.date,
+        });
       }
-      
+      await loadCourses();
       setIsAdding(false);
       setEditingId(null);
+      setSelectedImageFile(null);
       reset();
     } catch (error) {
-      console.error('Error saving course:', error);
       alert('Error al guardar el curso. Por favor, intenta de nuevo.');
+    } finally {
+      setIsUploading(false);
     }
   };
 
   const handleDeleteCourse = async (id: string) => {
     if (window.confirm('¿Estás seguro de eliminar este curso?')) {
       try {
-        await deleteCourse(id);
+        await SupabaseService.deleteCourse(id);
+        await loadCourses();
       } catch (error) {
         console.error('Error deleting course:', error);
         alert('Error al eliminar el curso. Por favor, intenta de nuevo.');
-      }
-    }
-  };
-
-  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      try {
-        const imageUrl = await handleImageUpload(file);
-        setValue('imageUrl' as any, imageUrl); // Temporal para preview
-      } catch (error) {
-        alert('Error al subir la imagen');
       }
     }
   };
@@ -235,9 +214,7 @@ const AdminCoursesPage: React.FC = () => {
                   type="file"
                   accept="image/*"
                   className="form-input"
-                  {...register('imageFile', { 
-                    required: isAdding ? 'La imagen es requerida' : false 
-                  })}
+                  {...register('imageFile', { required: isAdding ? 'La imagen es requerida' : false })}
                   onChange={handleFileChange}
                   disabled={isUploading}
                 />
@@ -289,15 +266,19 @@ const AdminCoursesPage: React.FC = () => {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {courses.map(course => (
           <div key={course.id} className="bg-white rounded-lg shadow-md overflow-hidden">
-            {course.imageUrl && (
+            {course.imageUrl ? (
               <img
                 src={course.imageUrl}
                 alt={course.title}
-                className="w-full h-48 object-cover"
+                className="w-full h-48 object-cover rounded-t-lg"
                 onError={(e) => {
                   (e.target as HTMLImageElement).src = '/placeholder-image.jpg';
                 }}
               />
+            ) : (
+              <div className="w-full h-48 bg-gray-100 flex items-center justify-center rounded-t-lg text-gray-400">
+                Sin imagen
+              </div>
             )}
             <div className="p-4">
               <div className="flex justify-between items-start mb-2">

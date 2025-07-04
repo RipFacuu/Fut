@@ -118,7 +118,7 @@ const EditableCell: React.FC<EditableCellProps> = React.memo(({
   return (
     <td 
       className={cn(
-        "px-6 py-4 whitespace-nowrap text-sm text-center cursor-pointer",
+        "px-6 py-4 whitespace-nowrap text-sm text-center cursor-pointer align-middle",
         field === 'teamName' ? "text-black font-medium" : "text-gray-500",
         isEditing && "bg-violet-50/30"
       )}
@@ -132,7 +132,7 @@ const EditableCell: React.FC<EditableCellProps> = React.memo(({
           <select
             value={standing.teamId}
             onChange={handleTeamChange}
-            className="w-full bg-transparent focus:outline-none focus:ring-1 focus:ring-violet-200 py-0.5"
+            className="w-full bg-white border border-violet-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-300 py-1 px-2 text-sm text-gray-800 shadow-sm"
             autoFocus
           >
             {zoneTeams.map(team => (
@@ -149,11 +149,15 @@ const EditableCell: React.FC<EditableCellProps> = React.memo(({
             onChange={handleChange}
             onBlur={handleBlur}
             onKeyDown={handleKeyDown}
-            className="w-full bg-transparent text-center focus:outline-none focus:ring-1 focus:ring-violet-200 py-0.5"
+            className="w-full bg-white border border-violet-200 rounded-lg text-center focus:outline-none focus:ring-2 focus:ring-violet-300 py-1 px-2 text-sm text-gray-800 shadow-sm"
             autoFocus
             style={{ 
               fontSize: 'inherit',
-              fontFamily: 'inherit'
+              fontFamily: 'inherit',
+              height: '2.25rem',
+              minWidth: '3.5rem',
+              maxWidth: '5rem',
+              boxSizing: 'border-box'
             }}
           />
         )
@@ -1130,15 +1134,15 @@ const StandingsPage: React.FC = () => {
             </div>
 
             {/* Campo de leyenda editable */}
-            <div className="px-6 pb-2">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2 px-6 pb-2">
+              <label className="block text-sm font-medium text-gray-700 mb-1 sm:mb-0 sm:mr-2 whitespace-nowrap">
                 📝 Leyenda de la Tabla de Posiciones
               </label>
               {isAuthenticated && user?.username === 'admin' ? (
-                <div className="flex items-center space-x-2">
+                <div className="flex items-center gap-2 w-full max-w-lg">
                   <input
                     type="text"
-                    className="form-input w-full max-w-lg text-sm"
+                    className="form-input w-full max-w-xs text-sm rounded-lg shadow-sm border-gray-300 focus:border-violet-400 focus:ring-violet-300"
                     value={legend}
                     onChange={e => { setLegend(e.target.value); setLegendDirty(true); }}
                     disabled={legendLoading}
@@ -1166,7 +1170,7 @@ const StandingsPage: React.FC = () => {
                   )}
                 </div>
               ) : (
-                <div className="mt-2 p-2 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg flex items-center space-x-2">
+                <div className="mt-2 sm:mt-0 p-2 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg flex items-center space-x-2 w-full max-w-xs">
                   <span className="text-sm font-medium text-blue-800">{legend || <span className="text-gray-400">Agregar leyenda</span>}</span>
                 </div>
               )}
@@ -1262,8 +1266,8 @@ const StandingsPage: React.FC = () => {
                             Posición
                           </div>
                         </th>
-                        <th className="px-4 lg:px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">
-                          Equipo
+                        <th className="px-4 lg:px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider align-middle">
+                          EQUIPO
                         </th>
                         <th className="px-4 lg:px-6 py-4 text-center text-xs font-bold text-gray-600 uppercase tracking-wider">PJ</th>
                         <th className="px-4 lg:px-6 py-4 text-center text-xs font-bold text-gray-600 uppercase tracking-wider">PTS</th>

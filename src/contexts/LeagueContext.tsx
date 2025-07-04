@@ -49,6 +49,8 @@ export interface Fixture {
   leagueId: string;
   categoryId: string;
   zoneId: string;
+  leyenda?: string;
+  texto_central?: string;
   matches: Match[];
 }
 
@@ -306,6 +308,19 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
       }
     };
     loadAllFixtures();
+  }, []);
+
+  // Cargar cursos al inicializar
+  useEffect(() => {
+    const loadAllCourses = async () => {
+      try {
+        const allCourses = await SupabaseService.getAllCourses();
+        setCourses(allCourses);
+      } catch (error) {
+        console.error('Error loading courses:', error);
+      }
+    };
+    loadAllCourses();
   }, []);
 
   // League operations

@@ -11,6 +11,8 @@ interface FixtureFormData {
   leagueId: string;
   categoryId: string;
   zoneId: string;
+  leyenda?: string;
+  texto_central?: string;
   matches: {
     homeTeamId: string;
     awayTeamId: string;
@@ -165,51 +167,11 @@ const FixturesPage: React.FC = () => {
     }
   }, [fixtures, selectedLeague, selectedCategory, selectedZone, isLoading]);
   
-  // Filtrado mejorado con logs más detallados
+  // Filtrado de fixtures solo por liga seleccionada
   const filteredFixtures = React.useMemo(() => {
-    console.log('=== FILTERING FIXTURES ===');
-    console.log('All fixtures:', fixtures.length);
-    console.log('Filters:', { selectedLeague, selectedCategory, selectedZone });
-    
-    // Si no hay fixtures, devolver array vacío
-    if (fixtures.length === 0) {
-      console.log('No fixtures available');
-      return [];
-    }
-    
-    // NUEVA LÓGICA: Solo mostrar fixtures si liga, categoría Y zona están seleccionadas
-    if (!selectedLeague || !selectedCategory || !selectedZone) {
-      console.log('Liga, categoría o zona no seleccionadas. No se muestran fixtures.');
-      return [];
-    }
-    
-    const filtered = fixtures.filter(fixture => {
-      // Convertir IDs a string para comparación segura
-      const fixtureLeagueId = fixture.leagueId?.toString() || '';
-      const fixtureCategoryId = fixture.categoryId?.toString() || '';
-      const fixtureZoneId = fixture.zoneId?.toString() || '';
-      
-      const selectedLeagueStr = selectedLeague?.toString() || '';
-      const selectedCategoryStr = selectedCategory?.toString() || '';
-      const selectedZoneStr = selectedZone?.toString() || '';
-      
-      const leagueMatch = fixtureLeagueId === selectedLeagueStr;
-      const categoryMatch = fixtureCategoryId === selectedCategoryStr;
-      const zoneMatch = fixtureZoneId === selectedZoneStr;
-      
-      console.log(`Fixture ${fixture.id}:`, {
-        leagueMatch: `${fixtureLeagueId} === ${selectedLeagueStr} = ${leagueMatch}`,
-        categoryMatch: `${fixtureCategoryId} === ${selectedCategoryStr} = ${categoryMatch}`,
-        zoneMatch: `${fixtureZoneId} === ${selectedZoneStr} = ${zoneMatch}`,
-        finalMatch: leagueMatch && categoryMatch && zoneMatch
-      });
-      
-      return leagueMatch && categoryMatch && zoneMatch;
-    });
-    
-    console.log('Filtered result:', filtered.length, filtered);
-    return filtered;
-  }, [fixtures, selectedLeague, selectedCategory, selectedZone]);
+    if (!selectedLeague) return [];
+    return fixtures.filter(fixture => fixture.leagueId === selectedLeague);
+  }, [fixtures, selectedLeague]);
   
   const handleAddClick = () => {
     setIsAdding(true);
@@ -246,6 +208,8 @@ const FixturesPage: React.FC = () => {
       leagueId: fixture.leagueId,
       categoryId: fixture.categoryId,
       zoneId: fixture.zoneId,
+      leyenda: fixture.leyenda || '',
+      texto_central: fixture.texto_central || '',
       matches: formattedMatches
     });
     
@@ -270,6 +234,15 @@ const FixturesPage: React.FC = () => {
   const onSubmit = async (data: FixtureFormData) => {
     try {
       setIsLoading(true);
+      // Filtrar partidos válidos
+      const validMatches = data.matches.filter(
+        match => match.homeTeamId && match.awayTeamId && match.homeTeamId !== match.awayTeamId
+      );
+      if (validMatches.length === 0) {
+        alert('Debes agregar al menos un partido válido con ambos equipos seleccionados y diferentes.');
+        setIsLoading(false);
+        return;
+      }
       
       if (isAdding) {
         console.log('Creando fixture con datos:', {
@@ -284,7 +257,9 @@ const FixturesPage: React.FC = () => {
           ligaId: data.leagueId,
           categoriaId: data.categoryId,
           zonaId: data.zoneId,
-          matches: data.matches.map(match => ({
+          leyenda: data.leyenda,
+          texto_central: data.texto_central,
+          matches: validMatches.map(match => ({
             homeTeamId: match.homeTeamId,
             awayTeamId: match.awayTeamId
           }))
@@ -311,22 +286,22 @@ const FixturesPage: React.FC = () => {
           return;
         }
       } else if (editingId) {
-        // Preserve match IDs for existing matches
-        const existingFixture = fixtures.find(f => f.id === editingId);
-        const updatedMatches = data.matches.map((match, index) => {
-          const existingMatch = existingFixture?.matches[index];
-          return {
-            ...match,
-            id: existingMatch?.id || `match_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-            fixtureId: editingId,
-            played: !!match.played
-          };
+        // Al editar, toma todos los partidos válidos del formulario
+        await SupabaseService.updateFixtureWithMatches(editingId, {
+          nombre: data.date,
+          fechaPartido: data.matchDate,
+          ligaId: data.leagueId,
+          categoriaId: data.categoryId,
+          zonaId: data.zoneId,
+          leyenda: data.leyenda,
+          texto_central: data.texto_central,
+          matches: validMatches.map(match => ({
+            homeTeamId: match.homeTeamId,
+            awayTeamId: match.awayTeamId
+          }))
         });
-        
-        updateFixture(editingId, {
-          ...data,
-          matches: updatedMatches
-        });
+        // Refresca los fixtures para ver los cambios
+        await refreshFixtures();
       }
       
       setIsAdding(false);
@@ -372,6 +347,8 @@ const FixturesPage: React.FC = () => {
   
   const formZoneTeams = getTeamsByZone(watch('zoneId'));
   
+  const leagueTeams = teams.filter(team => team.leagueId === watch('leagueId'));
+  
   return (
     <div key={refreshKey}>
       <div className="flex items-center justify-between mb-6">
@@ -380,7 +357,7 @@ const FixturesPage: React.FC = () => {
         <button
           className="btn btn-primary flex items-center space-x-2"
           onClick={handleAddClick}
-          disabled={isAdding || !!editingId || !selectedZone}
+          disabled={isAdding || !!editingId || !selectedLeague}
         >
           <Plus size={18} />
           <span>Agregar Fixture</span>
@@ -408,73 +385,6 @@ const FixturesPage: React.FC = () => {
               ))}
             </select>
           </div>
-          {isLigaMasculina ? (
-            <>
-              <div>
-                <label htmlFor="zoneFilter" className="form-label">Zona</label>
-                <select
-                  id="zoneFilter"
-                  className="form-input"
-                  value={selectedZone}
-                  onChange={handleZoneChange}
-                  disabled={!selectedLeague}
-                >
-                  <option value="">Seleccionar zona</option>
-                  {availableZones.map(zone => (
-                    <option key={zone.id} value={zone.id}>{zone.name}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label htmlFor="categoryFilter" className="form-label">Categoría</label>
-                <select
-                  id="categoryFilter"
-                  className="form-input"
-                  value={selectedCategory}
-                  onChange={handleCategoryChange}
-                  disabled={!selectedZone}
-                >
-                  <option value="">Seleccionar categoría</option>
-                  {availableCategories.map(category => (
-                    <option key={category.id} value={category.id}>{category.name}</option>
-                  ))}
-                </select>
-              </div>
-            </>
-          ) : (
-            <>
-              <div>
-                <label htmlFor="categoryFilter" className="form-label">Categoría</label>
-                <select
-                  id="categoryFilter"
-                  className="form-input"
-                  value={selectedCategory}
-                  onChange={handleCategoryChange}
-                  disabled={!selectedLeague}
-                >
-                  <option value="">Seleccionar categoría</option>
-                  {availableCategories.map(category => (
-                    <option key={category.id} value={category.id}>{category.name}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label htmlFor="zoneFilter" className="form-label">Zona</label>
-                <select
-                  id="zoneFilter"
-                  className="form-input"
-                  value={selectedZone}
-                  onChange={handleZoneChange}
-                  disabled={!selectedCategory}
-                >
-                  <option value="">Seleccionar zona</option>
-                  {availableZones.map(zone => (
-                    <option key={zone.id} value={zone.id}>{zone.name}</option>
-                  ))}
-                </select>
-              </div>
-            </>
-          )}
         </div>
       </div>
       
@@ -522,7 +432,6 @@ const FixturesPage: React.FC = () => {
                 )}
               </div>
               
-              {/* Campos de selección visibles */}
               <div>
                 <label className="form-label" htmlFor="formLeagueId">
                   Liga
@@ -536,9 +445,8 @@ const FixturesPage: React.FC = () => {
                   {...register('leagueId', { required: 'La liga es requerida' })}
                   onChange={(e) => {
                     setValue('leagueId', e.target.value);
-                    setValue('categoryId', '');
-                    setValue('zoneId', '');
                   }}
+                  value={watch('leagueId')}
                 >
                   <option value="">Seleccionar liga</option>
                   {leagues.map(league => (
@@ -547,99 +455,32 @@ const FixturesPage: React.FC = () => {
                     </option>
                   ))}
                 </select>
+                {errors.leagueId && <p className="mt-1 text-sm text-red-600">{errors.leagueId.message}</p>}
               </div>
               
-              {isLigaMasculina ? (
-                <>
-                  <div>
-                    <label className="form-label" htmlFor="formZoneId">Zona</label>
-                    <select
-                      id="formZoneId"
-                      className={cn(
-                        "form-input",
-                        errors.zoneId && "border-red-500"
-                      )}
-                      {...register('zoneId', { required: 'La zona es requerida' })}
-                      value={watch('zoneId')}
-                      onChange={e => {
-                        setValue('zoneId', e.target.value);
-                        setValue('categoryId', ''); // Resetear categoría al cambiar zona
-                      }}
-                    >
-                      <option value="">Seleccionar zona</option>
-                      {getZonesByLeague(watch('leagueId')).map(zone => (
-                        <option key={zone.id} value={zone.id}>{zone.name}</option>
-                      ))}
-                    </select>
-                    {errors.zoneId && <p className="mt-1 text-sm text-red-600">{errors.zoneId.message}</p>}
-                  </div>
-                  <div>
-                    <label className="form-label" htmlFor="formCategoryId">Categoría</label>
-                    <select
-                      id="formCategoryId"
-                      className={cn(
-                        "form-input",
-                        errors.categoryId && "border-red-500"
-                      )}
-                      {...register('categoryId', { required: 'La categoría es requerida' })}
-                      value={watch('categoryId')}
-                      onChange={e => setValue('categoryId', e.target.value)}
-                      disabled={!watch('zoneId')}
-                    >
-                      <option value="">Seleccionar categoría</option>
-                      {getCategoriesByZone(watch('zoneId')).map(category => (
-                        <option key={category.id} value={category.id}>{category.name}</option>
-                      ))}
-                    </select>
-                    {errors.categoryId && <p className="mt-1 text-sm text-red-600">{errors.categoryId.message}</p>}
-                  </div>
-                </>
-              ) : (
-                <>
-                  <div>
-                    <label className="form-label" htmlFor="formCategoryId">Categoría</label>
-                    <select
-                      id="formCategoryId"
-                      className={cn(
-                        "form-input",
-                        errors.categoryId && "border-red-500"
-                      )}
-                      {...register('categoryId', { required: 'La categoría es requerida' })}
-                      value={watch('categoryId')}
-                      onChange={e => {
-                        setValue('categoryId', e.target.value);
-                        setValue('zoneId', '');
-                      }}
-                    >
-                      <option value="">Seleccionar categoría</option>
-                      {getCategoriesByLeague(watch('leagueId')).map(category => (
-                        <option key={category.id} value={category.id}>{category.name}</option>
-                      ))}
-                    </select>
-                    {errors.categoryId && <p className="mt-1 text-sm text-red-600">{errors.categoryId.message}</p>}
-                  </div>
-                  <div>
-                    <label className="form-label" htmlFor="formZoneId">Zona</label>
-                    <select
-                      id="formZoneId"
-                      className={cn(
-                        "form-input",
-                        errors.zoneId && "border-red-500"
-                      )}
-                      {...register('zoneId', { required: 'La zona es requerida' })}
-                      value={watch('zoneId')}
-                      onChange={e => setValue('zoneId', e.target.value)}
-                      disabled={!watch('categoryId')}
-                    >
-                      <option value="">Seleccionar zona</option>
-                      {getZonesByCategory(watch('categoryId')).map(zone => (
-                        <option key={zone.id} value={zone.id}>{zone.name}</option>
-                      ))}
-                    </select>
-                    {errors.zoneId && <p className="mt-1 text-sm text-red-600">{errors.zoneId.message}</p>}
-                  </div>
-                </>
-              )}
+              <div>
+                <label className="form-label" htmlFor="leyenda">Leyenda (opcional)</label>
+                <input
+                  id="leyenda"
+                  type="text"
+                  className={cn("form-input", errors.leyenda && "border-red-500")}
+                  placeholder="Ej: Fecha especial, Apertura 2024, Final, etc."
+                  autoComplete="off"
+                  {...register('leyenda')}
+                />
+              </div>
+              
+              <div>
+                <label className="form-label" htmlFor="texto_central">Texto central (opcional)</label>
+                <input
+                  id="texto_central"
+                  type="text"
+                  className={cn("form-input", errors.texto_central && "border-red-500")}
+                  placeholder="Ej: Zona 1, Zona 2, etc."
+                  autoComplete="off"
+                  {...register('texto_central')}
+                />
+              </div>
             </div>
             
             {/* Matches Section */}
@@ -648,9 +489,8 @@ const FixturesPage: React.FC = () => {
                 <h3 className="text-lg font-medium">Partidos</h3>
                 <button
                   type="button"
-                  onClick={() => append({ homeTeamId: '', awayTeamId: '', played: false })}
+                  onClick={() => append({ homeTeamId: '', awayTeamId: '' })}
                   className="btn btn-secondary btn-sm flex items-center space-x-1"
-                  disabled={zoneTeams.length < 2}
                 >
                   <Plus size={16} />
                   <span>Agregar Partido</span>
@@ -671,7 +511,6 @@ const FixturesPage: React.FC = () => {
                       </button>
                     )}
                   </div>
-                  
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <label className="form-label">
@@ -687,7 +526,7 @@ const FixturesPage: React.FC = () => {
                         })}
                       >
                         <option value="">Seleccionar equipo local</option>
-                        {formZoneTeams.map(team => (
+                        {leagueTeams.map(team => (
                           <option key={team.id} value={team.id}>
                             {team.name}
                           </option>
@@ -714,7 +553,7 @@ const FixturesPage: React.FC = () => {
                         })}
                       >
                         <option value="">Seleccionar equipo visitante</option>
-                        {formZoneTeams.map(team => (
+                        {leagueTeams.map(team => (
                           <option key={team.id} value={team.id}>
                             {team.name}
                           </option>
@@ -726,53 +565,6 @@ const FixturesPage: React.FC = () => {
                         </p>
                       )}
                     </div>
-                  </div>
-                  
-                  {/* Match result section */}
-                  <div className="mt-4">
-                    <div className="flex items-center space-x-4">
-                      <label className="flex items-center space-x-2">
-                        <input
-                          type="checkbox"
-                          {...register(`matches.${index}.played`)}
-                          className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
-                        />
-                        <span className="text-sm font-medium">Partido jugado</span>
-                      </label>
-                    </div>
-                    
-                    {watch(`matches.${index}.played`) && (
-                      <div className="grid grid-cols-2 gap-4 mt-3">
-                        <div>
-                          <label className="form-label">
-                            Goles Local
-                          </label>
-                          <input
-                            type="number"
-                            min="0"
-                            className="form-input"
-                            {...register(`matches.${index}.homeScore`, {
-                              valueAsNumber: true,
-                              min: { value: 0, message: 'Los goles no pueden ser negativos' }
-                            })}
-                          />
-                        </div>
-                        <div>
-                          <label className="form-label">
-                            Goles Visitante
-                          </label>
-                          <input
-                            type="number"
-                            min="0"
-                            className="form-input"
-                            {...register(`matches.${index}.awayScore`, {
-                              valueAsNumber: true,
-                              min: { value: 0, message: 'Los goles no pueden ser negativos' }
-                            })}
-                          />
-                        </div>
-                      </div>
-                    )}
                   </div>
                 </div>
               ))}
@@ -822,9 +614,9 @@ const FixturesPage: React.FC = () => {
             <div className="text-center py-8">
               <Calendar size={48} className="mx-auto text-gray-400 mb-4" />
               <p className="text-gray-600">
-                {!selectedLeague || !selectedCategory || !selectedZone
-                  ? 'Selecciona liga, categoría y zona para ver los fixtures'
-                  : 'No hay fixtures para los filtros seleccionados'}
+                {!selectedLeague
+                  ? 'Selecciona una liga para ver los fixtures'
+                  : 'No hay fixtures para la liga seleccionada'}
               </p>
             </div>
           ) : (
@@ -864,7 +656,7 @@ const FixturesPage: React.FC = () => {
                   </div>
                   
                   <div className="space-y-2">
-                    {fixture.matches.map((match, index) => (
+                    {fixture.matches.filter(match => match.homeTeamId && match.awayTeamId && getTeamName(match.homeTeamId) !== 'Equipo desconocido' && getTeamName(match.awayTeamId) !== 'Equipo desconocido').map((match, index) => (
                       <div key={match.id || index} className="bg-gray-50 p-3 rounded-md">
                         <div className="flex flex-col xs:flex-row xs:items-center xs:justify-between space-y-2 xs:space-y-0">
                           <div className="flex flex-col xs:flex-row xs:items-center xs:space-x-4 space-y-1 xs:space-y-0">
@@ -872,16 +664,6 @@ const FixturesPage: React.FC = () => {
                             <span className="text-gray-500">vs</span>
                             <span className="font-medium break-words">{getTeamName(match.awayTeamId)}</span>
                           </div>
-                          {match.played && (
-                            <div className="flex items-center space-x-2 mt-1 xs:mt-0">
-                              <span className="font-bold text-lg">
-                                {match.homeScore} - {match.awayScore}
-                              </span>
-                              <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full">
-                                Jugado
-                              </span>
-                            </div>
-                          )}
                         </div>
                       </div>
                     ))}

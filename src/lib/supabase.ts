@@ -366,54 +366,35 @@ export async function eliminarCategoria(id: string) {
 }
 
 // Funciones para Fixtures
-export async function crearFixture(nombre: string, fechaPartido: string, ligaId: string, categoriaId: string, zonaId: string) {
-  // Agregar función de mapeo para convertir IDs de string a número
-  const getNumericLeagueId = (leagueStringId: string): number => {
-    const leagueMap: { [key: string]: number } = {
-      'liga_masculina': 1,
-      'lifufe': 2,
-      'mundialito': 3
-    };
-    return leagueMap[leagueStringId] || parseInt(leagueStringId);
-  };
-
-  const numericLeagueId = getNumericLeagueId(ligaId);
-  const numericCategoryId = parseInt(categoriaId);
-  const numericZoneId = parseInt(zonaId);
-
+export async function crearFixture(nombre: string, fechaPartido: string, ligaId: number, categoriaId: number, zonaId: number | null, leyenda?: string | null, texto_central?: string | null) {
   const { data, error } = await supabase
     .from('fixtures')
     .insert([{ 
       nombre, 
       fecha_partido: fechaPartido,
-      liga_id: numericLeagueId,        // Ahora envía número
-      categoria_id: numericCategoryId, // Ahora envía número
-      zona_id: numericZoneId          // Ahora envía número
+      liga_id: ligaId,
+      categoria_id: categoriaId,
+      zona_id: zonaId,
+      leyenda: leyenda || null,
+      texto_central: texto_central || null
     }])
     .select();
-
   if (error) {
     console.error('Error creando fixture:', error);
     return null;
   }
-
   return data;
 }
 
-export async function crearPartidoConFixture(equipoLocalId: string, equipoVisitanteId: string, zonaId: string, fecha: string, fixtureId: string) {
-  const numericZoneId = parseInt(zonaId);
-  const numericEquipoLocalId = parseInt(equipoLocalId);
-  const numericEquipoVisitanteId = parseInt(equipoVisitanteId);
-  const numericFixtureId = parseInt(fixtureId);
-
+export async function crearPartidoConFixture(equipoLocalId: number, equipoVisitanteId: number, zonaId: number | null, fecha: string, fixtureId: number) {
   const { data, error } = await supabase
     .from('partidos')
     .insert([{ 
-      equipo_local_id: numericEquipoLocalId,     // Ahora envía número
-      equipo_visitante_id: numericEquipoVisitanteId, // Ahora envía número
-      zona_id: numericZoneId,                    // Ahora envía número
+      equipo_local_id: equipoLocalId,
+      equipo_visitante_id: equipoVisitanteId,
+      zona_id: zonaId,
       fecha,
-      fixture_id: numericFixtureId               // Ahora envía número
+      fixture_id: fixtureId
     }])
     .select();
 
@@ -437,7 +418,9 @@ export async function obtenerFixtures() {
       liga_id,
       categoria_id,
       zona_id,
-      created_at
+      created_at,
+      leyenda,
+      texto_central
     `)
     .order('created_at', { ascending: false });
 
