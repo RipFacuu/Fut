@@ -1,115 +1,178 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { useForm } from 'react-hook-form';
-import { User, Lock, AlertCircle } from 'lucide-react';
-
-interface LoginFormData {
-  username: string;
-  password: string;
-}
+import { Trophy, Eye, EyeOff, Lock, User, Sparkles } from 'lucide-react';
 
 const AdminLogin: React.FC = () => {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
+  
   const { login } = useAuth();
   const navigate = useNavigate();
-  const [loginError, setLoginError] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  
-  const { register, handleSubmit, formState: { errors } } = useForm<LoginFormData>();
-  
-  const onSubmit = async (data: LoginFormData) => {
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
     setIsLoading(true);
-    setLoginError(null);
-    
+    setError('');
+
     try {
-      const success = await login(data.username, data.password);
-      
-      if (success) {
-        navigate('/admin');
-      } else {
-        setLoginError('Usuario o contraseña incorrectos');
-      }
-    } catch (error) {
-      setLoginError('Error al iniciar sesión. Intente nuevamente.');
+      await login(email, password);
+      navigate('/admin');
+    } catch (err) {
+      setError('Credenciales inválidas. Por favor, intenta de nuevo.');
     } finally {
       setIsLoading(false);
     }
   };
-  
+
   return (
-    <div className="max-w-md mx-auto my-12">
-      <div className="bg-white rounded-lg shadow-md overflow-hidden">
-        <div className="bg-primary-600 p-6">
-          <h1 className="text-2xl font-bold text-white text-center">Administración</h1>
-          <p className="text-primary-100 text-center mt-2">
-            Accede para gestionar Liga Participando
-          </p>
-        </div>
-        
-        <div className="p-6">
-          {loginError && (
-            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md flex items-start space-x-3">
-              <AlertCircle size={18} className="text-red-500 mt-0.5" />
-              <span className="text-red-700">{loginError}</span>
-            </div>
-          )}
-          
-          <form onSubmit={handleSubmit(onSubmit)}>
-            <div className="mb-4">
-              <label htmlFor="username" className="form-label">
-                Usuario
-              </label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-                  <User size={18} className="text-gray-400" />
+    <div className="min-h-screen relative bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 flex items-center justify-center p-4">
+      {/* Efectos de fondo */}
+      <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent opacity-30"></div>
+      
+      {/* Partículas flotantes */}
+      <div className="absolute inset-0 overflow-hidden">
+        <div className="absolute top-1/4 left-1/4 w-2 h-2 bg-blue-400 rounded-full animate-pulse opacity-60"></div>
+        <div className="absolute top-1/3 right-1/3 w-1 h-1 bg-purple-400 rounded-full animate-pulse opacity-40"></div>
+        <div className="absolute bottom-1/4 left-1/3 w-1.5 h-1.5 bg-blue-300 rounded-full animate-pulse opacity-50"></div>
+        <div className="absolute top-1/2 right-1/4 w-1 h-1 bg-indigo-400 rounded-full animate-pulse opacity-30"></div>
+      </div>
+
+      <div className="relative z-10 w-full max-w-md">
+        {/* Card de login */}
+        <div className="bg-white/80 backdrop-blur-sm rounded-3xl shadow-2xl border border-white/20 overflow-hidden">
+          {/* Header del card */}
+          <div className="relative bg-gradient-to-r from-primary-600 via-accent-600 to-primary-700 p-8 text-center">
+            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent opacity-50"></div>
+            <div className="relative z-10">
+              <div className="flex justify-center mb-4">
+                <div className="relative">
+                  <div className="absolute inset-0 bg-gradient-to-r from-yellow-400 to-orange-500 rounded-full blur-xl opacity-75 animate-pulse"></div>
+                  <Trophy size={48} className="relative text-white drop-shadow-lg" />
                 </div>
-                <input
-                  id="username"
-                  type="text"
-                  className="form-input pl-10"
-                  placeholder="Ingresa tu nombre de usuario"
-                  autoComplete="username"
-                  {...register('username', { required: 'Usuario es requerido' })}
-                />
               </div>
-              {errors.username && (
-                <p className="mt-1 text-sm text-red-600">{errors.username.message}</p>
-              )}
-            </div>
-            
-            <div className="mb-6">
-              <label htmlFor="password" className="form-label">
-                Contraseña
-              </label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-                  <Lock size={18} className="text-gray-400" />
-                </div>
-                <input
-                  id="password"
-                  type="password"
-                  className="form-input pl-10"
-                  placeholder="Ingresa tu contraseña"
-                  autoComplete="current-password"
-                  {...register('password', { required: 'Contraseña es requerida' })}
-                />
+              <h1 className="text-3xl font-bold text-white mb-2">
+                Panel Administrativo
+              </h1>
+              <p className="text-white/80 text-sm">
+                Accede a la gestión de ligas y equipos
+              </p>
+              <div className="flex justify-center mt-3 space-x-1">
+                <Sparkles size={12} className="text-yellow-300 animate-pulse" />
+                <Sparkles size={12} className="text-yellow-300 animate-pulse" />
+                <Sparkles size={12} className="text-yellow-300 animate-pulse" />
               </div>
-              {errors.password && (
-                <p className="mt-1 text-sm text-red-600">{errors.password.message}</p>
-              )}
             </div>
-            
-            <button
-              type="submit"
-              className="w-full btn btn-primary py-3"
-              disabled={isLoading}
-            >
-              {isLoading ? 'Iniciando sesión...' : 'Iniciar Sesión'}
-            </button>
-          </form>
-          
-          <div className="mt-4 text-center">
           </div>
+
+          {/* Formulario */}
+          <div className="p-8">
+            <form onSubmit={handleSubmit} className="space-y-6">
+              {/* Campo Email */}
+              <div>
+                <label htmlFor="email" className="form-label flex items-center">
+                  <User size={16} className="mr-2 text-primary-600" />
+                  Correo Electrónico
+                </label>
+                <div className="relative">
+                  <input
+                    type="email"
+                    id="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="form-input pl-12"
+                    placeholder="admin@ligaparticipando.com"
+                    required
+                  />
+                  <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                    <User size={20} className="text-slate-400" />
+                  </div>
+                </div>
+              </div>
+
+              {/* Campo Contraseña */}
+              <div>
+                <label htmlFor="password" className="form-label flex items-center">
+                  <Lock size={16} className="mr-2 text-primary-600" />
+                  Contraseña
+                </label>
+                <div className="relative">
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    id="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="form-input pl-12 pr-12"
+                    placeholder="••••••••"
+                    required
+                  />
+                  <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                    <Lock size={20} className="text-slate-400" />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute inset-y-0 right-0 pr-4 flex items-center text-slate-400 hover:text-slate-600 transition-colors"
+                  >
+                    {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                  </button>
+                </div>
+              </div>
+
+              {/* Mensaje de error */}
+              {error && (
+                <div className="bg-red-50 border border-red-200 rounded-xl p-4">
+                  <p className="text-red-700 text-sm font-medium">{error}</p>
+                </div>
+              )}
+
+              {/* Botón de envío */}
+              <button
+                type="submit"
+                disabled={isLoading}
+                className="w-full btn btn-primary text-lg py-4 relative overflow-hidden group"
+              >
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                <span className="relative z-10 flex items-center justify-center">
+                  {isLoading ? (
+                    <>
+                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-3"></div>
+                      Iniciando sesión...
+                    </>
+                  ) : (
+                    <>
+                      <Lock size={20} className="mr-2" />
+                      Iniciar Sesión
+                    </>
+                  )}
+                </span>
+              </button>
+            </form>
+
+            {/* Enlaces adicionales */}
+            <div className="mt-8 pt-6 border-t border-slate-200">
+              <div className="text-center">
+                <a 
+                  href="/" 
+                  className="text-primary-600 hover:text-primary-700 font-medium transition-colors duration-300 flex items-center justify-center group"
+                >
+                  <span className="group-hover:translate-x-1 transition-transform duration-300">
+                    ← Volver al inicio
+                  </span>
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Información adicional */}
+        <div className="mt-8 text-center">
+          <p className="text-slate-600 text-sm">
+            ¿Necesitas ayuda? Contacta al administrador del sistema
+          </p>
         </div>
       </div>
     </div>

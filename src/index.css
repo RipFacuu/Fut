@@ -1,86 +1,109 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Poppins:wght@400;500;600;700;800&family=Montserrat:wght@400;500;600;700;800&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
   html {
-    @apply antialiased;
+    @apply antialiased scroll-smooth;
   }
   
   body {
-    @apply bg-secondary-100 text-primary-900;
+    @apply bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 text-slate-800 min-h-screen;
+    background-attachment: fixed;
   }
   
   h1, h2, h3, h4, h5, h6 {
-    @apply font-heading font-semibold tracking-tight text-primary-600;
+    @apply font-heading font-semibold tracking-tight text-slate-800;
   }
   
   h1 {
-    @apply text-3xl md:text-4xl;
+    @apply text-4xl md:text-5xl lg:text-6xl bg-gradient-to-r from-primary-600 to-accent-600 bg-clip-text text-transparent;
   }
   
   h2 {
-    @apply text-2xl md:text-3xl;
+    @apply text-3xl md:text-4xl;
   }
   
   h3 {
-    @apply text-xl md:text-2xl;
+    @apply text-2xl md:text-3xl;
   }
 }
 
 @layer components {
   .btn {
-    @apply inline-flex items-center justify-center px-4 py-2 rounded-md font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2;
+    @apply inline-flex items-center justify-center px-6 py-3 rounded-xl font-medium transition-all duration-300 focus:outline-none focus:ring-4 focus:ring-offset-2 transform hover:scale-105 active:scale-95;
   }
   
   .btn-primary {
-    @apply bg-accent-500 text-white hover:bg-accent-600 focus:ring-accent-500;
+    @apply bg-gradient-to-r from-primary-500 to-primary-600 text-white hover:from-primary-600 hover:to-primary-700 focus:ring-primary-500 shadow-lg hover:shadow-xl;
   }
   
   .btn-secondary {
-    @apply bg-primary-600 text-white hover:bg-primary-700 focus:ring-primary-500;
+    @apply bg-gradient-to-r from-slate-600 to-slate-700 text-white hover:from-slate-700 hover:to-slate-800 focus:ring-slate-500 shadow-lg hover:shadow-xl;
+  }
+  
+  .btn-accent {
+    @apply bg-gradient-to-r from-accent-500 to-accent-600 text-white hover:from-accent-600 hover:to-accent-700 focus:ring-accent-500 shadow-lg hover:shadow-xl;
   }
   
   .btn-outline {
-    @apply border border-primary-200 bg-white text-primary-700 hover:bg-primary-50 focus:ring-primary-500;
+    @apply border-2 border-primary-200 bg-white/80 backdrop-blur-sm text-primary-700 hover:bg-primary-50 hover:border-primary-300 focus:ring-primary-500 shadow-md hover:shadow-lg;
   }
   
   .card {
-    @apply bg-white rounded-lg shadow-card overflow-hidden;
+    @apply bg-white/80 backdrop-blur-sm rounded-2xl shadow-md hover:shadow-lg border border-white/20 overflow-hidden transition-all duration-300 hover:scale-[1.02];
   }
   
   .form-input {
-    @apply w-full px-3 py-2 border border-primary-200 rounded-md focus:outline-none focus:ring-2 focus:ring-accent-500 focus:border-transparent;
+    @apply w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:outline-none focus:ring-4 focus:ring-primary-500/20 focus:border-primary-500 transition-all duration-300 bg-white/80 backdrop-blur-sm;
   }
   
   .form-label {
-    @apply block text-sm font-medium text-primary-700 mb-1;
+    @apply block text-sm font-semibold text-slate-700 mb-2;
   }
   
   .nav-link {
-    @apply px-3 py-2 rounded-md text-sm font-medium text-primary-700 hover:bg-primary-50 hover:text-primary-900 transition-colors;
+    @apply px-4 py-2 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-800 transition-all duration-300 hover:scale-105;
   }
   
   .nav-link-active {
-    @apply bg-accent-50 text-accent-700;
+    @apply bg-gradient-to-r from-primary-500 to-accent-500 text-white shadow-lg;
   }
   
   .league-panel {
-    @apply card p-4 transition-all duration-200 hover:shadow-lg border border-primary-100;
+    @apply card p-6 transition-all duration-500 hover:shadow-xl cursor-pointer;
+  }
+  
+  .league-panel:hover {
+    @apply transform -translate-y-2;
   }
   
   .fixture-card {
-    @apply card p-4 hover:shadow-fixture transition-all duration-200 border border-primary-100;
+    @apply card p-6 hover:shadow-xl transition-all duration-300 border-l-4 border-primary-500;
   }
   
   .team-row {
-    @apply border-b border-primary-100 hover:bg-primary-50 transition-colors;
+    @apply border-b border-slate-100 hover:bg-slate-50/50 transition-all duration-300 hover:scale-[1.01];
+  }
+  
+  .gradient-text {
+    @apply bg-gradient-to-r from-primary-600 to-accent-600 bg-clip-text text-transparent;
+  }
+  
+  .gradient-bg {
+    @apply bg-gradient-to-br from-primary-500 via-accent-500 to-primary-600;
+  }
+  
+  .glass-effect {
+    @apply bg-white/10 backdrop-blur-md border border-white/20;
   }
 }
 
 /* Estilos para la tabla de posiciones */
 .standings-container {
-  animation: fadeIn 0.5s ease-in-out;
+  animation: fadeIn 0.6s ease-out;
 }
 
 @keyframes fadeIn {
@@ -91,58 +114,64 @@
 .standings-container table {
   border-collapse: separate;
   border-spacing: 0;
-  border-radius: 0.5rem;
+  border-radius: 1rem;
   overflow: hidden;
+  box-shadow: 0 10px 40px -10px rgba(0, 0, 0, 0.1);
 }
 
 .standings-container th {
-  font-size: 0.85rem;
+  @apply font-semibold text-sm bg-gradient-to-r from-slate-100 to-slate-200 text-slate-700 py-4 px-4;
   letter-spacing: 0.05em;
 }
 
 .standings-container td {
-  transition: all 0.2s ease;
+  @apply py-3 px-4 transition-all duration-300;
 }
 
 .standings-container tr:hover td {
-  background-color: rgba(59, 130, 246, 0.05);
+  @apply bg-gradient-to-r from-primary-50 to-accent-50;
+}
+
+.standings-container tr:nth-child(even) {
+  @apply bg-slate-50/50;
 }
 
 /* Estilos para los botones */
 .btn {
-  transition: all 0.2s ease;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .btn:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  transform: translateY(-2px);
 }
 
 .btn:active {
   transform: translateY(0);
-  box-shadow: none;
 }
 
-/* Agregar al final del archivo */
+/* Efectos de hover para cards */
+.card:hover {
+  transform: translateY(-4px) scale(1.02);
+}
 
 /* Mejoras para móvil */
 @media (max-width: 768px) {
   .container {
-    @apply px-3;
+    @apply px-4;
   }
   
   /* Mejorar botones en móvil */
   .btn {
-    @apply min-h-[44px] touch-manipulation;
+    @apply min-h-[48px] touch-manipulation text-base;
   }
   
   /* Mejorar espaciado en móvil */
   .league-panel {
-    @apply p-3;
+    @apply p-4;
   }
   
   .fixture-card {
-    @apply p-3;
+    @apply p-4;
   }
   
   /* Ocultar scrollbar en navegación horizontal */
@@ -157,11 +186,24 @@
   
   /* Mejorar tablas en móvil */
   .overflow-x-auto {
-    @apply -mx-3;
+    @apply -mx-4;
   }
   
   .overflow-x-auto table {
     @apply min-w-full;
+  }
+  
+  /* Ajustar tamaños de texto en móvil */
+  h1 {
+    @apply text-3xl md:text-4xl;
+  }
+  
+  h2 {
+    @apply text-2xl md:text-3xl;
+  }
+  
+  h3 {
+    @apply text-xl md:text-2xl;
   }
 }
 
@@ -181,7 +223,7 @@
   }
   
   .nav-link:hover {
-    @apply border-primary-300;
+    @apply border-slate-300;
   }
 }
 
@@ -192,4 +234,53 @@
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+/* Efectos de partículas de fondo */
+.particles-bg {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: -1;
+}
+
+.particle {
+  position: absolute;
+  background: linear-gradient(45deg, #3b82f6, #8b5cf6);
+  border-radius: 50%;
+  opacity: 0.1;
+  animation: float 6s ease-in-out infinite;
+}
+
+.particle:nth-child(1) { width: 80px; height: 80px; top: 10%; left: 10%; animation-delay: 0s; }
+.particle:nth-child(2) { width: 60px; height: 60px; top: 20%; right: 20%; animation-delay: 2s; }
+.particle:nth-child(3) { width: 100px; height: 100px; bottom: 20%; left: 20%; animation-delay: 4s; }
+.particle:nth-child(4) { width: 40px; height: 40px; bottom: 10%; right: 10%; animation-delay: 1s; }
+.particle:nth-child(5) { width: 70px; height: 70px; top: 50%; left: 50%; animation-delay: 3s; }
+
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-10px); }
+}
+
+/* Scrollbar personalizada */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, #3b82f6, #8b5cf6);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, #2563eb, #7c3aed);
 }

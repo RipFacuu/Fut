@@ -1,312 +1,309 @@
 import React, { useState, useEffect } from 'react';
 import { useLeague } from '../../contexts/LeagueContext';
-import ImportCSVButton from './ImportCSVButton';
-import { Download, Trophy, Medal, Award, Pencil, X, Save } from 'lucide-react';
-import { cn } from '../../utils/cn';
+import { Download, Trophy, Medal, Award, TrendingUp, TrendingDown, Minus } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
-import { standingsLegendService } from '../../services/standingsLegendService';
 
-interface StandingsTableProps {
+interface Team {
+  id: string;
+  teamId: string;
   leagueId: string;
-  zoneId: string;
   categoryId: string;
+  zoneId: string;
+  name?: string;
+  teamName?: string;
+  equipo_nombre?: string;
+  points: number;
+  played: number;
+  won: number;
+  drawn: number;
+  lost: number;
+  goalsFor: number;
+  goalsAgainst: number;
+  goalDifference: number;
+  position: number;
+  previousPosition?: number;
 }
 
-const medalIcons = [
-  <svg key="gold" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-trophy text-yellow-500"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"></path><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"></path><path d="M4 22h16"></path><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"></path><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"></path><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"></path></svg>,
-  <svg key="silver" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-medal text-gray-400"><path d="M7.21 15 2.66 7.14a2 2 0 0 1 .13-2.2L4.4 2.8A2 2 0 0 1 6 2h12a2 2 0 0 1 1.6.8l1.6 2.14a2 2 0 0 1 .14 2.2L16.79 15"></path><path d="M11 12 5.12 2.2"></path><path d="m13 12 5.88-9.8"></path><path d="M8 7h8"></path><circle cx="12" cy="17" r="5"></circle><path d="M12 18v-2h-.5"></path></svg>,
-  <svg key="bronze" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-award text-amber-700"><circle cx="12" cy="8" r="6"></circle><path d="M15.477 12.89 17 22l-5-3-5 3 1.523-9.11"></path></svg>
-];
+interface StandingsTableProps {
+  teams: any[];
+  title?: string;
+}
 
-const StandingsTable: React.FC<StandingsTableProps> = ({ leagueId, zoneId, categoryId }) => {
-  const { getStandingsByZone, teams, zones } = useLeague();
-  const { isAuthenticated, user } = useAuth();
-  const [refreshKey, setRefreshKey] = useState(0);
-  const [isMobile, setIsMobile] = useState(false);
-  const [editingLegend, setEditingLegend] = useState(false);
-  const [legendValue, setLegendValue] = useState('');
-  const [savingLegend, setSavingLegend] = useState(false);
-  const [standings, setStandings] = useState<any[]>([]);
+const StandingsTable: React.FC<StandingsTableProps> = ({ teams, title = "Tabla de Posiciones" }) => {
+  const { isAuthenticated } = useAuth();
+  const [standings, setStandings] = useState<Team[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [legend, setLegend] = useState('');
-  
-  // Obtener la zona actual para mostrar la leyenda
-  const currentZone = zones.find(zone => zone.id === zoneId);
-  
+
+  const medalIcons = [
+    <Trophy key="gold" className="text-yellow-500" size={18} />,
+    <Medal key="silver" className="text-gray-400" size={18} />,
+    <Award key="bronze" className="text-amber-700" size={18} />
+  ];
+
+  // Simular datos de ejemplo para mostrar el diseño
   useEffect(() => {
-    setLegendValue(currentZone?.legend || '');
-  }, [currentZone?.legend]);
-  
-  // Detectar si es móvil
-  useEffect(() => {
-    const checkMobile = () => {
-      setIsMobile(window.innerWidth < 768);
-    };
-    
-    checkMobile();
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
-  }, []);
-  
-  useEffect(() => {
-    if (!zoneId || !categoryId) {
-      setStandings([]);
-      return;
-    }
     setLoading(true);
-    setError(null);
-    import('../../lib/supabase').then(({ obtenerPosicionesPorZonaYCategoria }) => {
-      obtenerPosicionesPorZonaYCategoria(zoneId, categoryId)
-        .then(data => {
-          setStandings(data.map((pos, index) => ({
-            id: `${pos.equipo_id}-${pos.zona_id}-${pos.categoria_id}-${index}`,
-            teamId: pos.equipo_id,
-            leagueId,
-            categoryId: String(pos.categoria_id),
-            zoneId: pos.zona_id,
-            puntos: pos.puntos || 0,
-            pj: pos.pj || 0,
-            won: 0,
-            drawn: 0,
-            lost: 0,
-            goalsFor: 0,
-            goalsAgainst: 0
-          })));
-        })
-        .catch(() => setError('Error al cargar la tabla de posiciones.'))
-        .finally(() => setLoading(false));
-    });
-  }, [zoneId, categoryId, leagueId]);
-  
-  // Get standings for this zone
+    // Simular carga de datos
+    setTimeout(() => {
+      const mockData: Team[] = teams.slice(0, 10).map((team, index) => ({
+        id: String(team.id || index),
+        teamId: String(team.id),
+        leagueId: '1',
+        categoryId: '1',
+        zoneId: '1',
+        name: team.name || team.teamName || 'Equipo ' + (index + 1),
+        teamName: team.name || team.teamName || 'Equipo ' + (index + 1),
+        equipo_nombre: team.name || team.teamName || 'Equipo ' + (index + 1),
+        points: Math.floor(Math.random() * 50) + 10,
+        played: Math.floor(Math.random() * 20) + 10,
+        won: Math.floor(Math.random() * 10) + 2,
+        drawn: Math.floor(Math.random() * 5) + 1,
+        lost: Math.floor(Math.random() * 8) + 1,
+        goalsFor: Math.floor(Math.random() * 30) + 10,
+        goalsAgainst: Math.floor(Math.random() * 25) + 8,
+        goalDifference: 0,
+        position: index + 1,
+        previousPosition: undefined
+      }));
+      
+      // Calcular diferencia de goles
+      mockData.forEach(team => {
+        team.goalDifference = team.goalsFor - team.goalsAgainst;
+      });
+      
+      setStandings(mockData);
+      setLoading(false);
+    }, 1000);
+  }, [teams]);
+
   const sortedStandings = standings.slice().sort((a, b) => {
     // First by points
-    if (b.puntos !== a.puntos) return b.puntos - a.puntos;
+    if (b.points !== a.points) return b.points - a.points;
     // Then by goal difference
     const aDiff = a.goalsFor - a.goalsAgainst;
     const bDiff = b.goalsFor - b.goalsAgainst;
     if (bDiff !== aDiff) return bDiff - aDiff;
-    // Then by goals scored
-    return b.goalsFor - a.goalsFor;
+    // Then by goals for
+    if (b.goalsFor !== a.goalsFor) return b.goalsFor - a.goalsFor;
+    // Finally by team name
+    return (a.name || '').localeCompare(b.name || '');
   });
-  
-  // Filtrar standings duplicados por teamId y zoneId
-  const uniqueStandings: typeof sortedStandings = [];
-  const seen = new Set();
-  for (const s of sortedStandings) {
-    const key = `${s.teamId}_${s.zoneId}`;
-    if (!seen.has(key)) {
-      uniqueStandings.push(s);
-      seen.add(key);
-    }
-  }
-  
+
   // Función mejorada para obtener el nombre del equipo
-  const getTeamName = (teamId: string, standing?: any): string => {
+  const getTeamName = (teamId: string, standing?: Team): string => {
     // Primero intenta encontrar el equipo por ID
     const team = teams.find(team => team.id === teamId);
     if (team) {
-      return team.name;
+      return team.name || team.teamName || team.equipo_nombre || 'Equipo Desconocido';
     }
     
-    // Si no encuentra el equipo, busca en los datos del standing
-    // Primero verifica si hay teamName (viene del mapper de posiciones_editable)
-    if (standing && standing.teamName) {
-      return standing.teamName;
+    // Si no encuentra el equipo, usa el nombre del standing
+    if (standing) {
+      return standing.name || standing.teamName || standing.equipo_nombre || 'Equipo Desconocido';
     }
     
-    // También verifica equipo_nombre por compatibilidad
-    if (standing && standing.equipo_nombre) {
-      return standing.equipo_nombre;
-    }
-    
-    // Fallback más informativo
-    return `Equipo ${teamId}`;
+    return 'Equipo Desconocido';
   };
-  
-  // Handle CSV export
+
   const handleExportCSV = () => {
-    // Verificar entorno del navegador
-    if (typeof window === 'undefined') return;
+    const uniqueStandings = sortedStandings.filter((standing, index, self) => 
+      index === self.findIndex(s => s.teamId === standing.teamId)
+    );
     
-    // Create CSV content
-    let csvContent = "Posición,Equipo,PJ,Puntos\n";
+    let csvContent = "data:text/csv;charset=utf-8,";
+    csvContent += "Posición,Equipo,Partidos Jugados,Puntos\n";
+    
     uniqueStandings.forEach((standing, index) => {
       const teamName = getTeamName(standing.teamId, standing);
-      csvContent += `${index + 1},${teamName},${standing.pj},${standing.puntos}\n`;
+      csvContent += `${index + 1},${teamName},${standing.played},${standing.points}\n`;
     });
     
-    // Create download link
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.setAttribute('href', url);
-    link.setAttribute('download', `standings_${zoneId}.csv`);
-    link.style.visibility = 'hidden';
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `posiciones_liga.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    URL.revokeObjectURL(url);
   };
-  
-  // Handle import complete
-  const handleImportComplete = () => {
-    setRefreshKey(prev => prev + 1);
+
+  const getPositionChange = (current: number, previous?: number) => {
+    if (!previous) return 'new';
+    if (current < previous) return 'up';
+    if (current > previous) return 'down';
+    return 'same';
   };
-  
-  if (uniqueStandings.length === 0) {
-    return (
-      <div className="text-center py-12">
-        <p className="text-gray-500">No hay equipos en esta zona.</p>
-      </div>
-    );
-  }
-  
-  // Función para obtener el ícono según la posición
-  const getPositionIcon = (position: number) => {
-    switch (position) {
-      case 1:
-        return <Trophy className="text-yellow-500" size={18} />;
-      case 2:
-        return <Medal className="text-gray-400" size={18} />;
-      case 3:
-        return <Award className="text-amber-700" size={18} />;
+
+  const getPositionIcon = (change: string) => {
+    switch (change) {
+      case 'up':
+        return <TrendingUp size={12} className="text-green-500" />;
+      case 'down':
+        return <TrendingDown size={12} className="text-red-500" />;
+      case 'same':
+        return <Minus size={12} className="text-gray-400" />;
       default:
         return null;
     }
   };
-  
-  const handleSaveLegend = async () => {
-    setSavingLegend(true);
-    await standingsLegendService.upsertLegend(zoneId, categoryId, legendValue);
-    setLegend(legendValue);
-    setEditingLegend(false);
-    setSavingLegend(false);
+
+  const getPositionBadge = (position: number) => {
+    if (position <= 4) {
+      return 'bg-gradient-to-r from-green-500 to-green-600 text-white';
+    } else if (position <= 8) {
+      return 'bg-gradient-to-r from-blue-500 to-blue-600 text-white';
+    } else if (position >= sortedStandings.length - 3) {
+      return 'bg-gradient-to-r from-red-500 to-red-600 text-white';
+    }
+    return 'bg-gradient-to-r from-slate-100 to-slate-200 text-slate-700';
   };
-  
+
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center py-12">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="text-center py-12">
+        <p className="text-red-600 mb-4">{error}</p>
+        <button 
+          onClick={() => window.location.reload()}
+          className="btn btn-primary"
+        >
+          Reintentar
+        </button>
+      </div>
+    );
+  }
+
   return (
-    <div className="bg-white shadow rounded-lg p-6">
-      <div className="standings-container">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 space-y-2 sm:space-y-0 sm:space-x-2">
-          <div>
-            <h3 className="text-lg font-semibold">Tabla de Posiciones</h3>
-            {editingLegend ? (
-              <div className="mt-2 p-2 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg flex items-center space-x-2">
-                <input
-                  className="form-input text-sm font-medium text-blue-800 bg-white border-blue-300 rounded px-2 py-1 mr-2"
-                  value={legendValue}
-                  onChange={e => setLegendValue(e.target.value)}
-                  disabled={savingLegend}
-                  maxLength={50}
-                  placeholder="Ej: Apertura 2025, Clausura 2025"
-                  style={{ minWidth: 120 }}
-                />
-                <button
-                  className="btn btn-xs btn-success flex items-center"
-                  onClick={handleSaveLegend}
-                  disabled={savingLegend}
-                  title="Guardar leyenda"
-                >
-                  <span>Guardar</span>
-                </button>
-                <button
-                  className="btn btn-xs btn-outline flex items-center"
-                  onClick={() => { setEditingLegend(false); setLegendValue(legend); }}
-                  disabled={savingLegend}
-                  title="Cancelar"
-                >
-                  <span>Cancelar</span>
-                </button>
-              </div>
-            ) : (
-              <div className="mt-2 p-2 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg flex items-center space-x-2">
-                <span className="text-sm font-medium text-blue-800">{legend || <span className="text-gray-400">Agregar leyenda</span>}</span>
-                {isAuthenticated && user?.username === 'admin' && (
-                  <button
-                    className="ml-2 text-blue-700 hover:text-blue-900"
-                    onClick={() => setEditingLegend(true)}
-                    title={legend ? "Editar leyenda" : "Agregar leyenda"}
-                  >
-                    Editar
-                  </button>
-                )}
-              </div>
-            )}
-          </div>
-          <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2 w-full sm:w-auto">
-            <ImportCSVButton zoneId={zoneId} onImportComplete={handleImportComplete} />
-            <button 
-              className="btn btn-outline btn-sm flex items-center justify-center space-x-2 w-full sm:w-auto"
-              onClick={handleExportCSV}
-            >
-              <Download size={16} />
-              <span>Exportar CSV</span>
-            </button>
-          </div>
+    <div className="standings-container">
+      {title && (
+        <div className="text-center mb-8">
+          <h2 className="text-3xl md:text-4xl font-bold gradient-text mb-2">
+            {title}
+          </h2>
+          <div className="w-24 h-1 bg-gradient-to-r from-primary-500 to-accent-500 mx-auto rounded-full"></div>
         </div>
-        <div className="overflow-x-auto rounded-lg shadow">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gradient-to-r from-primary-600 to-primary-700">
-              <tr>
-                <th className="px-6 py-4 text-left text-xs font-medium text-white uppercase tracking-wider w-16">Pos</th>
-                <th className="px-6 py-4 text-left text-xs font-medium text-white uppercase tracking-wider">Equipo</th>
-                <th className="px-6 py-4 text-center text-xs font-medium text-white uppercase tracking-wider w-20">PJ</th>
-                <th className="px-6 py-4 text-center text-xs font-medium text-white uppercase tracking-wider w-20">PTS</th>
+      )}
+      
+      <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg border border-white/20 overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead>
+              <tr className="bg-gradient-to-r from-slate-100 to-slate-200">
+                <th className="px-4 py-4 text-left font-semibold text-slate-700">Pos</th>
+                <th className="px-4 py-4 text-left font-semibold text-slate-700">Equipo</th>
+                <th className="px-4 py-4 text-center font-semibold text-slate-700">PJ</th>
+                <th className="px-4 py-4 text-center font-semibold text-slate-700">G</th>
+                <th className="px-4 py-4 text-center font-semibold text-slate-700">E</th>
+                <th className="px-4 py-4 text-center font-semibold text-slate-700">P</th>
+                <th className="px-4 py-4 text-center font-semibold text-slate-700">GF</th>
+                <th className="px-4 py-4 text-center font-semibold text-slate-700">GC</th>
+                <th className="px-4 py-4 text-center font-semibold text-slate-700">DG</th>
+                <th className="px-4 py-4 text-center font-semibold text-slate-700">Pts</th>
               </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {sortedStandings.length === 0 ? (
-                <tr>
-                  <td colSpan={4} className="text-center py-12 text-gray-500">
-                    No hay equipos en esta zona.
-                  </td>
-                </tr>
-              ) : (
-                sortedStandings.map((s, idx) => {
-                  const team = teams.find(t => t.id === s.teamId);
-                  return (
-                    <tr key={s.id} className={
-                      idx < 3 ? 'hover:bg-gray-50 transition-colors bg-green-50/30' :
-                      idx >= sortedStandings.length - 3 ? 'hover:bg-gray-50 transition-colors bg-red-50/30' :
-                      'hover:bg-gray-50 transition-colors'
-                    }>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center space-x-2">
-                          <span className="font-bold text-lg">{idx + 1}</span>
-                          {idx < 3 && medalIcons[idx]}
+            <tbody>
+              {sortedStandings.map((team, index) => {
+                const positionChange = getPositionChange(team.position, team.previousPosition);
+                const isEven = index % 2 === 0;
+                const teamName = getTeamName(team.teamId, team);
+                
+                return (
+                  <tr 
+                    key={team.id} 
+                    className={`team-row transition-all duration-300 hover:scale-[1.01] ${
+                      isEven ? 'bg-slate-50/50' : 'bg-white/50'
+                    }`}
+                  >
+                    <td className="px-4 py-4">
+                      <div className="flex items-center space-x-2">
+                        <span className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${getPositionBadge(index + 1)}`}>
+                          {index + 1}
+                        </span>
+                        {getPositionIcon(positionChange)}
+                      </div>
+                    </td>
+                    <td className="px-4 py-4">
+                      <div className="flex items-center space-x-3">
+                        <div className="w-8 h-8 bg-gradient-to-r from-primary-100 to-accent-100 rounded-full flex items-center justify-center">
+                          <span className="text-xs font-bold text-primary-700">
+                            {teamName.charAt(0).toUpperCase()}
+                          </span>
                         </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center">
-                          <div className="w-8 h-8 mr-3 bg-primary-100 rounded-full flex items-center justify-center border-2 border-primary-200">
-                            <span className="text-xs font-bold text-primary-700">{team?.name?.charAt(0) || '?'}</span>
-                          </div>
-                          <span className="text-sm font-medium text-gray-900">{team?.name || s.teamId}</span>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700 text-center font-medium">{s.pj}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-center"><span className="text-lg font-bold">{s.puntos}</span></td>
-                    </tr>
-                  );
-                })
-              )}
+                        <span className="font-semibold text-slate-800">{teamName}</span>
+                        {index < 3 && (
+                          <Trophy size={16} className="text-yellow-500 animate-pulse" />
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-4 py-4 text-center font-medium text-slate-700">
+                      {team.played}
+                    </td>
+                    <td className="px-4 py-4 text-center">
+                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-700">
+                        {team.won}
+                      </span>
+                    </td>
+                    <td className="px-4 py-4 text-center">
+                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-700">
+                        {team.drawn}
+                      </span>
+                    </td>
+                    <td className="px-4 py-4 text-center">
+                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-700">
+                        {team.lost}
+                      </span>
+                    </td>
+                    <td className="px-4 py-4 text-center font-medium text-slate-700">
+                      {team.goalsFor}
+                    </td>
+                    <td className="px-4 py-4 text-center font-medium text-slate-700">
+                      {team.goalsAgainst}
+                    </td>
+                    <td className="px-4 py-4 text-center">
+                      <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold ${
+                        team.goalDifference > 0 
+                          ? 'bg-green-100 text-green-700' 
+                          : team.goalDifference < 0 
+                          ? 'bg-red-100 text-red-700' 
+                          : 'bg-gray-100 text-gray-700'
+                      }`}>
+                        {team.goalDifference > 0 ? '+' : ''}{team.goalDifference}
+                      </span>
+                    </td>
+                    <td className="px-4 py-4 text-center">
+                      <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-bold bg-gradient-to-r from-primary-500 to-accent-500 text-white shadow-md">
+                        {team.points}
+                      </span>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
-        <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-          <div className="bg-green-50 p-3 rounded-lg border border-green-200">
-            <h4 className="font-medium text-green-800 mb-1">Clasificación</h4>
-            <p className="text-green-700">Equipos en posiciones de clasificación</p>
-          </div>
-          <div className="bg-gray-50 p-3 rounded-lg border border-gray-200">
-            <h4 className="font-medium text-gray-800 mb-1">Zona Media</h4>
-            <p className="text-gray-700">Equipos en posiciones intermedias</p>
-          </div>
-          <div className="bg-red-50 p-3 rounded-lg border border-red-200">
-            <h4 className="font-medium text-red-800 mb-1">Descenso</h4>
-            <p className="text-red-700">Equipos en riesgo de descenso</p>
-          </div>
+      </div>
+
+      {/* Leyenda */}
+      <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="flex items-center space-x-2">
+          <div className="w-4 h-4 bg-gradient-to-r from-green-500 to-green-600 rounded-full"></div>
+          <span className="text-sm text-slate-600">Clasificación a playoffs</span>
+        </div>
+        <div className="flex items-center space-x-2">
+          <div className="w-4 h-4 bg-gradient-to-r from-blue-500 to-blue-600 rounded-full"></div>
+          <span className="text-sm text-slate-600">Posición media</span>
+        </div>
+        <div className="flex items-center space-x-2">
+          <div className="w-4 h-4 bg-gradient-to-r from-red-500 to-red-600 rounded-full"></div>
+          <span className="text-sm text-slate-600">Zona de descenso</span>
         </div>
       </div>
     </div>
