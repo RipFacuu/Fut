@@ -8,8 +8,8 @@ const CoursesPage: React.FC = () => {
 
   const handleImageError = (e: React.SyntheticEvent<HTMLImageElement>) => {
     const target = e.target as HTMLImageElement;
-    // Cambiamos la ruta de la imagen por defecto a una que existe en el proyecto
-    target.src = '/placeholder-course.jpg';
+    // Usar una imagen de placeholder online
+    target.src = 'https://via.placeholder.com/400x300/f3f4f6/9ca3af?text=Sin+Imagen';
     target.onerror = null; // Prevenir bucle infinito
   };
 
@@ -29,9 +29,9 @@ const CoursesPage: React.FC = () => {
               <div className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow duration-300 cursor-pointer">
                 <div className="relative w-full h-48 bg-gray-100">
                   <img
-                    src={course.imageUrl || '/placeholder-course.jpg'}
+                    src={course.imageUrl || 'https://via.placeholder.com/400x300/f3f4f6/9ca3af?text=Sin+Imagen'}
                     alt={course.title}
-                    className="w-full h-full object-cover"
+                    className="w-full h-full object-cover rounded-t-lg"
                     onError={handleImageError}
                   />
                 </div>

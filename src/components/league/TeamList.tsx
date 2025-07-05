@@ -30,11 +30,19 @@ const TeamList: React.FC<TeamListProps> = ({ zoneId }) => {
           <div className="p-4 flex items-center space-x-4">
             <div className="w-12 h-12 bg-primary-100 rounded-full flex items-center justify-center">
               {team.logo ? (
+                <>
                 <img 
                   src={team.logo} 
                   alt={`${team.name} logo`} 
                   className="w-10 h-10 rounded-full object-cover"
+                  onError={(e) => {
+                    const target = e.target as HTMLImageElement;
+                    target.style.display = 'none';
+                    target.nextElementSibling?.classList.remove('hidden');
+                  }}
                 />
+                <Users size={24} className="text-primary-600 hidden" />
+                </>
               ) : (
                 <Users size={24} className="text-primary-600" />
               )}

@@ -272,7 +272,7 @@ const AdminCoursesPage: React.FC = () => {
                 alt={course.title}
                 className="w-full h-48 object-cover rounded-t-lg"
                 onError={(e) => {
-                  (e.target as HTMLImageElement).src = '/placeholder-image.jpg';
+                  (e.target as HTMLImageElement).src = 'https://via.placeholder.com/400x300/f3f4f6/9ca3af?text=Sin+Imagen';
                 }}
               />
             ) : (

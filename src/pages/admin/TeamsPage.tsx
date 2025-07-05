@@ -557,11 +557,21 @@ const TeamsPage: React.FC = () => {
                       <div className="flex flex-col xs:flex-row xs:items-center xs:space-x-4 space-y-2 xs:space-y-0">
                         <div className="w-12 h-12 bg-primary-100 rounded-full flex items-center justify-center mx-auto xs:mx-0">
                           {team.logo ? (
-                            <img 
-                              src={team.logo} 
-                              alt={`${team.name} logo`} 
-                              className="w-10 h-10 rounded-full object-cover"
-                            />
+                            <>
+                              <img 
+                                src={team.logo} 
+                                alt={`${team.name} logo`} 
+                                className="w-10 h-10 rounded-full object-cover"
+                                onError={(e) => {
+                                  const target = e.target as HTMLImageElement;
+                                  target.style.display = 'none';
+                                  target.nextElementSibling?.classList.remove('hidden');
+                                }}
+                              />
+                              <span className="text-primary-600 font-bold text-lg hidden">
+                                {team.name.substring(0, 2).toUpperCase()}
+                              </span>
+                            </>
                           ) : (
                             <span className="text-primary-600 font-bold text-lg">
                               {team.name.substring(0, 2).toUpperCase()}
