@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Link, NavLink, useNavigate } from 'react-router-dom';
+import { Link, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { Trophy, Menu, X, User, LogOut } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { cn } from '../utils/cn';
@@ -8,6 +8,11 @@ const Header: React.FC = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const { isAuthenticated, logout } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  let leagueTitle = 'Liga Participando';
+  if (location.pathname.startsWith('/league/lifufe')) leagueTitle = 'LIFUFE';
+  else if (location.pathname.startsWith('/league/mundialito')) leagueTitle = 'Mundialito';
+  else if (location.pathname.startsWith('/league/liga_masculina')) leagueTitle = 'Liga Participando';
   
   const toggleMenu = () => {
     setIsMenuOpen(!isMenuOpen);
@@ -25,7 +30,7 @@ const Header: React.FC = () => {
           {/* Logo */}
           <Link to="/" className="flex items-center space-x-2">
             <Trophy size={28} className="text-accent-300" />
-            <span className="font-heading text-xl font-semibold">Liga Participando</span>
+            <span className="font-heading text-xl font-semibold">{leagueTitle}</span>
           </Link>
           
           {/* Desktop Navigation */}

@@ -1010,7 +1010,7 @@ const StandingsPage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-100">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 lg:py-8">
+      <div className="w-full mx-0 px-0 max-w-[1400px] mx-auto py-6 lg:py-8">
         {/* Header mejorado */}
         <div className="bg-white shadow-xl rounded-2xl border border-gray-100 overflow-hidden">
           <div className="bg-gradient-to-r from-violet-600 to-purple-700 px-6 py-8">
@@ -1032,7 +1032,7 @@ const StandingsPage: React.FC = () => {
             </div>
           </div>
 
-          <div className="px-6 py-8">
+          <div className="px-0 py-0 md:px-6 md:py-8">
             {/* Filtros mejorados con diseño de tarjetas */}
             <div className="mb-8">
               <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
@@ -1357,12 +1357,12 @@ const StandingsPage: React.FC = () => {
                   </table>
                 </div>
                 {/* Vista tipo lista para mobile */}
-                <div className="md:hidden space-y-3 p-2">
+                <div className="md:hidden space-y-3 p-0">
                   {completeStandings.map((standing: Standing, idx: number) => (
                     <div
                       key={standing.id}
                       className={
-                        'flex flex-col rounded-lg p-3 border ' +
+                        'flex flex-col rounded-lg p-3 border w-full mx-0 ' +
                         (modifiedRows.has(String(standing.id))
                           ? 'bg-yellow-50 border-yellow-200'
                           : idx < 3
@@ -1377,7 +1377,7 @@ const StandingsPage: React.FC = () => {
                             <span className="text-xs font-medium text-green-600 bg-green-100 px-2 py-1 rounded-full">Top {idx + 1}</span>
                           )}
                         </div>
-                        <div className="flex flex-row space-x-2">
+                        <div className="flex flex-row gap-3">
                           {/* Flechas de orden */}
                           <button onClick={() => moveStanding(idx, 'up')} disabled={idx === 0} title="Subir" className="text-gray-500 hover:text-violet-600 disabled:opacity-30"><span>▲</span></button>
                           <button onClick={() => moveStanding(idx, 'down')} disabled={idx === completeStandings.length - 1} title="Bajar" className="text-gray-500 hover:text-violet-600 disabled:opacity-30"><span>▼</span></button>

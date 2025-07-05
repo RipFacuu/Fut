@@ -111,7 +111,7 @@ const AdminDashboard: React.FC = () => {
           </aside>
           
           {/* Main Content */}
-          <main className="lg:col-span-5 bg-white rounded-md shadow-sm p-6">
+          <main className="lg:col-span-5 bg-white rounded-md shadow-sm p-0 md:p-6">
             <Outlet />
           </main>
         </div>

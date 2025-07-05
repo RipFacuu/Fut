@@ -24,7 +24,7 @@ const HomePage: React.FC = () => {
               to="/league/liga_masculina"
               className="btn bg-primary-600 hover:bg-primary-700 text-white text-center"
             >
-              Liga Masculina
+              Liga Participando
             </Link>
             <Link 
               to="/league/lifufe" 

@@ -821,8 +821,8 @@ const StandingsTable: React.FC<{ zoneId: string; leagueId: string; categoryId: s
           </tbody>
         </table>
       </div>
-      {/* Vista tipo lista para mobile */}
-      <div className="md:hidden space-y-3">
+      {/* Vista tipo lista para mobile: más ancha y cómoda */}
+      <div className="md:hidden space-y-3 w-full p-0">
         {allRows.map((standing, idx) => {
           const team = teams.find(t => t.id === standing.teamId);
           const isModified = modifiedRows.has(String(standing.id));
@@ -830,7 +830,7 @@ const StandingsTable: React.FC<{ zoneId: string; leagueId: string; categoryId: s
             <div
               key={standing.id}
               className={
-                'flex flex-col rounded-lg p-3 border ' +
+                'flex flex-col rounded-lg p-4 border w-full mx-0 ' +
                 (isModified ? 'bg-yellow-50 border-yellow-200' : 'bg-gray-50 border-gray-200')
               }
             >
@@ -859,7 +859,7 @@ const StandingsTable: React.FC<{ zoneId: string; leagueId: string; categoryId: s
                   </button>
                 </div>
               </div>
-              <div className="flex flex-col space-y-1">
+              <div className="flex flex-col space-y-2">
                 <div className="text-base font-semibold text-gray-900">{team?.name || 'Equipo desconocido'}</div>
                 <div className="flex flex-wrap gap-2 mt-1">
                   <span className="bg-gray-200 text-gray-700 px-2 py-0.5 rounded text-xs font-semibold">PJ: {standing.pj}</span>
