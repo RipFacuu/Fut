@@ -36,7 +36,7 @@ const HomePage: React.FC = () => {
               to="/league/mundialito" 
               className="btn bg-white hover:bg-gray-100 text-secondary-800 text-center"
             >
-              Liga Participando
+              Mundialito
             </Link>
           </div>
         </div>
