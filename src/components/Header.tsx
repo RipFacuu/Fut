@@ -50,7 +50,7 @@ const Header: React.FC = () => {
               </span>
               <div className="flex items-center space-x-1">
                 <Sparkles size={12} className="text-yellow-300 animate-pulse" />
-                <span className="text-xs text-white/80 font-medium">Fútbol Profesional</span>
+                <span className="text-xs text-white/80 font-medium">Fútbol Infantil</span>
                 <Sparkles size={12} className="text-yellow-300 animate-pulse" />
               </div>
             </div>

@@ -37,7 +37,7 @@ const Footer: React.FC = () => {
               {getLeagueTitle()}
             </span>
           </div>
-          <p className="text-white/60 text-sm">Fútbol Profesional</p>
+          <p className="text-white/60 text-sm">Fútbol Infantil</p>
         </div>
         
         {/* Contenido principal */}
