@@ -4,7 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { Trophy, Eye, EyeOff, Lock, User, Sparkles } from 'lucide-react';
 
 const AdminLogin: React.FC = () => {
-  const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -19,10 +19,14 @@ const AdminLogin: React.FC = () => {
     setError('');
 
     try {
-      await login(email, password);
-      navigate('/admin');
+      const success = await login(username, password);
+      if (success) {
+        navigate('/admin');
+      } else {
+        setError('Credenciales inválidas. Por favor, intenta de nuevo.');
+      }
     } catch (err) {
-      setError('Credenciales inválidas. Por favor, intenta de nuevo.');
+      setError('Ocurrió un error inesperado. Intenta de nuevo.');
     } finally {
       setIsLoading(false);
     }
@@ -71,20 +75,20 @@ const AdminLogin: React.FC = () => {
           {/* Formulario */}
           <div className="p-8">
             <form onSubmit={handleSubmit} className="space-y-6">
-              {/* Campo Email */}
+              {/* Campo Usuario */}
               <div>
-                <label htmlFor="email" className="form-label flex items-center">
+                <label htmlFor="username" className="form-label flex items-center">
                   <User size={16} className="mr-2 text-primary-600" />
-                  Correo Electrónico
+                  Usuario
                 </label>
                 <div className="relative">
                   <input
-                    type="email"
-                    id="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    type="text"
+                    id="username"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
                     className="form-input pl-12"
-                    placeholder="admin@ligaparticipando.com"
+                    placeholder="admin"
                     required
                   />
                   <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">

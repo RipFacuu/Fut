@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { jwtDecode } from 'jwt-decode';
+import { supabase } from '../lib/supabase';
 
 interface User {
   id: string;
@@ -8,7 +9,7 @@ interface User {
 
 interface AuthContextType {
   user: User | null;
-  login: (username: string, password: string) => Promise<boolean>;
+  login: (email: string, password: string) => Promise<boolean>;
   logout: () => void;
   isAuthenticated: boolean;
 }
@@ -35,10 +36,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     const token = localStorage.getItem('auth_token');
     if (token) {
       try {
-        const decoded = jwtDecode<{id: string; username: string}>(token);
+        const parsed = JSON.parse(token);
         setUser({
-          id: decoded.id,
-          username: decoded.username
+          id: parsed.id,
+          username: parsed.username
         });
         setIsAuthenticated(true);
       } catch (error) {
@@ -49,25 +50,27 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   }, []);
   
-  // Mock login function (in a real app, this would call an API)
-  const login = async (username: string, password: string): Promise<boolean> => {
-    // Mock successful login for admin/admin
-    if (username === 'Ferferchu' && password === 'Fer5378') {
-      const mockUser = {
-        id: '1',
-        username: 'admin'
-      };
-      
-      // Mock JWT token (this would come from the server in a real app)
-      const mockToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjEiLCJ1c2VybmFtZSI6ImFkbWluIn0.8tat9J_uRfI23gNX2qqSZMVsJ3Q-oVGpQOgqB9RcQcM';
-      
-      localStorage.setItem('auth_token', mockToken);
-      setUser(mockUser);
-      setIsAuthenticated(true);
-      return true;
+  const login = async (email: string, password: string): Promise<boolean> => {
+    // Busca el usuario por email
+    const { data, error } = await supabase
+      .from('usuarios')
+      .select('*')
+      .eq('email', email)
+      .single();
+
+    if (error || !data) {
+      return false;
     }
-    
-    return false;
+
+    // Compara la contraseña (sin hash por ahora)
+    if (data.password !== password) return false;
+
+    // Guarda el usuario autenticado
+    const token = JSON.stringify({ id: data.id, username: data.nombre, email: data.email });
+    localStorage.setItem('auth_token', token);
+    setUser({ id: data.id, username: data.nombre });
+    setIsAuthenticated(true);
+    return true;
   };
   
   const logout = () => {
