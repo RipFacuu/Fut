@@ -154,6 +154,54 @@
   transform: translateY(-4px) scale(1.02);
 }
 
+/* Animaciones para el carrusel de flyers */
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateX(100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes slideOut {
+  from {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(-100%);
+  }
+}
+
+.flyer-slide-enter {
+  animation: slideIn 0.5s ease-out;
+}
+
+.flyer-slide-exit {
+  animation: slideOut 0.5s ease-out;
+}
+
+/* Mejoras para el carrusel */
+.carousel-container {
+  perspective: 1000px;
+}
+
+.carousel-slide {
+  transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.carousel-indicator {
+  transition: all 0.3s ease;
+}
+
+.carousel-indicator.active {
+  transform: scale(1.2);
+}
+
 /* Mejoras para móvil */
 @media (max-width: 768px) {
   .container {

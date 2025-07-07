@@ -17,6 +17,7 @@ import ZonesPage from './pages/admin/ZonesPage';
 import NotFoundPage from './pages/NotFoundPage';
 import CoursesPage from './pages/CoursesPage';
 import AdminCoursesPage from './pages/admin/CoursesPage';
+import FlyersPage from './pages/admin/FlyersPage';
 import CourseDetailPage from './pages/CourseDetailPage';
 
 const App: React.FC = () => {
@@ -44,6 +45,7 @@ const App: React.FC = () => {
                 <Route path="categories" element={<CategoriesPage />} />
                 <Route path="zones" element={<ZonesPage />} />
                 <Route path="courses" element={<AdminCoursesPage />} />
+                <Route path="flyers" element={<FlyersPage />} />
               </Route>
             </Route>
           </Routes>

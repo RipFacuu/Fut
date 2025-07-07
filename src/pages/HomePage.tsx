@@ -2,6 +2,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { useLeague } from '../contexts/LeagueContext';
 import { Trophy, Users, ClipboardList, Star, Zap, Target, Award } from 'lucide-react';
+import FlyerCarousel from '../components/FlyerCarousel';
 
 const HomePage: React.FC = () => {
   const { leagues } = useLeague();
@@ -22,6 +23,11 @@ const HomePage: React.FC = () => {
 
       {/* Hero Section ancho igual a Nuestras Ligas */}
       {/* Sección eliminada por pedido del usuario */}
+
+      {/* Carrusel de Flyers */}
+      <section className="animate-fade-in max-w-5xl mx-auto px-4 sm:px-8">
+        <FlyerCarousel />
+      </section>
 
       {/* League Panels con efectos modernos */}
       <section className="animate-fade-in max-w-5xl mx-auto px-4 sm:px-8">

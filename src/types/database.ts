@@ -190,6 +190,41 @@ export interface Database {
           goals_against?: number
         }
       }
+      flyers: {
+        Row: {
+          id: string
+          title: string
+          description: string | null
+          image_url: string
+          link_url: string | null
+          is_active: boolean
+          order_index: number
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          title: string
+          description?: string | null
+          image_url: string
+          link_url?: string | null
+          is_active?: boolean
+          order_index?: number
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          title?: string
+          description?: string | null
+          image_url?: string
+          link_url?: string | null
+          is_active?: boolean
+          order_index?: number
+          created_at?: string
+          updated_at?: string
+        }
+      }
       created_at?: string
       updated_at?: string
     }

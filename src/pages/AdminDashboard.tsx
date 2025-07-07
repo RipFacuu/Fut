@@ -1,6 +1,6 @@
 import React from 'react';
 import { Outlet, NavLink } from 'react-router-dom';
-import { Users, Calendar, ClipboardList, Trophy, ListFilter, Layers, GraduationCap } from 'lucide-react';
+import { Users, Calendar, ClipboardList, Trophy, ListFilter, Layers, GraduationCap, Image } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { cn } from '../utils/cn';
 
@@ -105,6 +105,19 @@ const AdminDashboard: React.FC = () => {
                 >
                   <GraduationCap size={18} />
                   <span>Cursos y Capacitaciones</span>
+                </NavLink>
+                
+                <NavLink
+                  to="/admin/flyers"
+                  className={({ isActive }) => cn(
+                    "flex items-center space-x-3 px-3 py-2 rounded-md text-sm transition-colors",
+                    isActive
+                      ? "bg-primary-50 text-primary-700"
+                      : "text-gray-700 hover:bg-gray-50"
+                  )}
+                >
+                  <Image size={18} />
+                  <span>Flyers</span>
                 </NavLink>
               </div>
             </nav>
