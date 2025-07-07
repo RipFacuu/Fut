@@ -1,18 +1,36 @@
-import React, { useState, useEffect } from 'react';
-import { useLeague, Standing, Team } from '../../contexts/LeagueContext';
+import React, { useState, useEffect, useMemo } from 'react';
+import { useLeague, Team } from '../../contexts/LeagueContext';
 import { Trash2, Save, Plus, X, Download, Upload, RefreshCw } from 'lucide-react';
 import { cn } from '../../utils/cn';
 import { useForm } from 'react-hook-form';
 import { useAuth } from '../../contexts/AuthContext';
 import { standingsLegendService } from '../../services/standingsLegendService';
 
-interface EditableCellProps {
-  value: number | string;
-  standing: Standing;
-  field: keyof Standing | 'teamName';
-  onUpdate: (id: string, field: keyof Standing | 'teamName', value: any) => void;
-  type?: 'number' | 'text';
-  min?: number;
+// 1. INTERFACES CORREGIDAS
+interface Standing {
+  id: string;
+  teamId: string;
+  leagueId: string;
+  categoryId: string;
+  zoneId: string;
+  pj: number;
+  won: number;
+  drawn: number;
+  lost: number;
+  goalsFor: number;
+  goalsAgainst: number;
+  puntos: number;
+}
+
+interface NewTeamFormData {
+  teamName: string;
+  pj: number;
+  won: number;
+  drawn: number;
+  lost: number;
+  goalsFor: number;
+  goalsAgainst: number;
+  puntos: number;
 }
 
 const EditableCell: React.FC<EditableCellProps> = ({ 
@@ -117,15 +135,13 @@ const EditableCell: React.FC<EditableCellProps> = ({
   );
 };
 
-interface NewTeamFormData {
-  teamName: string;
-  played: number;
-  won: number;
-  drawn: number;
-  lost: number;
-  goalsFor: number;
-  goalsAgainst: number;
-  points: number;
+interface EditableCellProps {
+  value: number | string;
+  standing: Standing;
+  field: keyof Standing | 'teamName';
+  onUpdate: (id: string, field: keyof Standing | 'teamName', value: any) => void;
+  type?: 'number' | 'text';
+  min?: number;
 }
 
 const StandingsTable: React.FC<{ zoneId: string; leagueId: string; categoryId: string }> = ({ 
@@ -173,7 +189,9 @@ const StandingsTable: React.FC<{ zoneId: string; leagueId: string; categoryId: s
     teamsForZone: teams.filter(t => t.zoneId === zoneId)
   });
   
+  // 2. DATOS DE PRUEBA SOLO EN DESARROLLO
   useEffect(() => {
+    if (process.env.NODE_ENV !== 'development') return;
     const createTestData = async () => {
       // Solo para testing - crear datos de prueba si no existen
       if (zoneStandings.length === 0 && zoneId && leagueId && categoryId) {
@@ -230,32 +248,29 @@ const StandingsTable: React.FC<{ zoneId: string; leagueId: string; categoryId: s
     createTestData();
   }, [zoneId, leagueId, categoryId, zoneStandings.length, addTeam, createStanding]);
   
-  // Ordenar standings por puntos (descendente) de forma robusta
-  const sortedStandings = [...zoneStandings].sort((a, b) => {
-    // Asegurar que los valores sean números
-    const aPuntos = typeof a.puntos === 'number' ? a.puntos : parseInt(a.puntos) || 0;
-    const bPuntos = typeof b.puntos === 'number' ? b.puntos : parseInt(b.puntos) || 0;
-    if (bPuntos !== aPuntos) return bPuntos - aPuntos;
-    const aGoalsFor = typeof a.goalsFor === 'number' ? a.goalsFor : parseInt(a.goalsFor) || 0;
-    const aGoalsAgainst = typeof a.goalsAgainst === 'number' ? a.goalsAgainst : parseInt(a.goalsAgainst) || 0;
-    const bGoalsFor = typeof b.goalsFor === 'number' ? b.goalsFor : parseInt(b.goalsFor) || 0;
-    const bGoalsAgainst = typeof b.goalsAgainst === 'number' ? b.goalsAgainst : parseInt(b.goalsAgainst) || 0;
-    const aDiff = aGoalsFor - aGoalsAgainst;
-    const bDiff = bGoalsFor - bGoalsAgainst;
-    if (bDiff !== aDiff) return bDiff - aDiff;
-    return bGoalsFor - aGoalsFor;
-  });
+  // 3. ORDENAMIENTO CON useMemo
+  const sortedStandings = useMemo(() => {
+    return [...zoneStandings].sort((a, b) => {
+      const aPuntos = Number(a.puntos) || 0;
+      const bPuntos = Number(b.puntos) || 0;
+      if (bPuntos !== aPuntos) return bPuntos - aPuntos;
+      const aDiff = (Number(a.goalsFor) || 0) - (Number(a.goalsAgainst) || 0);
+      const bDiff = (Number(b.goalsFor) || 0) - (Number(b.goalsAgainst) || 0);
+      if (bDiff !== aDiff) return bDiff - aDiff;
+      return (Number(b.goalsFor) || 0) - (Number(a.goalsFor) || 0);
+    });
+  }, [zoneStandings]);
 
   const { register, handleSubmit, reset, formState: { errors }, watch } = useForm<NewTeamFormData>({
     defaultValues: {
       teamName: '',
-      played: 0,
+      pj: 0,
       won: 0,
       drawn: 0,
       lost: 0,
       goalsFor: 0,
       goalsAgainst: 0,
-      points: 0
+      puntos: 0
     }
   });
 
@@ -263,6 +278,16 @@ const StandingsTable: React.FC<{ zoneId: string; leagueId: string; categoryId: s
   const goalsFor = watch('goalsFor');
   const goalsAgainst = watch('goalsAgainst');
   const goalDifference = goalsFor - goalsAgainst;
+
+  // 8. VALIDACIÓN DE DATOS EN onSubmitNewTeam
+  const validateStats = (data: NewTeamFormData): boolean => {
+    const total = data.won + data.drawn + data.lost;
+    if (total !== data.pj) {
+      alert(`Los partidos jugados (${data.pj}) deben ser igual a G+E+P (${total})`);
+      return false;
+    }
+    return true;
+  };
 
   const handleUpdate = async (id: string, field: keyof Standing | 'teamName', value: any) => {
     // Si es draft, actualizar en draftTeams
@@ -302,8 +327,9 @@ const StandingsTable: React.FC<{ zoneId: string; leagueId: string; categoryId: s
     rowInputs.forEach(input => input.blur());
   };
 
-  // Guardar fila: forzar blur y esperar un tick antes de guardar
+  // 7. MEJORAR MANEJO DE ASYNC/AWAIT Y LOADING EN handleSaveRow
   const handleSaveRow = async (id: string) => {
+    setIsLoading(true);
     try {
       // Encontrar el standing actual
       const standing = zoneStandings.find(s => s.id === id);
@@ -330,12 +356,24 @@ const StandingsTable: React.FC<{ zoneId: string; leagueId: string; categoryId: s
         return newSet;
       });
     } catch (error) {
-      console.error('Error guardando fila:', error);
-      alert('Error al guardar. Inténtalo de nuevo.');
+      console.error('Error:', error);
+      alert('Error al guardar. Intenta de nuevo.');
+    } finally {
+      setIsLoading(false);
     }
   };
 
+  // Forzar blur de todos los inputs editables antes de guardar todo
+  const forceAllInputsBlur = () => {
+    const allInputs = document.querySelectorAll<HTMLInputElement>('input[data-row-id]');
+    allInputs.forEach(input => input.blur());
+  };
+
   const handleSaveAll = async () => {
+    // Forzar blur de todos los inputs editables antes de guardar
+    forceAllInputsBlur();
+    // Esperar un tick para que los blur se procesen y actualicen modifiedRows
+    await new Promise(resolve => setTimeout(resolve, 0));
     if (modifiedRows.size === 0 && !legendDirty && draftTeams.length === 0) return;
     setIsLoading(true);
     try {
@@ -389,10 +427,22 @@ const StandingsTable: React.FC<{ zoneId: string; leagueId: string; categoryId: s
     }
   };
 
+  // 6. ACCESIBILIDAD EN INPUTS
+  // Ejemplo para un input:
+  // <div className="form-group">
+  //   <label htmlFor="pj" className="sr-only">Partidos Jugados</label>
+  //   <input id="pj" ... aria-label="Partidos Jugados" />
+  // </div>
+  // Aplica esto a todos los inputs del formulario y tabla.
+  // 9. VALIDACIÓN DE PERMISOS EN handleDeleteTeam
   const handleDeleteTeam = async (standing: Standing) => {
+    if (!isAuthenticated || user?.username !== 'admin') {
+      alert('No tienes permisos para eliminar equipos');
+      return;
+    }
     if (window.confirm('¿Estás seguro de eliminar este equipo? Esta acción no se puede deshacer.')) {
+      setIsLoading(true);
       try {
-        setIsLoading(true);
         await deleteTeam(standing.teamId);
         setRefreshKey(prev => prev + 1);
       } catch (error) {
@@ -405,6 +455,7 @@ const StandingsTable: React.FC<{ zoneId: string; leagueId: string; categoryId: s
   };
 
   const onSubmitNewTeam = async (data: NewTeamFormData) => {
+    if (!validateStats(data)) return;
     setDraftTeams(prev => [
       ...prev,
       {
@@ -414,13 +465,13 @@ const StandingsTable: React.FC<{ zoneId: string; leagueId: string; categoryId: s
         categoryId,
         zoneId,
         logo: '',
-        pj: data.played,
+        pj: data.pj,
         won: data.won,
         drawn: data.drawn,
         lost: data.lost,
         goalsFor: data.goalsFor,
         goalsAgainst: data.goalsAgainst,
-        puntos: data.points
+        puntos: data.puntos
       }
     ]);
     setIsAddingTeam(false);
@@ -675,7 +726,7 @@ const StandingsTable: React.FC<{ zoneId: string; leagueId: string; categoryId: s
                     type="number"
                     min="0"
                     className="form-input w-full text-sm text-center"
-                    {...register('played', { min: 0, valueAsNumber: true })}
+                    {...register('pj', { min: 0, valueAsNumber: true })}
                   />
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
@@ -726,7 +777,7 @@ const StandingsTable: React.FC<{ zoneId: string; leagueId: string; categoryId: s
                     type="number"
                     min="0"
                     className="form-input w-full text-sm text-center"
-                    {...register('points', { min: 0, valueAsNumber: true })}
+                    {...register('puntos', { min: 0, valueAsNumber: true })}
                   />
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">

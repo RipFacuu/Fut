@@ -611,8 +611,37 @@ const StandingsPage: React.FC = () => {
     if (legendDirty) {
       await handleSaveLegend();
     }
-    await handleSaveAllWithLegend();
+    await handleSaveAll(); // Llama a la función real de guardado, no a sí misma
   }, [legendDirty, handleSaveLegend, editingCell]);
+
+  // Función real de guardado de standings
+  const handleSaveAll = useCallback(async () => {
+    setLoading(true);
+    try {
+      // Guardar todos los standings modificados
+      for (const id of modifiedRows) {
+        const standing = localStandings.find(s => s.id === id);
+        if (!standing) continue;
+        await actualizarPosicion(
+          standing.teamId,
+          standing.zoneId,
+          standing.categoryId,
+          {
+            puntos: Number(standing.puntos) || 0,
+            pj: Number(standing.pj) || 0,
+            // Agrega aquí otros campos si tu función los soporta
+          }
+        );
+      }
+      setModifiedRows(new Set());
+      await loadStandings();
+    } catch (error) {
+      setError('Error al guardar los cambios');
+      console.error(error);
+    } finally {
+      setLoading(false);
+    }
+  }, [modifiedRows, localStandings, loadStandings]);
 
   // Recalculate standings from matches
   const handleRecalculateStandings = useCallback(() => {
