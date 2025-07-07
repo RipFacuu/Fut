@@ -10,18 +10,6 @@ const Header: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Función para obtener el título de la liga según la ruta
-  const getLeagueTitle = () => {
-    if (location.pathname.startsWith('/league/lifufe')) {
-      return 'LIFUFE';
-    } else if (location.pathname.startsWith('/league/mundialito')) {
-      return 'Mundialito';
-    } else if (location.pathname.startsWith('/league/liga_masculina')) {
-      return 'Liga Participando';
-    }
-    return 'Liga Participando'; // Default
-  };
-
   const handleLogout = () => {
     logout();
     navigate('/');
@@ -37,23 +25,12 @@ const Header: React.FC = () => {
       <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent opacity-50"></div>
       
       <div className="container mx-auto px-4 relative z-10">
-        <div className="flex items-center justify-between h-20">
-          {/* Logo con efectos */}
-          <Link to="/" className="flex items-center space-x-3 group">
-            <div className="relative">
-              <div className="absolute inset-0 bg-gradient-to-r from-yellow-400 to-orange-500 rounded-full blur-lg opacity-75 group-hover:opacity-100 transition-opacity duration-300"></div>
-              <Trophy size={32} className="relative text-white drop-shadow-lg group-hover:scale-110 transition-transform duration-300" />
-            </div>
-            <div className="flex flex-col">
-              <span className="font-display text-2xl font-bold bg-gradient-to-r from-white to-yellow-200 bg-clip-text text-transparent">
-                {getLeagueTitle()}
-              </span>
-              <div className="flex items-center space-x-1">
-                <Sparkles size={12} className="text-yellow-300 animate-pulse" />
-                <span className="text-xs text-white/80 font-medium">Fútbol Infantil</span>
-                <Sparkles size={12} className="text-yellow-300 animate-pulse" />
-              </div>
-            </div>
+        <div className="relative flex items-center justify-center w-full h-20 lg:justify-between lg:items-center">
+          {/* Logos y texto personalizado */}
+          <Link to="/" className="flex items-center justify-center w-full space-x-4 group mx-auto lg:mx-0 lg:w-auto lg:mb-0 lg:justify-start">
+            <img src="/liga_participando.jpeg" alt="Liga Participando" className="w-12 h-12 rounded-full object-cover border-2 border-white shadow cursor-pointer" />
+            <img src="/lifufe.jpeg" alt="LIFUFE" className="w-12 h-12 rounded-full object-cover border-2 border-white shadow cursor-pointer" />
+            <img src="/mundialito.jpeg" alt="Mundialito" className="w-12 h-12 rounded-full object-cover border-2 border-white shadow cursor-pointer" />
           </Link>
           
           {/* Desktop Navigation */}
@@ -180,8 +157,9 @@ const Header: React.FC = () => {
 
           {/* Mobile menu button */}
           <button
-            className="lg:hidden flex items-center p-2 text-white hover:bg-white/10 rounded-xl transition-all duration-300"
+            className="lg:hidden flex items-center p-2 text-white hover:bg-white/10 rounded-xl transition-all duration-300 absolute right-4 top-1/2 -translate-y-1/2"
             onClick={toggleMenu}
+            style={{ zIndex: 20 }}
           >
             {isMenuOpen ? (
               <X size={24} className="text-white" />
