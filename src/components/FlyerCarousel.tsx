@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { Flyer, getActiveFlyers } from '../services/flyersService';
-import Lightbox from 'react-image-lightbox';
-import 'react-image-lightbox/style.css';
+import Lightbox from 'yet-another-react-lightbox';
+import 'yet-another-react-lightbox/styles.css';
 
 const FlyerCarousel: React.FC = () => {
   const [flyers, setFlyers] = useState<Flyer[]>([]);
@@ -91,28 +91,21 @@ const FlyerCarousel: React.FC = () => {
     containerWidth = 'max-w-[520px]';
   }
 
+  // Preparar slides para el lightbox
+  const slides = flyers.map(f => ({ src: f.image_url, alt: f.title, description: f.description }));
+
   return (
     <div className={`relative mx-auto mb-12 flex flex-col items-center ${containerWidth}`}>
       {lightboxOpen && (
-        flyers.length > 1 ? (
-          <Lightbox
-            mainSrc={flyers[currentIndex].image_url}
-            nextSrc={currentIndex < flyers.length - 1 ? flyers[currentIndex + 1].image_url : undefined}
-            prevSrc={currentIndex > 0 ? flyers[currentIndex - 1].image_url : undefined}
-            onCloseRequest={() => setLightboxOpen(false)}
-            onMovePrevRequest={() => setCurrentIndex(currentIndex > 0 ? currentIndex - 1 : 0)}
-            onMoveNextRequest={() => setCurrentIndex(currentIndex < flyers.length - 1 ? currentIndex + 1 : currentIndex)}
-            imageTitle={flyers[currentIndex].title}
-            imageCaption={flyers[currentIndex].description}
-          />
-        ) : (
-          <Lightbox
-            mainSrc={flyers[currentIndex].image_url}
-            onCloseRequest={() => setLightboxOpen(false)}
-            imageTitle={flyers[currentIndex].title}
-            imageCaption={flyers[currentIndex].description}
-          />
-        )
+        <Lightbox
+          open={lightboxOpen}
+          close={() => setLightboxOpen(false)}
+          slides={slides}
+          index={currentIndex}
+          on={{
+            view: ({ index }) => setCurrentIndex(index)
+          }}
+        />
       )}
       <div className={`relative overflow-hidden flex items-center justify-center bg-transparent ${containerHeight} w-full`}>
         {/* Imagen principal adaptativa */}
