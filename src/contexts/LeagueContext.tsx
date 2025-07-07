@@ -2,7 +2,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { mockLeagueData } from '../data/mockData';
 import { zonesService } from '../services/zonesService';
-import { supabase, eliminarEquipo, eliminarCategoria } from '../lib/supabase';
+import { supabase, eliminarEquipo, eliminarCategoria, crearPosicion, eliminarPosicionPorEquipo } from '../lib/supabase';
 import { SupabaseService } from '../services/supabaseService';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -625,7 +625,15 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
       );
       if (savedTeam) {
         setTeams(prev => [...prev, savedTeam]);
-        // Ya NO se crea el standing automáticamente aquí
+        // Crear posición editable automáticamente
+        await crearPosicion({
+          equipo_id: savedTeam.id,
+          zona_id: savedTeam.zoneId,
+          categoria_id: savedTeam.categoryId,
+          equipo_nombre: savedTeam.name,
+          puntos: standingData?.puntos || 0,
+          pj: standingData?.pj || 0
+        });
         return savedTeam;
       }
     } catch (error) {
@@ -636,7 +644,8 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
         id: `team_${Date.now()}`
       };
       setTeams(prev => [...prev, newTeam]);
-      // Ya NO se crea el standing automáticamente aquí
+      // Crear posición editable localmente (opcional, solo si tienes lógica local)
+      // await crearPosicion({ ... });
       return newTeam;
     }
   };
@@ -683,7 +692,10 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
     try {
       // Eliminar de Supabase
       const success = await eliminarEquipo(id);
-      
+
+      // Eliminar posiciones_editable asociadas
+      await eliminarPosicionPorEquipo(id);
+
       if (success) {
         // Eliminar del estado local
         setTeams(teams.filter(team => team.id !== id));

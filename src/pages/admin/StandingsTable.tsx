@@ -160,7 +160,8 @@ const StandingsTable: React.FC<{ zoneId: string; leagueId: string; categoryId: s
     importStandingsFromCSV,
     createStanding,
     zones,
-    updateZone
+    updateZone,
+    refreshStandings // <-- Agregar refreshStandings del contexto
   } = useLeague();
   const { isAuthenticated, user } = useAuth();
   
@@ -349,6 +350,7 @@ const StandingsTable: React.FC<{ zoneId: string; leagueId: string; categoryId: s
         goalsFor: Number(standing.goalsFor),
         goalsAgainst: Number(standing.goalsAgainst)
       });
+      await refreshStandings(); // <-- Refrescar standings después de guardar
       // Remover de filas modificadas
       setModifiedRows(prev => {
         const newSet = new Set(prev);
@@ -417,6 +419,7 @@ const StandingsTable: React.FC<{ zoneId: string; leagueId: string; categoryId: s
         });
       });
       await Promise.all(updates);
+      await refreshStandings(); // <-- Refrescar standings después de guardar todo
       setModifiedRows(new Set());
       setRefreshKey(prev => prev + 1);
     } catch (error) {

@@ -701,6 +701,20 @@ export async function eliminarPosicion(posicionId: string) {
   return true;
 }
 
+// Función para eliminar posiciones_editable por equipo_id
+export async function eliminarPosicionPorEquipo(equipo_id: string) {
+  const { error } = await supabase
+    .from('posiciones_editable')
+    .delete()
+    .eq('equipo_id', equipo_id);
+
+  if (error) {
+    console.error('Error eliminando posiciones_editable:', error);
+    return false;
+  }
+  return true;
+}
+
 // Funciones para Cursos
 export async function crearCurso(curso: {
   title: string;

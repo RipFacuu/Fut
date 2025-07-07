@@ -8,7 +8,7 @@ export const standingsLegendService = {
       .select('*')
       .eq('zona_id', zona_id)
       .eq('categoria_id', categoria_id)
-      .single();
+      .maybeSingle();
     return data || null;
   },
   async upsertLegend(zona_id: string, categoria_id: string, leyenda: string): Promise<StandingsLegend | null> {
@@ -16,7 +16,7 @@ export const standingsLegendService = {
       .from('standings_legends')
       .upsert([{ zona_id, categoria_id, leyenda }], { onConflict: 'zona_id,categoria_id' })
       .select()
-      .single();
+      .maybeSingle();
     return data || null;
   }
 };
