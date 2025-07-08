@@ -214,28 +214,29 @@ export const mapSupabaseToTeam = (supabaseTeam: any): Team => {
   };
 };
 
-export const mapSupabaseToFixture = (supabaseFixture: any): Fixture => {
+export const mapSupabaseToFixture = (supabaseFixture: any): Fixture & { invalidLeagueId?: boolean } => {
   console.log('Mapping fixture from Supabase:', supabaseFixture);
   
   // Función para mapear IDs numéricos de liga a strings
-  const getStringLeagueId = (numericId: number | string): string => {
+  const getStringLeagueId = (numericId: number | string | null | undefined): string => {
     const idMap: { [key: number]: string } = {
       1: 'liga_masculina',
       2: 'lifufe',
       3: 'mundialito'
     };
-    
+    if (numericId === null || numericId === undefined || isNaN(Number(numericId))) return '__INVALID__';
     const numId = typeof numericId === 'string' ? parseInt(numericId) : numericId;
-    return idMap[numId] || String(numericId);
+    return idMap[numId] || '__INVALID__';
   };
   
   // Asegurarse de que todos los IDs sean strings y manejar valores nulos
   const fixtureId = supabaseFixture.id ? supabaseFixture.id.toString() : '';
-  const leagueId = supabaseFixture.liga_id ? getStringLeagueId(supabaseFixture.liga_id) : '';
+  const leagueId = getStringLeagueId(supabaseFixture.liga_id);
   const categoryId = supabaseFixture.categoria_id ? supabaseFixture.categoria_id.toString() : '';
   const zoneId = supabaseFixture.zona_id ? supabaseFixture.zona_id.toString() : '';
+  const invalidLeagueId = leagueId === '__INVALID__';
   
-  console.log('Mapped IDs:', { fixtureId, leagueId, categoryId, zoneId });
+  console.log('Mapped IDs:', { fixtureId, leagueId, categoryId, zoneId, invalidLeagueId });
   
   return {
     id: fixtureId,
@@ -246,7 +247,8 @@ export const mapSupabaseToFixture = (supabaseFixture: any): Fixture => {
     zoneId: zoneId,
     leyenda: supabaseFixture.leyenda || '',
     texto_central: supabaseFixture.texto_central || '',
-    matches: []
+    matches: [],
+    invalidLeagueId
   };
 };
 

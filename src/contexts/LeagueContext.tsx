@@ -52,6 +52,7 @@ export interface Fixture {
   leyenda?: string;
   texto_central?: string;
   matches: Match[];
+  invalidLeagueId?: boolean; // <-- Agregado para advertencia de fixtures inválidos
 }
 
 export interface Standing {
@@ -623,13 +624,14 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
         team.categoryId,
         team.logo
       );
-      if (savedTeam) {
+      if (savedTeam && savedTeam.id) {
         setTeams(prev => [...prev, savedTeam]);
-        // Crear posición editable automáticamente
+        // Crear posición editable automáticamente SOLO si los IDs son válidos
+        const categoriaIdValida = savedTeam.categoryId && savedTeam.categoryId !== '' ? savedTeam.categoryId : null;
         await crearPosicion({
           equipo_id: savedTeam.id,
           zona_id: savedTeam.zoneId,
-          categoria_id: savedTeam.categoryId,
+          categoria_id: categoriaIdValida,
           equipo_nombre: savedTeam.name,
           puntos: standingData?.puntos || 0,
           pj: standingData?.pj || 0
@@ -638,15 +640,9 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
       }
     } catch (error) {
       console.error('Error adding team:', error);
-      // Fallback al estado local
-      const newTeam = {
-        ...team,
-        id: `team_${Date.now()}`
-      };
-      setTeams(prev => [...prev, newTeam]);
-      // Crear posición editable localmente (opcional, solo si tienes lógica local)
-      // await crearPosicion({ ... });
-      return newTeam;
+      // NO agregar al estado local si falla la creación en Supabase
+      alert('Error al crear el equipo. Verifica los datos e inténtalo de nuevo.');
+      return undefined;
     }
   };
 

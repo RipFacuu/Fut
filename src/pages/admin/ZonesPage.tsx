@@ -173,9 +173,11 @@ const ZonesPage: React.FC = () => {
   };
 
 // Removed unused categories variable
-  const filteredZones = watchCategoryId ? 
-    zones.filter(zone => zone.categoryId === watchCategoryId) : 
-    zones;
+  const filteredZones = selectedLeague === 'liga_masculina'
+    ? zones.filter(zone => zone.leagueId === selectedLeague)
+    : (watchCategoryId
+        ? zones.filter(zone => zone.categoryId === watchCategoryId)
+        : zones);
 
   return (
     <div className="space-y-6">

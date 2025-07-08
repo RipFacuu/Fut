@@ -179,16 +179,90 @@ const StandingsTable: React.FC<{ zoneId: string; leagueId: string; categoryId: s
   
   const zoneStandings = getStandingsByZone(zoneId);
   
-  // DEBUG: Agregar estas líneas para verificar los datos
-  console.log('Debug StandingsTable:', {
-    zoneId,
-    leagueId,
-    categoryId,
-    zoneStandings,
-    allStandings: standings,
-    allTeams: teams,
-    teamsForZone: teams.filter(t => t.zoneId === zoneId)
-  });
+  // 3. ORDENAMIENTO CON useMemo
+  const sortedStandings = useMemo(() => {
+    return [...zoneStandings].sort((a, b) => {
+      const aPuntos = Number(a.puntos) || 0;
+      const bPuntos = Number(b.puntos) || 0;
+      if (bPuntos !== aPuntos) return bPuntos - aPuntos;
+      const aDiff = (Number(a.goalsFor) || 0) - (Number(a.goalsAgainst) || 0);
+      const bDiff = (Number(b.goalsFor) || 0) - (Number(b.goalsAgainst) || 0);
+      if (bDiff !== aDiff) return bDiff - aDiff;
+      return (Number(b.goalsFor) || 0) - (Number(a.goalsFor) || 0);
+    });
+  }, [zoneStandings]);
+
+  // 1. Obtener todos los equipos de la zona y categoría seleccionada (aunque no tengan posición)
+  const teamsForZoneAndCategory = useMemo(() => {
+    return teams.filter(
+      t => t.zoneId === zoneId && t.categoryId === categoryId && t.leagueId === leagueId
+    );
+  }, [teams, zoneId, categoryId, leagueId]);
+
+  // 2. Unir standings existentes con equipos que no tengan posición, y ordenar correctamente
+  const allRows = useMemo(() => {
+    // Drafts (equipos nuevos no guardados)
+    const draftRows = draftTeams.map(draft => ({
+      ...draft,
+      id: draft.tempId,
+      teamId: draft.tempId,
+      isDraft: true
+    }));
+    // Standings existentes, ordenados por puntos, diferencia de gol y nombre
+    const standingsRows = sortedStandings
+      .map(s => ({ ...s, isDraft: false }))
+      .sort((a, b) => {
+        const bPuntos = Number(b.puntos) || 0;
+        const aPuntos = Number(a.puntos) || 0;
+        if (bPuntos !== aPuntos) return bPuntos - aPuntos;
+        const bDiff = (Number(b.goalsFor) || 0) - (Number(b.goalsAgainst) || 0);
+        const aDiff = (Number(a.goalsFor) || 0) - (Number(a.goalsAgainst) || 0);
+        if (bDiff !== aDiff) return bDiff - aDiff;
+        const teamA = teams.find(t => t.id === a.teamId)?.name || '';
+        const teamB = teams.find(t => t.id === b.teamId)?.name || '';
+        return teamA.localeCompare(teamB);
+      });
+    // Equipos sin posición, ordenados alfabéticamente
+    const teamIdsWithStanding = new Set(standingsRows.map(s => s.teamId));
+    const missingTeams = teamsForZoneAndCategory.filter(t => !teamIdsWithStanding.has(t.id));
+    const missingRows = missingTeams
+      .map(team => ({
+        id: `missing_${team.id}`,
+        teamId: team.id,
+        leagueId: team.leagueId,
+        categoryId: team.categoryId,
+        zoneId: team.zoneId,
+        pj: 0, won: 0, drawn: 0, lost: 0, goalsFor: 0, goalsAgainst: 0, puntos: 0,
+        isDraft: false
+      }))
+      .sort((a, b) => {
+        const teamA = teams.find(t => t.id === a.teamId)?.name || '';
+        const teamB = teams.find(t => t.id === b.teamId)?.name || '';
+        return teamA.localeCompare(teamB);
+      });
+    // Unir y eliminar duplicados por teamId
+    const all = [...draftRows, ...standingsRows, ...missingRows];
+    const uniqueByTeamId = all.filter((row, idx, arr) =>
+      arr.findIndex(r => r.teamId === row.teamId) === idx
+    );
+    return uniqueByTeamId;
+  }, [draftTeams, sortedStandings, teamsForZoneAndCategory, teams]);
+
+  // useEffect para forzar rerender visual cuando draftTeams cambia
+  useEffect(() => {
+    setRefreshKey(k => k + 1);
+  }, [draftTeams.length]);
+
+  // 3. Log de depuración
+  useEffect(() => {
+    console.log('MUNDIALITO DEBUG:', {
+      zoneId, leagueId, categoryId,
+      teamsForZoneAndCategory,
+      allRows,
+      zoneStandings,
+      allTeams: teams
+    });
+  }, [zoneId, leagueId, categoryId, teamsForZoneAndCategory, allRows, zoneStandings, teams]);
   
   // 2. DATOS DE PRUEBA SOLO EN DESARROLLO
   useEffect(() => {
@@ -249,19 +323,6 @@ const StandingsTable: React.FC<{ zoneId: string; leagueId: string; categoryId: s
     createTestData();
   }, [zoneId, leagueId, categoryId, zoneStandings.length, addTeam, createStanding]);
   
-  // 3. ORDENAMIENTO CON useMemo
-  const sortedStandings = useMemo(() => {
-    return [...zoneStandings].sort((a, b) => {
-      const aPuntos = Number(a.puntos) || 0;
-      const bPuntos = Number(b.puntos) || 0;
-      if (bPuntos !== aPuntos) return bPuntos - aPuntos;
-      const aDiff = (Number(a.goalsFor) || 0) - (Number(a.goalsAgainst) || 0);
-      const bDiff = (Number(b.goalsFor) || 0) - (Number(b.goalsAgainst) || 0);
-      if (bDiff !== aDiff) return bDiff - aDiff;
-      return (Number(b.goalsFor) || 0) - (Number(a.goalsFor) || 0);
-    });
-  }, [zoneStandings]);
-
   const { register, handleSubmit, reset, formState: { errors }, watch } = useForm<NewTeamFormData>({
     defaultValues: {
       teamName: '',
@@ -457,6 +518,30 @@ const StandingsTable: React.FC<{ zoneId: string; leagueId: string; categoryId: s
     }
   };
 
+  // Handler para eliminar posición/standing (draft o real)
+  const handleDeletePosition = async (standing: Standing & { isDraft?: boolean }) => {
+    setIsLoading(true);
+    try {
+      if (standing.isDraft || (typeof standing.id === 'string' && standing.id.startsWith('draft_'))) {
+        setDraftTeams(prev => {
+          const updated = prev.filter(d => d.tempId !== standing.id);
+          setRefreshKey(k => k + 1); // Forzar refresco
+          return updated;
+        });
+      } else if (typeof standing.id === 'string' && standing.id.startsWith('missing_')) {
+        // No hacer nada, es solo visual
+      } else {
+        await deleteTeam(standing.teamId);
+        await refreshStandings();
+      }
+    } catch (error) {
+      alert('Error al eliminar el equipo. Intenta de nuevo.');
+      console.error('Error eliminando equipo:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const onSubmitNewTeam = async (data: NewTeamFormData) => {
     if (!validateStats(data)) return;
     setDraftTeams(prev => [
@@ -568,17 +653,6 @@ const StandingsTable: React.FC<{ zoneId: string; leagueId: string; categoryId: s
     setLegendLoading(false);
   };
 
-  // En la tabla, muestro los draftTeams junto con los standings existentes
-  const allRows = [
-    ...draftTeams.map(draft => ({
-      ...draft,
-      id: draft.tempId,
-      teamId: draft.tempId,
-      isDraft: true
-    })),
-    ...sortedStandings
-  ];
-
   return (
     <div key={refreshKey} className="bg-white shadow overflow-hidden sm:rounded-lg">
       {/* Campo de leyenda editable */}
@@ -663,7 +737,7 @@ const StandingsTable: React.FC<{ zoneId: string; leagueId: string; categoryId: s
       
       {/* Tabla tradicional para desktop */}
       <div className="overflow-x-auto hidden md:block">
-        <table className="min-w-full divide-y divide-gray-200">
+        <table key={refreshKey} className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
             <tr>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -807,76 +881,76 @@ const StandingsTable: React.FC<{ zoneId: string; leagueId: string; categoryId: s
               </tr>
             )}
             
-            {allRows.map((standing, index) => {
-              const team = teams.find(t => t.id === standing.teamId);
-              const isModified = modifiedRows.has(String(standing.id));
-              
-              return (
-                <tr 
-                  key={standing.id} 
-                  className={cn(
-                    "hover:bg-gray-50",
-                    isModified && "bg-yellow-50/30"
-                  )}
-                >
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-500">
-                    {index + 1}
-                  </td>
-                  <EditableCell 
-                    value={team?.name || 'Equipo desconocido'} 
-                    standing={standing} 
-                    field="teamName" 
-                    onUpdate={handleUpdate}
-                    type="text"
-                  />
-                  <EditableCell value={standing.pj} standing={standing} field="pj" onUpdate={handleUpdate} />
-                  <EditableCell value={standing.won} standing={standing} field="won" onUpdate={handleUpdate} />
-                  <EditableCell value={standing.drawn} standing={standing} field="drawn" onUpdate={handleUpdate} />
-                  <EditableCell value={standing.lost} standing={standing} field="lost" onUpdate={handleUpdate} />
-                  <EditableCell value={standing.goalsFor} standing={standing} field="goalsFor" onUpdate={handleUpdate} />
-                  <EditableCell value={standing.goalsAgainst} standing={standing} field="goalsAgainst" onUpdate={handleUpdate} />
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-center">
-                    {standing.goalsFor - standing.goalsAgainst}
-                  </td>
-                  <EditableCell value={standing.puntos} standing={standing} field="puntos" onUpdate={handleUpdate} />
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                    <div className="flex justify-end space-x-2">
-                      {isModified && (
-                        <button
-                          onClick={() => handleSaveRow(String(standing.id))}
-                          className="text-green-600 hover:text-green-900"
-                          title="Confirmar cambios"
-                          disabled={isLoading}
-                        >
-                          <Save size={18} />
-                        </button>
-                      )}
-                      <button
-                        onClick={() => handleDeleteTeam(standing)}
-                        className="text-red-600 hover:text-red-900"
-                        title="Eliminar equipo"
-                        disabled={isLoading}
-                      >
-                        <Trash2 size={18} />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              );
-            })}
-            
-            {allRows.length === 0 && !isAddingTeam && (
+            {allRows.length === 0 && !isAddingTeam ? (
               <tr>
                 <td colSpan={11} className="px-6 py-8 text-center text-gray-500">
-                  No hay equipos en esta zona. Agrega el primer equipo para comenzar.
+                  No hay equipos en esta zona y categoría. Agrega el primer equipo para comenzar.
                 </td>
               </tr>
+            ) : (
+              allRows.map((standing, index) => {
+                const team = teams.find(t => t.id === standing.teamId);
+                const isModified = modifiedRows.has(String(standing.id));
+                
+                return (
+                  <tr 
+                    key={standing.id} 
+                    className={cn(
+                      "hover:bg-gray-50",
+                      isModified && "bg-yellow-50/30"
+                    )}
+                  >
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-500">
+                      {index + 1}
+                    </td>
+                    <EditableCell 
+                      value={team?.name || 'Equipo desconocido'} 
+                      standing={standing} 
+                      field="teamName" 
+                      onUpdate={handleUpdate}
+                      type="text"
+                    />
+                    <EditableCell value={standing.pj} standing={standing} field="pj" onUpdate={handleUpdate} />
+                    <EditableCell value={standing.won} standing={standing} field="won" onUpdate={handleUpdate} />
+                    <EditableCell value={standing.drawn} standing={standing} field="drawn" onUpdate={handleUpdate} />
+                    <EditableCell value={standing.lost} standing={standing} field="lost" onUpdate={handleUpdate} />
+                    <EditableCell value={standing.goalsFor} standing={standing} field="goalsFor" onUpdate={handleUpdate} />
+                    <EditableCell value={standing.goalsAgainst} standing={standing} field="goalsAgainst" onUpdate={handleUpdate} />
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-center">
+                      {standing.goalsFor - standing.goalsAgainst}
+                    </td>
+                    <EditableCell value={standing.puntos} standing={standing} field="puntos" onUpdate={handleUpdate} />
+                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                      <div className="flex justify-end space-x-2">
+                        {isModified && (
+                          <button
+                            onClick={() => handleSaveRow(String(standing.id))}
+                            className="text-green-600 hover:text-green-900"
+                            title="Confirmar cambios"
+                            disabled={isLoading}
+                          >
+                            <Save size={18} />
+                          </button>
+                        )}
+                        <button
+                          onClick={() => handleDeletePosition(standing)}
+                          className="text-red-600 hover:text-red-900"
+                          title="Eliminar equipo"
+                          disabled={isLoading}
+                        >
+                          <Trash2 size={18} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })
             )}
           </tbody>
         </table>
       </div>
       {/* Vista tipo lista para mobile: más ancha y cómoda */}
-      <div className="md:hidden space-y-3 w-full p-0">
+      <div className="md:hidden space-y-3 w-full p-0" key={refreshKey}>
         {allRows.map((standing, idx) => {
           const team = teams.find(t => t.id === standing.teamId);
           const isModified = modifiedRows.has(String(standing.id));
@@ -904,7 +978,7 @@ const StandingsTable: React.FC<{ zoneId: string; leagueId: string; categoryId: s
                     </button>
                   )}
                   <button
-                    onClick={() => handleDeleteTeam(standing)}
+                    onClick={() => handleDeletePosition(standing)}
                     className="text-red-600 hover:text-red-900"
                     title="Eliminar equipo"
                     disabled={isLoading}

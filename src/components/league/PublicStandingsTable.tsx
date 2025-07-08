@@ -56,17 +56,33 @@ const PublicStandingsTable: React.FC<PublicStandingsTableProps> = ({ leagueId, z
           const uniqueData = Array.from(uniqueDataMap.values());
 
           // Filtrar standings SOLO de la zona y categoría seleccionada y por teamId único
-          const filteredStandings = uniqueData.filter(
-            s => String(s.zoneId) === String(zoneId) && String(s.categoryId) === String(categoryId)
+          const teamsForZoneAndCategory = teams.filter(
+            t => t.zoneId === zoneId && t.categoryId === categoryId && t.leagueId === leagueId
           );
-          const seenTeamIds = new Set();
-          const uniqueStandings = [];
-          for (const s of filteredStandings) {
-            if (!seenTeamIds.has(s.teamId)) {
-              uniqueStandings.push(s);
-              seenTeamIds.add(s.teamId);
+          const teamIdsValid = new Set(teamsForZoneAndCategory.map(t => t.id));
+          // Solo standings de equipos válidos
+          const filteredStandings = uniqueData.filter(s => teamIdsValid.has(s.teamId));
+          // Ordenar standings por puntos, diferencia de gol y nombre
+          const sortedStandings = filteredStandings.slice().sort((a, b) => {
+            if (typeof a.orden === 'number' && typeof b.orden === 'number' && a.orden !== b.orden) {
+              return a.orden - b.orden;
+            }
+            if (b.puntos !== a.puntos) return b.puntos - a.puntos;
+            const aDiff = a.goalsFor - a.goalsAgainst;
+            const bDiff = b.goalsFor - b.goalsAgainst;
+            if (bDiff !== aDiff) return bDiff - aDiff;
+            const teamA = teams.find(t => t.id === a.teamId)?.name || '';
+            const teamB = teams.find(t => t.id === b.teamId)?.name || '';
+            return teamA.localeCompare(teamB);
+          });
+          // Eliminar duplicados por teamId, priorizando equipo_nombre no vacío
+          const uniqueStandingsMap = new Map();
+          for (const s of sortedStandings) {
+            if (!uniqueStandingsMap.has(s.teamId) || (s.equipo_nombre && s.equipo_nombre.trim() !== '')) {
+              uniqueStandingsMap.set(s.teamId, s);
             }
           }
+          const uniqueStandings = Array.from(uniqueStandingsMap.values());
 
           setStandings(uniqueData.map(pos => ({
             id: `${pos.equipo_id}-${pos.zona_id}-${pos.categoria_id}`,
@@ -148,28 +164,36 @@ const PublicStandingsTable: React.FC<PublicStandingsTableProps> = ({ leagueId, z
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {uniqueStandings.map((standing, index) => {
-                const team = teams.find(t => t.id === standing.teamId);
-                return (
-                  <tr key={standing.id} className={
-                    index < 3 ? 'hover:bg-gray-50 transition-colors bg-green-50/30' :
-                    index >= uniqueStandings.length - 3 ? 'hover:bg-gray-50 transition-colors bg-red-50/30' :
-                    'hover:bg-gray-50 transition-colors'
-                  }>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center space-x-2">
-                        <span className="font-bold text-lg">{index + 1}</span>
-                        {index < 3 && medalIcons[index]}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="text-lg font-bold text-gray-900">{standing.equipo_nombre && standing.equipo_nombre.trim() !== '' ? standing.equipo_nombre : standing.teamId}</span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700 text-center font-medium">{standing.pj}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-center"><span className="text-lg font-bold">{standing.puntos}</span></td>
-                  </tr>
-                );
-              })}
+              {uniqueStandings.length === 0 ? (
+                <tr>
+                  <td colSpan={4} className="px-6 py-8 text-center text-gray-500">
+                    No hay equipos en esta zona y categoría. Agrega el primer equipo para comenzar.
+                  </td>
+                </tr>
+              ) : (
+                uniqueStandings.map((standing, index) => {
+                  const team = teams.find(t => t.id === standing.teamId);
+                  return (
+                    <tr key={standing.id} className={
+                      index < 3 ? 'hover:bg-gray-50 transition-colors bg-green-50/30' :
+                      index >= uniqueStandings.length - 3 ? 'hover:bg-gray-50 transition-colors bg-red-50/30' :
+                      'hover:bg-gray-50 transition-colors'
+                    }>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center space-x-2">
+                          <span className="font-bold text-lg">{index + 1}</span>
+                          {index < 3 && medalIcons[index]}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className="text-lg font-bold text-gray-900">{standing.equipo_nombre && standing.equipo_nombre.trim() !== '' ? standing.equipo_nombre : team?.name || standing.teamId}</span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700 text-center font-medium">{standing.pj}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-center"><span className="text-lg font-bold">{standing.puntos}</span></td>
+                    </tr>
+                  );
+                })
+              )}
             </tbody>
           </table>
         </div>

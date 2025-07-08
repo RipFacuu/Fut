@@ -173,6 +173,9 @@ const FixturesPage: React.FC = () => {
     return fixtures.filter(fixture => fixture.leagueId === selectedLeague);
   }, [fixtures, selectedLeague]);
   
+  // --- ADVERTENCIA DE FIXTURES INVÁLIDOS ---
+  const invalidFixtures = fixtures.filter(f => f.invalidLeagueId);
+
   const handleAddClick = () => {
     setIsAdding(true);
     setEditingId(null);
@@ -364,6 +367,20 @@ const FixturesPage: React.FC = () => {
         </button>
       </div>
       
+      {/* Mensaje de advertencia si hay fixtures inválidos */}
+      {invalidFixtures.length > 0 && (
+        <div className="mb-6 p-4 bg-yellow-100 border-l-4 border-yellow-500 text-yellow-800 rounded">
+          <strong>¡Atención!</strong> Hay {invalidFixtures.length} fixture(s) con <b>liga_id inválido o nulo</b> en la base de datos.<br/>
+          Estos fixtures no se mostrarán correctamente en la web.<br/>
+          <ul className="mt-2 list-disc list-inside">
+            {invalidFixtures.map(f => (
+              <li key={f.id}>ID: <b>{f.id}</b> - Nombre: <b>{f.date || '(sin nombre)'}</b></li>
+            ))}
+          </ul>
+          <span className="block mt-2">Por favor, corrige el <b>liga_id</b> de estos fixtures en Supabase.</span>
+        </div>
+      )}
+
       {/* Filters */}
       <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-200 mb-8">
         <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">

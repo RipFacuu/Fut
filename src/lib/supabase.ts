@@ -648,7 +648,7 @@ export async function obtenerPosicionesPorZonaYCategoria(zonaId: string, categor
 export async function crearPosicion(posicion: {
   equipo_id: string;
   zona_id: string;
-  categoria_id: string;
+  categoria_id: string | null;
   equipo_nombre?: string;
   puntos?: number;
   pj?: number;
@@ -687,7 +687,7 @@ export async function actualizarPosicion(equipo_id: string, zona_id: string, cat
   return data;
 }
 
-export async function eliminarPosicion(posicionId: string) {
+export async function eliminarPosicion(posicionId: string | number) {
   const { error } = await supabase
     .from('posiciones_editable')
     .delete()

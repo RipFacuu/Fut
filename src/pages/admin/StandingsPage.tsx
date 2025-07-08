@@ -228,6 +228,16 @@ const StandingsPage: React.FC = () => {
   
   // Get teams for the selected zone
   const zoneTeams = useMemo(() => selectedZone ? getTeamsByZone(selectedZone) : [], [selectedZone, getTeamsByZone]);
+
+  // Selector de equipo para agregar a la tabla de posiciones
+  // Solo mostrar equipos de la zona seleccionada si es liga_masculina
+  const availableTeamsForStanding = useMemo(() => {
+    if (isLigaMasculina && selectedZone) {
+      return getTeamsByZone(selectedZone);
+    }
+    // Para otras ligas, lógica anterior (puedes ajustar si es necesario)
+    return teams;
+  }, [isLigaMasculina, selectedZone, getTeamsByZone, teams]);
   
   // Función para validar datos - SIMPLIFICADA
   const validateStandingData = useCallback((standing: Standing): boolean => {
@@ -843,51 +853,34 @@ const StandingsPage: React.FC = () => {
     }
   }, [selectedLeague, selectedCategory, selectedZone, addTeam, addStanding]);
 
-  // Handle deleting a team
-  const handleDeleteTeam = useCallback(async (standing: Standing) => {
-    if (!standing) {
-      setError('No se encontró el standing para eliminar.');
+  // Handler para eliminar posición/standing
+  const handleDeletePosition = async (standing: Standing) => {
+    console.log('Intentando eliminar standing:', standing);
+    // Si el ID es temporal, solo eliminar del estado local
+    if (typeof standing.id === 'string' && standing.id.startsWith('temp-')) {
+      setLocalStandings(prev => prev.filter(p => p.id !== standing.id));
       return;
     }
-
-    if (!confirm(`¿Estás seguro de que quieres eliminar a ${getTeamName(standing.teamId)} de la tabla?`)) {
-      return;
-    }
-
-    setLoading(true);
-    setError(null);
-
+    // Si el ID es numérico o string convertible a número, intenta eliminar en Supabase
     try {
-      // Si tiene ID y no es temporal, eliminar de la base de datos
-      if (String(standing.id).startsWith('temp-')) {
-        await eliminarPosicion(String(standing.id));
-        console.log('✅ Posición eliminada de la base de datos');
+      const result = await eliminarPosicion(standing.id);
+      if (result) {
+        setLocalStandings(prev => prev.filter(s => s.id !== standing.id));
+        setModifiedRows(prev => {
+          const newSet = new Set(prev);
+          if (String(standing.id)) newSet.delete(String(standing.id));
+          return newSet;
+        });
+        setError(null);
+        // Refresca standings si tienes función para ello
+        if (typeof loadStandings === 'function') await loadStandings();
+      } else {
+        setError('No se pudo eliminar la posición en la base de datos.');
       }
-      // Eliminar del estado local por ID si existe, si no por combinación de teamId, zoneId, leagueId, categoryId
-      setLocalStandings(prev => prev.filter(s => {
-        if (String(standing.id)) {
-          return s.id !== standing.id;
-        } else {
-          return !(
-            s.teamId === standing.teamId &&
-            s.zoneId === standing.zoneId &&
-            s.leagueId === standing.leagueId &&
-            s.categoryId === standing.categoryId
-          );
-        }
-      }));
-      setModifiedRows(prev => {
-        const newSet = new Set(prev);
-        if (String(standing.id)) newSet.delete(String(standing.id));
-        return newSet;
-      });
-      setError(null);
     } catch (error) {
       setError(`Error al eliminar la posición: ${error instanceof Error ? error.message : 'Error desconocido'}`);
-    } finally {
-      setLoading(false);
     }
-  }, [getTeamName]);
+  };
   
   // Filtrado de equipos y standings
   const filteredEquipos = useMemo(() => {
@@ -1371,7 +1364,7 @@ const StandingsPage: React.FC = () => {
                                 <Save className="h-4 w-4" />
                               </button>
                               <button
-                                onClick={() => handleDeleteTeam(standing)}
+                                onClick={() => handleDeletePosition(standing)}
                                 disabled={loading}
                                 title="Eliminar de las posiciones"
                                 className="inline-flex items-center p-2.5 border border-transparent rounded-lg text-xs text-white bg-gradient-to-r from-red-600 to-pink-600 hover:from-red-700 hover:to-pink-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-110"
@@ -1419,7 +1412,7 @@ const StandingsPage: React.FC = () => {
                             <Edit size={18} />
                           </button>
                           <button
-                            onClick={() => handleDeleteTeam(standing)}
+                            onClick={() => handleDeletePosition(standing)}
                             className="text-red-600 hover:text-red-900"
                             title="Eliminar"
                             disabled={loading}
@@ -1464,6 +1457,62 @@ const StandingsPage: React.FC = () => {
             {(zoneOptions.length <= 1 || categoryOptions.length <= 1) && (
               <div className="text-center py-8 text-gray-500">
                 Debes seleccionar una liga, zona y categoría para ver la tabla de posiciones.
+              </div>
+            )}
+
+            {/* Selector de equipo para agregar a la tabla de posiciones */}
+            {isAddingTeam && (
+              <div className="mb-4 flex flex-col md:flex-row md:items-end md:space-x-4">
+                <div className="flex-1">
+                  <label className="form-label" htmlFor="teamSelect">Equipo</label>
+                  <select
+                    id="teamSelect"
+                    className="form-input"
+                    value={selectedTeamId}
+                    onChange={e => setSelectedTeamId(e.target.value)}
+                  >
+                    <option value="">Seleccionar equipo</option>
+                    {availableTeamsForStanding.map(team => (
+                      <option key={team.id} value={team.id}>{team.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <button
+                  className="btn btn-primary mt-2 md:mt-0"
+                  onClick={() => {
+                    if (selectedTeamId) {
+                      handleAddStanding({
+                        teamId: selectedTeamId,
+                        leagueId: selectedLeague,
+                        categoryId: selectedCategory,
+                        zoneId: selectedZone,
+                        puntos: 0,
+                        pj: 0,
+                        won: 0,
+                        drawn: 0,
+                        lost: 0,
+                        goalsFor: 0,
+                        goalsAgainst: 0
+                      });
+                      setSelectedTeamId('');
+                      setIsAddingTeam(false);
+                    }
+                  }}
+                  disabled={!selectedTeamId}
+                >
+                  <Plus size={18} />
+                  <span>Agregar a posiciones</span>
+                </button>
+                <button
+                  className="btn btn-outline ml-2"
+                  onClick={() => {
+                    setIsAddingTeam(false);
+                    setSelectedTeamId('');
+                  }}
+                >
+                  <X size={18} />
+                  <span>Cancelar</span>
+                </button>
               </div>
             )}
           </div>
