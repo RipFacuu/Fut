@@ -634,7 +634,7 @@ export async function obtenerPosicionesPorZona(zonaId: string) {
 export async function obtenerPosicionesPorZonaYCategoria(zonaId: string, categoriaId: string) {
   const { data, error } = await supabase
     .from('posiciones_editable')
-    .select('*')
+    .select('equipo_id, equipo_nombre, zona_id, pj, puntos, categoria_id, orden, id')
     .eq('zona_id', zonaId)
     .eq('categoria_id', categoriaId)
     .order('orden', { ascending: true })
@@ -890,4 +890,14 @@ export async function crearZonaConEstructura(name: string, leagueId: string, cat
   }
   
   return data;
+}
+
+export async function obtenerEquipoPorId(equipoId: string) {
+  const { data, error } = await supabase
+    .from('equipos')
+    .select('nombre')
+    .eq('id', equipoId)
+    .single();
+  if (error) throw error;
+  return data?.nombre || '';
 }

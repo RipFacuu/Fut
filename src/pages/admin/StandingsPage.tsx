@@ -1,23 +1,28 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { useLeague, Standing, Team } from '../../contexts/LeagueContext';
+import { useLeague, Team } from '../../contexts/LeagueContext';
 import { Download, Edit, Save, X, Plus } from 'lucide-react';
 import { cn } from '../../utils/cn';
-import { obtenerPosicionesPorZonaYCategoria, crearPosicion, actualizarPosicion, eliminarPosicion } from '../../lib/supabase';
+import { obtenerPosicionesPorZonaYCategoria, crearPosicion, actualizarPosicion, eliminarPosicion, obtenerEquipoPorId } from '../../lib/supabase';
 import { standingsLegendService, updateEditablePositionsOrder } from '../../services/standingsLegendService';
 import { useAuth } from '../../contexts/AuthContext';
+import StandingsTable from './StandingsTable';
 
-type PosicionRow = {
+interface Standing {
   id: string;
-  equipo_id: string;
-  zona_id: string;
-  liga_id: string;
-  categoria_id: string;
-  equipo_nombre: string;
+  teamId: string;
+  leagueId: string;
+  categoryId: string;
+  zoneId: string;
   puntos: number;
   pj: number;
-  created_at?: string;
-  updated_at?: string;
-};
+  orden?: number;
+  won?: number;
+  drawn?: number;
+  lost?: number;
+  goalsFor?: number;
+  goalsAgainst?: number;
+  equipo_nombre?: string;
+}
 
 interface EditableCellProps {
   value: number | string;
@@ -182,6 +187,7 @@ const StandingsPage: React.FC = () => {
     getTeamsByZone,
     addTeam,
     addStanding,
+    createStanding, // <--- Asegurar que esté importado
     calculateStandingsFromMatches,
     getCategoriesByZone
   } = useLeague();
@@ -232,12 +238,11 @@ const StandingsPage: React.FC = () => {
   // Selector de equipo para agregar a la tabla de posiciones
   // Solo mostrar equipos de la zona seleccionada si es liga_masculina
   const availableTeamsForStanding = useMemo(() => {
-    if (isLigaMasculina && selectedZone) {
-      return getTeamsByZone(selectedZone);
-    }
-    // Para otras ligas, lógica anterior (puedes ajustar si es necesario)
-    return teams;
-  }, [isLigaMasculina, selectedZone, getTeamsByZone, teams]);
+    // Mostrar todos los equipos de la liga seleccionada, sin importar categoría ni zona
+    return teams
+      .filter(t => String(t.leagueId) === String(selectedLeague))
+      .map(t => ({ ...t, id: String(t.id) }));
+  }, [teams, selectedLeague]);
   
   // Función para validar datos - SIMPLIFICADA
   const validateStandingData = useCallback((standing: Standing): boolean => {
@@ -282,15 +287,17 @@ const StandingsPage: React.FC = () => {
     try {
       // Trae standings solo de la zona y categoría seleccionada
       const posiciones = await obtenerPosicionesPorZonaYCategoria(selectedZone, selectedCategory);
+      console.log('Respuesta de obtenerPosicionesPorZonaYCategoria:', posiciones);
       const standingsData = posiciones.map(pos => ({
-        id: `${pos.equipo_id}-${pos.zona_id}-${pos.categoria_id}`,
-        teamId: pos.equipo_id,
+        id: String(pos.id), // Usar el id único de la base
+        teamId: String(pos.equipo_id),
         leagueId: selectedLeague,
         categoryId: String(pos.categoria_id),
-        zoneId: pos.zona_id,
-        puntos: pos.puntos || 0,
-        pj: pos.pj || 0,
+        zoneId: String(pos.zona_id),
+        puntos: Number(pos.puntos) || 0,
+        pj: Number(pos.pj) || 0,
         orden: typeof pos.orden === 'number' ? pos.orden : 0,
+        equipo_nombre: pos.equipo_nombre || '',
         won: 0,
         drawn: 0,
         lost: 0,
@@ -452,7 +459,7 @@ const StandingsPage: React.FC = () => {
       setOrderDirty(false);
       setOrderSaved(true);
       await loadStandings(); // Recargar standings desde Supabase
-      alert('¡Orden guardado en Supabase!');
+      alert('¡Orden guardado!');
     } catch (e) {
       alert('Error al guardar el orden');
       console.error('Error al guardar el orden en Supabase:', e);
@@ -515,7 +522,13 @@ const StandingsPage: React.FC = () => {
       setTimeout(() => handleSaveRow(standing), 0);
       return;
     }
-    const currentStanding = completeStandings.find(s => s.id === standing.id);
+    // Buscar el standing actualizado por id o por combinación de claves
+    const currentStanding = sortedStandings.find(s => s.id === standing.id)
+      || sortedStandings.find(s =>
+        s.teamId === standing.teamId &&
+        s.zoneId === standing.zoneId &&
+        s.categoryId === standing.categoryId
+      );
     if (!currentStanding) {
       setError('Error: No se encontraron los datos actualizados.');
       return;
@@ -533,7 +546,13 @@ const StandingsPage: React.FC = () => {
     setLoading(true);
     setError(null);
     try {
-      const teamName = getTeamName(standingToSave.teamId);
+      // Buscar el nombre real del equipo desde la base
+      let teamName = '';
+      try {
+        teamName = await obtenerEquipoPorId(standingToSave.teamId);
+      } catch (e) {
+        teamName = '';
+      }
       if (String(standingToSave.id).startsWith('temp-')) {
         // Crear nueva posición con categoria_id y valores editados
         const posicionData = {
@@ -585,7 +604,7 @@ const StandingsPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [completeStandings, validateStandingData, getTeamName, selectedLeague, selectedCategory, selectedZone, loadStandings, getOrderedStandings]);
+  }, [editingCell, sortedStandings, selectedLeague, selectedCategory, selectedZone, validateStandingData, getTeamName, crearPosicion, actualizarPosicion, loadStandings, setManualOrder, getOrderedStandings]);
   
   // Forzar blur de todos los inputs editables antes de guardar todo
   const forceAllRowsBlur = () => {
@@ -710,22 +729,17 @@ const StandingsPage: React.FC = () => {
   
   // Get teams that are not already in standings - CORREGIDA dependencias
   useEffect(() => {
-    if (selectedZone) {
+    if (selectedLeague) {
       const teamsInStandings = new Set(localStandings.map(s => s.teamId));
-      const availableZoneTeams = zoneTeams.filter(team => !teamsInStandings.has(team.id));
-      
-      setAvailableTeams(availableZoneTeams);
-      
-      if (availableZoneTeams.length > 0 && !selectedTeamId) {
-        setSelectedTeamId(availableZoneTeams[0].id);
-      } else if (availableZoneTeams.length === 0) {
-        setSelectedTeamId('');
-      }
+      const availableLeagueTeams = teams.filter(
+        team => String(team.leagueId) === String(selectedLeague) && !teamsInStandings.has(team.id)
+      );
+      setAvailableTeams(availableLeagueTeams);
     } else {
       setAvailableTeams([]);
       setSelectedTeamId('');
     }
-  }, [selectedZone, localStandings, zoneTeams, selectedTeamId]);
+  }, [selectedLeague, localStandings, teams]);
   
   // 5. DEPURACIÓN: Agregar useEffect para monitorear cambios 
   useEffect(() => { 
@@ -945,30 +959,53 @@ const StandingsPage: React.FC = () => {
     setModifiedRows(prev => new Set(prev).add(id));
   };
 
-  // Al crear un nuevo standing, asegúrate de setear zona y categoría
-  const handleAddStanding = (newStandingData: any) => {
-    const newStanding = {
-      ...newStandingData,
-      zoneId: selectedZone,
-      categoryId: selectedCategory,
-      leagueId: selectedLeague
+  // 1. Eliminar referencias a createStanding y SupabaseService.createStanding, usar solo crearPosicion y obtenerPosicionesPorZonaYCategoria
+  // 2. Modificar handleAddStanding para usar crearPosicion y refrescar posiciones
+  const handleAddStanding = async (newStandingData: any) => {
+    // Buscar el nombre real del equipo desde la base
+    let equipoNombre = '';
+    try {
+      equipoNombre = await obtenerEquipoPorId(newStandingData.teamId);
+    } catch (e) {
+      equipoNombre = '';
+    }
+
+    const newPosicion = {
+      equipo_id: newStandingData.teamId,
+      zona_id: String(Number(selectedZone)),
+      categoria_id: String(Number(selectedCategory)),
+      equipo_nombre: equipoNombre,
+      puntos: 0,
+      pj: 0
     };
-    addStanding(newStanding);
+    console.log('Guardando nueva posición:', newPosicion);
+    const result = await crearPosicion(newPosicion);
+    console.log('Respuesta de crearPosicion:', result);
+    await loadStandings(); // Refresca desde posiciones_editable
   };
   
   // 2. Limpieza robusta al cambiar filtros
   useEffect(() => {
     setLocalStandings([]);
     setAvailableTeams([]);
-    setSelectedTeamId('');
     setModifiedRows(new Set());
+    // No limpiar selectedTeamId aquí
   }, [selectedZone, selectedLeague, selectedCategory]);
 
-  // 5. Si no hay equipos, muestra mensaje apropiado
-  // ... en el render, debajo de la tabla ...
-  {filteredEquipos.length === 0 && selectedZone && (
-    <div className="text-center text-gray-500 py-8">No hay equipos para esta combinación de liga, zona y categoría.</div>
-  )}
+  // 4. Solo limpiar selectedTeamId al cerrar el modal o si no hay equipos disponibles
+  // Eliminar este useEffect:
+  // useEffect(() => {
+  //   if (isAddingTeam) {
+  //     if (availableTeamsForStanding.length > 0) {
+  //       setSelectedTeamId(String(availableTeamsForStanding[0].id));
+  //     } else {
+  //       setSelectedTeamId('');
+  //     }
+  //   }
+  // }, [isAddingTeam, availableTeamsForStanding]);
+
+  // 5. Normalizar todos los IDs a string en los filtros y handlers
+  // ... existing code ...
   
   // 3. En el render, muestra solo standings únicos por teamId
   const uniqueStandings = useMemo(() => {
@@ -1029,6 +1066,11 @@ const StandingsPage: React.FC = () => {
 
   // Validación para habilitar guardado
   const canSave = !!selectedZone && !!selectedCategory && modifiedRows.size > 0 && !loading;
+
+  console.log('selectedZone:', selectedZone);
+  console.log('zoneTeams:', zoneTeams);
+  console.log('teams:', teams);
+  console.log('Equipos disponibles para seleccionar:', availableTeams);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-100">
@@ -1266,7 +1308,12 @@ const StandingsPage: React.FC = () => {
                   </div>
                   
                   <button
-                    onClick={() => setIsAddingTeam(true)}
+                    onClick={() => {
+                      setIsAddingTeam(true);
+                      if (!isAddingTeam && availableTeamsForStanding.length > 0) {
+                        setSelectedTeamId(String(availableTeamsForStanding[0].id));
+                      }
+                    }}
                     disabled={loading}
                     className="inline-flex items-center px-4 py-2.5 border border-transparent text-sm font-semibold rounded-lg text-white bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50 shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105"
                   >
@@ -1297,7 +1344,7 @@ const StandingsPage: React.FC = () => {
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-100">
-                      {completeStandings.map((standing: Standing, index: number) => (
+                      {sortedStandings.map((standing: Standing, index: number) => (
                         <tr 
                           key={standing.id} 
                           className={cn(
@@ -1325,7 +1372,7 @@ const StandingsPage: React.FC = () => {
                             </div>
                           </td>
                           <EditableCell
-                            value={getTeamName(standing.teamId)}
+                            value={standing.equipo_nombre || getTeamName(standing.teamId)}
                             standing={standing}
                             field="teamName"
                             onUpdate={handleUpdate}
@@ -1349,7 +1396,7 @@ const StandingsPage: React.FC = () => {
                             <div className="flex justify-center space-x-2">
                               {/* Flechas de orden */}
                               <button onClick={() => moveStanding(index, 'up')} disabled={index === 0} title="Subir" className="text-gray-500 hover:text-violet-600 disabled:opacity-30"><span>▲</span></button>
-                              <button onClick={() => moveStanding(index, 'down')} disabled={index === completeStandings.length - 1} title="Bajar" className="text-gray-500 hover:text-violet-600 disabled:opacity-30"><span>▼</span></button>
+                              <button onClick={() => moveStanding(index, 'down')} disabled={index === sortedStandings.length - 1} title="Bajar" className="text-gray-500 hover:text-violet-600 disabled:opacity-30"><span>▼</span></button>
                               <button
                                 onClick={() => handleSaveRow(standing)}
                                 disabled={loading || !modifiedRows.has(String(standing.id))}
@@ -1380,7 +1427,7 @@ const StandingsPage: React.FC = () => {
                 </div>
                 {/* Vista tipo lista para mobile */}
                 <div className="md:hidden space-y-3 p-0">
-                  {completeStandings.map((standing: Standing, idx: number) => (
+                  {sortedStandings.map((standing: Standing, idx: number) => (
                     <div
                       key={standing.id}
                       className={
@@ -1402,7 +1449,7 @@ const StandingsPage: React.FC = () => {
                         <div className="flex flex-row gap-3">
                           {/* Flechas de orden */}
                           <button onClick={() => moveStanding(idx, 'up')} disabled={idx === 0} title="Subir" className="text-gray-500 hover:text-violet-600 disabled:opacity-30"><span>▲</span></button>
-                          <button onClick={() => moveStanding(idx, 'down')} disabled={idx === completeStandings.length - 1} title="Bajar" className="text-gray-500 hover:text-violet-600 disabled:opacity-30"><span>▼</span></button>
+                          <button onClick={() => moveStanding(idx, 'down')} disabled={idx === sortedStandings.length - 1} title="Bajar" className="text-gray-500 hover:text-violet-600 disabled:opacity-30"><span>▼</span></button>
                           <button
                             onClick={() => handleSaveRow(standing)}
                             className="text-indigo-600 hover:text-indigo-900"
@@ -1422,7 +1469,7 @@ const StandingsPage: React.FC = () => {
                         </div>
                       </div>
                       <div className="flex flex-col space-y-1">
-                        <div className="text-base font-semibold text-gray-900">{getTeamName(standing.teamId)}</div>
+                        <div className="text-base font-semibold text-gray-900">{standing.equipo_nombre || getTeamName(standing.teamId)}</div>
                         <div className="flex flex-wrap gap-2 mt-1">
                           <span className="bg-gray-200 text-gray-700 px-2 py-0.5 rounded text-xs font-semibold">PJ: {standing.pj}</span>
                           <span className="bg-indigo-200 text-indigo-800 px-2 py-0.5 rounded text-xs font-semibold">PTS: {standing.puntos}</span>
@@ -1430,7 +1477,7 @@ const StandingsPage: React.FC = () => {
                       </div>
                     </div>
                   ))}
-                  {completeStandings.length === 0 && (
+                  {sortedStandings.length === 0 && (
                     <div className="text-center py-8 text-gray-500 bg-gray-50 rounded-md">
                       No hay equipos en esta zona. Agrega el primer equipo para comenzar.
                     </div>
@@ -1438,7 +1485,7 @@ const StandingsPage: React.FC = () => {
                 </div>
 
                 {/* Botón Guardar Orden */}
-                {orderDirty && completeStandings.length > 1 && (
+                {orderDirty && sortedStandings.length > 1 && (
                   <div className="flex justify-end mb-2">
                     <button
                       onClick={handleSaveOrder}
@@ -1469,19 +1516,30 @@ const StandingsPage: React.FC = () => {
                     id="teamSelect"
                     className="form-input"
                     value={selectedTeamId}
-                    onChange={e => setSelectedTeamId(e.target.value)}
+                    onChange={e => {
+                      console.log('Nuevo equipo seleccionado:', e.target.value);
+                      setSelectedTeamId(e.target.value);
+                    }}
                   >
                     <option value="">Seleccionar equipo</option>
-                    {availableTeamsForStanding.map(team => (
-                      <option key={team.id} value={team.id}>{team.name}</option>
+                    {availableTeams.map(team => (
+                      <option key={team.id} value={String(team.id)}>
+                        {team.name}
+                      </option>
                     ))}
+
+                    {/* fallback visual si se filtró */}
+                    {selectedTeamId &&
+                     !availableTeams.some(t => String(t.id) === selectedTeamId) && (
+                      <option value={selectedTeamId}>Equipo seleccionado</option>
+                    )}
                   </select>
                 </div>
                 <button
                   className="btn btn-primary mt-2 md:mt-0"
-                  onClick={() => {
+                  onClick={async () => {
                     if (selectedTeamId) {
-                      handleAddStanding({
+                      await handleAddStanding({
                         teamId: selectedTeamId,
                         leagueId: selectedLeague,
                         categoryId: selectedCategory,

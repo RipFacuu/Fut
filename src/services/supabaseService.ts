@@ -632,10 +632,12 @@ static async updateTeam(
     }[];
   }): Promise<{ success: boolean; fixtureId?: string; error?: string }> {
     try {
+      // Mapear leagueId string a número SIEMPRE antes de guardar
+      const numericLeagueId = getNumericLeagueId(fixtureData.ligaId);
       const fixtureResult = await crearFixture(
         fixtureData.nombre,
         fixtureData.fechaPartido,
-        Number(fixtureData.ligaId),
+        numericLeagueId, // Usar el ID numérico correcto
         Number(fixtureData.categoriaId),
         fixtureData.zonaId ? Number(fixtureData.zonaId) : null,
         fixtureData.leyenda || null,
