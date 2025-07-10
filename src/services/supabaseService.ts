@@ -299,27 +299,21 @@ export const mapSupabaseToStanding = (supabaseStanding: any): Standing => {
 };
 
 // Mapper para posiciones_editable
-export const mapPosicionEditableToStanding = (posicion: any): Standing & { teamName?: string } => {
-  if (!posicion) {
-    throw new Error('Posicion data is required');
-  }
-
-  return {
-    id: `${posicion.equipo_id}_${posicion.zona_id}`,
-    teamId: String(posicion.equipo_id || ''),
-    leagueId: String(posicion.liga_id || ''),
-    categoryId: String(posicion.categoria_id || ''),
-    zoneId: String(posicion.zona_id || ''),
-    puntos: Number(posicion.puntos || 0),
-    pj: Number(posicion.pj || 0),
-    won: Number(posicion.won || 0),
-    drawn: Number(posicion.drawn || 0),
-    lost: Number(posicion.lost || 0),
-    goalsFor: Number(posicion.goals_for || 0),
-    goalsAgainst: Number(posicion.goals_against || 0),
-    teamName: posicion.equipo_nombre || posicion.teamName
-  };
-};
+export const mapPosicionEditableToStanding = (posicion: any): Standing => ({
+  id: String(posicion.id ?? `${posicion.equipo_id}_${posicion.zona_id}_${posicion.categoria_id}`),
+  teamId: String(posicion.equipo_id),
+  leagueId: String(posicion.liga_id ?? ''),
+  categoryId: String(posicion.categoria_id ?? ''),
+  zoneId: String(posicion.zona_id ?? ''),
+  puntos: Number(posicion.puntos ?? 0),
+  pj: Number(posicion.pj ?? 0),
+  orden: typeof posicion.orden === 'number' ? posicion.orden : 0,
+  won: 0,
+  drawn: 0,
+  lost: 0,
+  goalsFor: 0,
+  goalsAgainst: 0
+});
 
 // Mapper para cursos
 export const mapSupabaseToCourse = (supabaseCourse: any): Course => {
@@ -729,15 +723,8 @@ static async updateTeam(
   // Standings
   static async getStandingsByZone(zoneId: string): Promise<Standing[]> {
     try {
-      // Usar la tabla 'standings' real, traer todos los campos incluyendo 'id' y 'orden'
-      const { data, error } = await supabase
-        .from('standings')
-        .select('*')
-        .eq('zona_id', zoneId)
-        .order('orden', { ascending: true })
-        .order('points', { ascending: false });
-      if (error) throw error;
-      return data || [];
+      const posicionesData = await obtenerPosicionesPorZona(zoneId);
+      return posicionesData.map(mapPosicionEditableToStanding);
     } catch (error) {
       console.error('Error getting standings by zone:', error);
       return [];

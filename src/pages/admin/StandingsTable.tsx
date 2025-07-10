@@ -1,10 +1,11 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useLeague, Team } from '../../contexts/LeagueContext';
 import { Trash2, Save, Plus, X, Download, Upload, RefreshCw } from 'lucide-react';
 import { cn } from '../../utils/cn';
 import { useForm } from 'react-hook-form';
 import { useAuth } from '../../contexts/AuthContext';
 import { standingsLegendService, updateEditablePositionsOrder } from '../../services/standingsLegendService';
+import { obtenerPosicionesPorZonaYCategoria } from '../../lib/supabase';
 
 // 1. INTERFACES CORREGIDAS
 interface Standing {
@@ -21,6 +22,7 @@ interface Standing {
   goalsAgainst: number;
   puntos: number;
   orden?: number;
+  equipo_nombre?: string;
 }
 
 interface NewTeamFormData {
@@ -151,7 +153,7 @@ const StandingsTable: React.FC<{ zoneId: string; leagueId: string; categoryId: s
   categoryId 
 }) => {
   const { 
-    standings, 
+    standings: contextStandings, 
     updateStanding, 
     teams, 
     addTeam, 
@@ -178,27 +180,73 @@ const StandingsTable: React.FC<{ zoneId: string; leagueId: string; categoryId: s
   const [legendDirty, setLegendDirty] = useState(false);
   const [draftTeams, setDraftTeams] = useState<any[]>([]);
   
-  const zoneStandings = getStandingsByZone(zoneId);
-  
-  // 3. ORDENAMIENTO CON useMemo
-  const sortedStandings = useMemo(() => {
-    return [...zoneStandings].sort((a, b) => {
-      // 1. Orden manual si existe
-      if (typeof a.orden === 'number' && typeof b.orden === 'number' && a.orden !== b.orden) {
-        return a.orden - b.orden;
+  // 1. Estado unificado para standings y control de orden
+  const [standings, setStandings] = useState<Standing[]>([]);
+  const [hasManualOrder, setHasManualOrder] = useState(false);
+  const [orderDirty, setOrderDirty] = useState(false);
+  const [savingOrder, setSavingOrder] = useState(false);
+  const [movingTeamId, setMovingTeamId] = useState<string | null>(null);
+
+  // 2. Cargar standings desde la base y aplicar orden manual si existe
+  useEffect(() => {
+    const loadStandingsData = async () => {
+      if (!zoneId || !categoryId) return;
+      setIsLoading(true);
+      try {
+        // Trae standings solo de la zona y categoría seleccionada
+        const posiciones = await obtenerPosicionesPorZonaYCategoria(zoneId, categoryId);
+        const orderedStandings = (posiciones as any[])
+          .map((pos: any) => ({
+            id: String(pos.id),
+            teamId: String(pos.equipo_id),
+            leagueId: String(pos.liga_id),
+            categoryId: String(pos.categoria_id),
+            zoneId: String(pos.zona_id),
+            puntos: Number(pos.puntos) || 0,
+            pj: Number(pos.pj) || 0,
+            orden: typeof pos.orden === 'number' ? pos.orden : 0,
+            equipo_nombre: pos.equipo_nombre || '',
+            won: 0,
+            drawn: 0,
+            lost: 0,
+            goalsFor: 0,
+            goalsAgainst: 0
+          }))
+          .sort((a, b) => (a.orden || 0) - (b.orden || 0));
+        setStandings(orderedStandings.map(s => ({ ...s, id: String(s.id) })));
+        setHasManualOrder(orderedStandings.some(s => s.orden && s.orden > 0));
+        setOrderDirty(false);
+      } catch (error) {
+        console.error('Error loading standings:', error);
+      } finally {
+        setIsLoading(false);
       }
-      // 2. Automático si no hay orden manual
-      const aPuntos = Number(a.puntos) || 0;
-      const bPuntos = Number(b.puntos) || 0;
-      if (bPuntos !== aPuntos) return bPuntos - aPuntos;
-      const aDiff = (Number(a.goalsFor) || 0) - (Number(a.goalsAgainst) || 0);
-      const bDiff = (Number(b.goalsFor) || 0) - (Number(b.goalsAgainst) || 0);
-      if (bDiff !== aDiff) return bDiff - aDiff;
-      if ((Number(b.goalsFor) || 0) !== (Number(a.goalsFor) || 0)) return (Number(b.goalsFor) || 0) - (Number(a.goalsFor) || 0);
-      if ((Number(a.pj) || 0) !== (Number(b.pj) || 0)) return (Number(a.pj) || 0) - (Number(b.pj) || 0);
-      return 0;
-    });
-  }, [zoneStandings]);
+    };
+    loadStandingsData();
+  }, [zoneId, categoryId]);
+
+  // 4. Guardar el orden manual en la base
+  const handleSaveOrder = useCallback(async () => {
+    setSavingOrder(true);
+    try {
+      const payload = standings.map((standing, idx) => ({
+        equipo_id: Number(standing.teamId),
+        zona_id: Number(standing.zoneId),
+        categoria_id: Number(standing.categoryId),
+        orden: idx + 1
+      }));
+      await updateEditablePositionsOrder(payload);
+      setOrderDirty(false);
+      setHasManualOrder(true);
+      // Recargar standings desde la base
+      // (opcional) await loadStandingsData();
+    } catch (error) {
+      console.error('Error al guardar el orden:', error);
+      alert('Error al guardar el orden');
+    } finally {
+      setSavingOrder(false);
+    }
+  }, [standings]);
 
   // 1. Obtener todos los equipos de la zona y categoría seleccionada (aunque no tengan posición)
   const teamsForZoneAndCategory = useMemo(() => {
@@ -217,7 +265,7 @@ const StandingsTable: React.FC<{ zoneId: string; leagueId: string; categoryId: s
       isDraft: true
     }));
     // Standings existentes, ordenados por puntos, diferencia de gol y nombre
-    const standingsRows = sortedStandings
+    const standingsRows = contextStandings
       .map(s => ({ ...s, isDraft: false }))
       .sort((a, b) => {
         const bPuntos = Number(b.puntos) || 0;
@@ -254,7 +302,7 @@ const StandingsTable: React.FC<{ zoneId: string; leagueId: string; categoryId: s
       arr.findIndex(r => r.teamId === row.teamId) === idx
     );
     return uniqueByTeamId;
-  }, [draftTeams, sortedStandings, teamsForZoneAndCategory, teams]);
+  }, [draftTeams, contextStandings, teamsForZoneAndCategory, teams]);
 
   // useEffect para forzar rerender visual cuando draftTeams cambia
   useEffect(() => {
@@ -267,17 +315,17 @@ const StandingsTable: React.FC<{ zoneId: string; leagueId: string; categoryId: s
       zoneId, leagueId, categoryId,
       teamsForZoneAndCategory,
       allRows,
-      zoneStandings,
+      contextStandings,
       allTeams: teams
     });
-  }, [zoneId, leagueId, categoryId, teamsForZoneAndCategory, allRows, zoneStandings, teams]);
+  }, [zoneId, leagueId, categoryId, teamsForZoneAndCategory, allRows, contextStandings, teams]);
   
   // 2. DATOS DE PRUEBA SOLO EN DESARROLLO
   useEffect(() => {
     if (process.env.NODE_ENV !== 'development') return;
     const createTestData = async () => {
       // Solo para testing - crear datos de prueba si no existen
-      if (zoneStandings.length === 0 && zoneId && leagueId && categoryId) {
+      if (contextStandings.length === 0 && zoneId && leagueId && categoryId) {
         console.log('Creando datos de prueba...');
         
         // Crear equipos de prueba
@@ -329,7 +377,7 @@ const StandingsTable: React.FC<{ zoneId: string; leagueId: string; categoryId: s
     };
     
     createTestData();
-  }, [zoneId, leagueId, categoryId, zoneStandings.length, addTeam, createStanding]);
+  }, [zoneId, leagueId, categoryId, contextStandings.length, addTeam, createStanding]);
   
   const { register, handleSubmit, reset, formState: { errors }, watch } = useForm<NewTeamFormData>({
     defaultValues: {
@@ -367,7 +415,7 @@ const StandingsTable: React.FC<{ zoneId: string; leagueId: string; categoryId: s
     }
     try {
       if (field === 'teamName') {
-        const standing = zoneStandings.find(s => s.id === id);
+        const standing = contextStandings.find(s => s.id === id);
         if (standing) {
           await updateTeam(standing.teamId, { name: value });
         }
@@ -402,7 +450,7 @@ const StandingsTable: React.FC<{ zoneId: string; leagueId: string; categoryId: s
     setIsLoading(true);
     try {
       // Encontrar el standing actual
-      const standing = zoneStandings.find(s => s.id === id);
+      const standing = contextStandings.find(s => s.id === id);
       if (!standing) return;
       // Forzar blur de inputs de la fila
       const rowInputs = document.querySelectorAll<HTMLInputElement>(`input[data-row-id='${id}']`);
@@ -475,7 +523,7 @@ const StandingsTable: React.FC<{ zoneId: string; leagueId: string; categoryId: s
       setDraftTeams([]);
       // 5.2 Guardar standings editados
       const updates = Array.from(modifiedRows).map(async (id) => {
-        const standing = zoneStandings.find(s => s.id === id);
+        const standing = contextStandings.find(s => s.id === id);
         if (!standing) return;
         await updateStanding(id, {
           pj: standing.pj,
@@ -578,7 +626,7 @@ const StandingsTable: React.FC<{ zoneId: string; leagueId: string; categoryId: s
     if (typeof window === 'undefined') return; // Verificar entorno del navegador
     
     try {
-      const zoneStandings = standings.filter(s => s.zoneId === zoneId);
+      const zoneStandings = contextStandings.filter(s => s.zoneId === zoneId);
       
       let csvContent = "Posición,Equipo,PJ,PG,PE,PP,GF,GC,DG,Puntos\n";
       zoneStandings.forEach((standing, index) => {
@@ -662,35 +710,35 @@ const StandingsTable: React.FC<{ zoneId: string; leagueId: string; categoryId: s
   };
 
   // ============ SECCIÓN 1: Estado para ordenamiento manual ============
-  const [manualOrder, setManualOrder] = useState<(Standing & { orden?: number })[]>([]);
-  const [hasManualOrder, setHasManualOrder] = useState(false);
+  // const [manualOrder, setManualOrder] = useState<(Standing & { orden?: number })[]>([]);
+  // const [hasManualOrder, setHasManualOrder] = useState(false);
 
   // ============ SECCIÓN 2: Sincronización mejorada ============
-  useEffect(() => {
-    // Detectar si hay orden manual en los datos
-    const realStandings = sortedStandings.filter(s => 
-      !String(s.id).startsWith('missing_') && 
-      !String(s.id).startsWith('draft_')
-    );
-    const hasOrderValues = realStandings.some(s => 
-      typeof s.orden === 'number' && s.orden > 0
-    );
-    if (hasOrderValues) {
-      // Hay orden manual en los datos
-      const orderedStandings = [...realStandings].sort((a, b) => {
-        if (typeof a.orden === 'number' && typeof b.orden === 'number') {
-          return a.orden - b.orden;
-        }
-        return 0;
-      });
-      setManualOrder(orderedStandings.map(s => ({ ...s, id: String(s.id) })));
-      setHasManualOrder(true);
-    } else {
-      // No hay orden manual, usar orden automático
-      setManualOrder(realStandings.map(s => ({ ...s, id: String(s.id) })));
-      setHasManualOrder(false);
-    }
-  }, [sortedStandings]);
+  // useEffect(() => {
+  //   // Detectar si hay orden manual en los datos
+  //   const realStandings = sortedStandings.filter(s => 
+  //     !String(s.id).startsWith('missing_') && 
+  //     !String(s.id).startsWith('draft_')
+  //   );
+  //   const hasOrderValues = realStandings.some(s => 
+  //     typeof s.orden === 'number' && s.orden > 0
+  //   );
+  //   if (hasOrderValues) {
+  //     // Hay orden manual en los datos
+  //     const orderedStandings = [...realStandings].sort((a, b) => {
+  //       if (typeof a.orden === 'number' && typeof b.orden === 'number') {
+  //         return a.orden - b.orden;
+  //       }
+  //       return 0;
+  //     });
+  //     setManualOrder(orderedStandings.map(s => ({ ...s, id: String(s.id) })));
+  //     setHasManualOrder(true);
+  //   } else {
+  //     // No hay orden manual, usar orden automático
+  //     setManualOrder(realStandings.map(s => ({ ...s, id: String(s.id) })));
+  //     setHasManualOrder(false);
+  //   }
+  // }, [sortedStandings]);
 
   // ============ SECCIÓN 3: Función moveStanding corregida ============
   // 6. DEBUGGING: función para logs
@@ -698,58 +746,84 @@ const StandingsTable: React.FC<{ zoneId: string; leagueId: string; categoryId: s
     console.log('=== DEBUG MOVE STANDING ===');
     console.log('Index:', index);
     console.log('Direction:', direction);
-    console.log('displayStandings.length:', displayStandings.length);
+    console.log('standings.length:', standings.length);
     console.log('hasManualOrder:', hasManualOrder);
-    console.log('manualOrder.length:', manualOrder.length);
-    console.log('Current displayStandings:', displayStandings);
-    console.log('Current manualOrder:', manualOrder);
+    console.log('Current standings:', standings);
     console.log('=============================');
   };
-  // 2. moveStanding robusto y asíncrono
-  const moveStanding = async (index: number, direction: 'up' | 'down') => {
-    debugMoveStanding(index, direction);
-    // Validaciones
-    if ((direction === 'up' && index === 0) || (direction === 'down' && index === displayStandings.length - 1)) {
-      return;
-    }
-    try {
-      setIsLoading(true);
-      // Obtener el orden actual
-      const currentOrder = hasManualOrder ? manualOrder : displayStandings;
-      const newOrder = [...currentOrder];
-      // Intercambiar posiciones
-      const swapWithIdx = direction === 'up' ? index - 1 : index + 1;
-      [newOrder[index], newOrder[swapWithIdx]] = [newOrder[swapWithIdx], newOrder[index]];
-      // Asignar números de orden
-      const orderedStandings = newOrder.map((standing, idx) => ({
-        ...standing,
-        orden: idx + 1
-      }));
-      // Actualizar estado local inmediatamente
-      setManualOrder(orderedStandings);
-      setHasManualOrder(true);
-      console.log('Nuevo orden manualOrder:', orderedStandings);
-      // Preparar datos para la API
-      const updates = orderedStandings.map((standing, idx) => ({
-        equipo_id: Number(standing.teamId),
-        zona_id: Number(standing.zoneId),
-        categoria_id: Number(standing.categoryId),
-        orden: idx + 1
-      }));
-      // Actualizar en la base de datos
-      const resp = await updateEditablePositionsOrder(updates);
-      console.log('Respuesta updateEditablePositionsOrder:', resp);
-      await refreshStandings();
-    } catch (error) {
-      console.error('Error al actualizar orden:', error);
-      // Revertir cambios en caso de error
-      setHasManualOrder(false);
-      setManualOrder(displayStandings.map(s => ({ ...s, id: String(s.id) })));
-      alert('Error al actualizar el orden. Intenta de nuevo.');
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  // 1. Estado para feedback visual
+  // const [movingTeamId, setMovingTeamId] = useState<string | null>(null);
+
+  // Mueve la declaración de displayStandings antes de moveStanding
+  // const displayStandings = useMemo(() => {
+  //   if (hasManualOrder) {
+  //     return manualOrder.map(s => ({ ...s, id: String(s.id) }));
+  //   }
+  //   return sortedStandings
+  //     .filter(standing => 
+  //       !String(standing.id).startsWith('missing_') && 
+  //       !String(standing.id).startsWith('draft_')
+  //     )
+  //     .map(s => ({ ...s, id: String(s.id) }));
+  // }, [hasManualOrder, manualOrder, sortedStandings]);
+
+  // Determina si hay orden manual
+  // const hasManualOrderInData = displayStandings.some(s => typeof s.orden === 'number' && s.orden > 0);
+
+  // Ordena por orden manual si existe, si no por puntos
+  // const orderedStandings = useMemo(() => {
+  //   if (hasManualOrderInData) {
+  //     return [...displayStandings].sort((a, b) => (a.orden ?? 9999) - (b.orden ?? 9999));
+  //   }
+  //   // Orden automático por puntos, diferencia de gol, etc.
+  //   return [...displayStandings].sort((a, b) => {
+  //     if (b.puntos !== a.puntos) return b.puntos - a.puntos;
+  //     const aDiff = (a.goalsFor || 0) - (a.goalsAgainst || 0);
+  //     const bDiff = (b.goalsFor || 0) - (b.goalsAgainst || 0);
+  //     if (bDiff !== aDiff) return bDiff - aDiff;
+  //     if ((b.goalsFor || 0) !== (a.goalsFor || 0)) return (b.goalsFor || 0) - (a.goalsFor || 0);
+  //     return (a.pj || 0) - (b.pj || 0);
+  //   });
+  // }, [displayStandings, hasManualOrderInData]);
+
+  // 2. moveStanding robusto y con feedback visual
+  // const moveStanding = useCallback(async (index: number, direction: 'up' | 'down') => {
+  //   if (!isAuthenticated) {
+  //     alert('Debes iniciar sesión para realizar esta acción');
+  //     return;
+  //   }
+  //   if ((direction === 'up' && index === 0) || (direction === 'down' && index === displayStandings.length - 1)) {
+  //     return;
+  //   }
+  //   setIsLoading(true);
+  //   setMovingTeamId(displayStandings[index].teamId);
+  //   try {
+  //     const newOrder = [...displayStandings];
+  //     const swapIndex = direction === 'up' ? index - 1 : index + 1;
+  //     [newOrder[index], newOrder[swapIndex]] = [newOrder[swapIndex], newOrder[index]];
+  //     const orderedStandings = newOrder.map((standing, idx) => ({
+  //       ...standing,
+  //       orden: idx + 1
+  //     }));
+  //     setManualOrder(orderedStandings);
+  //     setHasManualOrder(true);
+  //     const updates = orderedStandings.map((standing, idx) => ({
+  //       equipo_id: Number(standing.teamId),
+  //       zona_id: Number(standing.zoneId),
+  //       categoria_id: Number(standing.categoryId),
+  //       orden: idx + 1
+  //     }));
+  //     await updateEditablePositionsOrder(updates);
+  //     await refreshStandings();
+  //   } catch (error: any) {
+  //     console.error('Error al mover equipo:', error);
+  //     setManualOrder([...displayStandings]);
+  //     alert(`Error al actualizar el orden: ${error.message || error}`);
+  //   } finally {
+  //     setIsLoading(false);
+  //     setMovingTeamId(null);
+  //   }
+  // }, [displayStandings, isAuthenticated, refreshStandings]);
 
   // ============ SECCIÓN 4: Función para resetear orden manual ============
   // 4. resetManualOrder robusto
@@ -757,7 +831,7 @@ const StandingsTable: React.FC<{ zoneId: string; leagueId: string; categoryId: s
     try {
       setIsLoading(true);
       // Obtener standings reales para resetear
-      const realStandings = sortedStandings.filter(s => 
+      const realStandings = contextStandings.filter(s => 
         !String(s.id).startsWith('missing_') && 
         !String(s.id).startsWith('draft_')
       );
@@ -771,8 +845,9 @@ const StandingsTable: React.FC<{ zoneId: string; leagueId: string; categoryId: s
       await updateEditablePositionsOrder(updates);
       await refreshStandings();
       // Actualizar estado local
+      setStandings(realStandings.map(s => ({ ...s, id: String(s.id), orden: 0 })));
       setHasManualOrder(false);
-      setManualOrder(realStandings.map(s => ({ ...s, id: String(s.id) })));
+      setOrderDirty(false);
     } catch (error) {
       console.error('Error al resetear orden:', error);
       alert('Error al resetear el orden. Intenta de nuevo.');
@@ -785,7 +860,7 @@ const StandingsTable: React.FC<{ zoneId: string; leagueId: string; categoryId: s
   // 5. Detectar si hay orden manual en los datos
   useEffect(() => {
     // Solo verificar en standings reales
-    const realStandings = sortedStandings.filter(s => 
+    const realStandings = contextStandings.filter(s => 
       !String(s.id).startsWith('missing_') && 
       !String(s.id).startsWith('draft_')
     );
@@ -794,15 +869,10 @@ const StandingsTable: React.FC<{ zoneId: string; leagueId: string; categoryId: s
     );
     if (hasOrderValues && !hasManualOrder) {
       setHasManualOrder(true);
-      const orderedStandings = [...realStandings].sort((a, b) => {
-        if (typeof a.orden === 'number' && typeof b.orden === 'number') {
-          return a.orden - b.orden;
-        }
-        return 0;
-      });
-      setManualOrder(orderedStandings.map(s => ({ ...s, id: String(s.id) })));
+      setStandings(realStandings.map(s => ({ ...s, id: String(s.id), orden: s.orden || 0 })));
+      setOrderDirty(true);
     }
-  }, [sortedStandings, hasManualOrder]);
+  }, [contextStandings, hasManualOrder]);
 
   // ============ SECCIÓN 6: Agregar botón de reseteo en la UI ============
   // En la sección de botones:
@@ -820,18 +890,44 @@ const StandingsTable: React.FC<{ zoneId: string; leagueId: string; categoryId: s
 
   // ============ SECCIÓN 7: Usar los datos correctos en el render ============
   // 1. displayStandings con useMemo y solo standings reales
-  const displayStandings = useMemo(() => {
-    if (hasManualOrder) {
-      return manualOrder.map(s => ({ ...s, id: String(s.id) }));
+  // const displayStandings = useMemo(() => {
+  //   if (hasManualOrder) {
+  //     return manualOrder.map(s => ({ ...s, id: String(s.id) }));
+  //   }
+  //   // Usar solo standings reales ordenados automáticamente
+  //   return sortedStandings
+  //     .filter(standing => 
+  //       !String(standing.id).startsWith('missing_') && 
+  //       !String(standing.id).startsWith('draft_')
+  //     )
+  //     .map(s => ({ ...s, id: String(s.id) }));
+  // }, [hasManualOrder, manualOrder, sortedStandings]);
+
+  // Ordena standings por orden manual si existe, si no por puntos
+  const sortedStandings = [...standings].sort((a, b) => {
+    if (typeof a.orden === 'number' && typeof b.orden === 'number' && a.orden !== b.orden) {
+      return a.orden - b.orden;
     }
-    // Usar solo standings reales ordenados automáticamente
-    return sortedStandings
-      .filter(standing => 
-        !String(standing.id).startsWith('missing_') && 
-        !String(standing.id).startsWith('draft_')
-      )
-      .map(s => ({ ...s, id: String(s.id) }));
-  }, [hasManualOrder, manualOrder, sortedStandings]);
+    if (b.puntos !== a.puntos) return b.puntos - a.puntos;
+    const aDiff = (a.goalsFor || 0) - (a.goalsAgainst || 0);
+    const bDiff = (b.goalsFor || 0) - (b.goalsAgainst || 0);
+    if (bDiff !== aDiff) return bDiff - aDiff;
+    return (a.pj || 0) - (b.pj || 0);
+  });
+
+  // Elimina la declaración duplicada de moveStanding, deja solo la versión con el swap sobre filteredStandings y setOrderDirty
+  // 1. Solo una función moveStanding:
+  const filteredStandings = standings.filter(s => !String(s.id).startsWith('draft_') && !String(s.id).startsWith('missing_'));
+  const moveStanding = (index: number, direction: 'up' | 'down') => {
+    setStandings(prev => {
+      const arr = prev.filter(s => !String(s.id).startsWith('draft_') && !String(s.id).startsWith('missing_'));
+      const newIndex = direction === 'up' ? index - 1 : index + 1;
+      if (newIndex < 0 || newIndex >= arr.length) return prev;
+      [arr[index], arr[newIndex]] = [arr[newIndex], arr[index]];
+      return arr.map((s, idx) => ({ ...s, orden: idx + 1 }));
+    });
+    setOrderDirty(true);
+  };
 
   return (
     <div key={refreshKey} className="bg-white shadow overflow-hidden sm:rounded-lg">
@@ -917,6 +1013,12 @@ const StandingsTable: React.FC<{ zoneId: string; leagueId: string; categoryId: s
               <span>Orden Auto</span>
             </button>
           )}
+          {orderDirty && (
+            <button onClick={handleSaveOrder} disabled={savingOrder} className="btn btn-success flex items-center space-x-1">
+              {savingOrder ? 'Guardando...' : 'Guardar Orden'}
+              <RefreshCw size={16} />
+            </button>
+          )}
         </div>
       </div>
       
@@ -970,7 +1072,7 @@ const StandingsTable: React.FC<{ zoneId: string; leagueId: string; categoryId: s
             {isAddingTeam && (
               <tr className="bg-green-50/30">
                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-500">
-                  {sortedStandings.length + 1}
+                  {contextStandings.length + 1}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
                   <input
@@ -1072,95 +1174,99 @@ const StandingsTable: React.FC<{ zoneId: string; leagueId: string; categoryId: s
               </tr>
             )}
             
-            {allRows.length === 0 && !isAddingTeam ? (
+            {contextStandings.length === 0 && !isAddingTeam ? (
               <tr>
                 <td colSpan={11} className="px-6 py-8 text-center text-gray-500">
                   No hay equipos en esta zona y categoría. Agrega el primer equipo para comenzar.
                 </td>
               </tr>
             ) : (
-              displayStandings.map((standing, index) => {
-                const team = teams.find(t => t.id === standing.teamId);
-                const isModified = modifiedRows.has(String(standing.id));
-                
-                return (
-                  <tr 
-                    key={standing.id} 
-                    className={cn(
-                      "hover:bg-gray-50",
-                      isModified && "bg-yellow-50/30"
-                    )}
-                  >
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-500">
-                      {index + 1}
-                    </td>
-                    <EditableCell 
-                      value={team?.name || 'Equipo desconocido'} 
-                      standing={standing} 
-                      field="teamName" 
-                      onUpdate={handleUpdate}
-                      type="text"
-                    />
-                    <EditableCell value={standing.pj} standing={standing} field="pj" onUpdate={handleUpdate} />
-                    <EditableCell value={standing.won} standing={standing} field="won" onUpdate={handleUpdate} />
-                    <EditableCell value={standing.drawn} standing={standing} field="drawn" onUpdate={handleUpdate} />
-                    <EditableCell value={standing.lost} standing={standing} field="lost" onUpdate={handleUpdate} />
-                    <EditableCell value={standing.goalsFor} standing={standing} field="goalsFor" onUpdate={handleUpdate} />
-                    <EditableCell value={standing.goalsAgainst} standing={standing} field="goalsAgainst" onUpdate={handleUpdate} />
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-center">
-                      {standing.goalsFor - standing.goalsAgainst}
-                    </td>
-                    <EditableCell value={standing.puntos} standing={standing} field="puntos" onUpdate={handleUpdate} />
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      <div className="flex justify-end space-x-2">
-                        {isModified && (
+              filteredStandings
+                .slice()
+                .sort((a, b) => (a.orden ?? 9999) - (b.orden ?? 9999))
+                .map((standing, index) => {
+                  const team = teams.find(t => t.id === standing.teamId);
+                  const isModified = modifiedRows.has(String(standing.id));
+                  
+                  return (
+                    <tr 
+                      key={standing.id} 
+                      className={cn(
+                        "hover:bg-gray-50",
+                        isModified && "bg-yellow-50/30",
+                        movingTeamId === standing.teamId && "bg-blue-50"
+                      )}
+                    >
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-500">
+                        {index + 1}
+                      </td>
+                      <EditableCell 
+                        value={team?.name || 'Equipo desconocido'} 
+                        standing={standing} 
+                        field="teamName" 
+                        onUpdate={handleUpdate}
+                        type="text"
+                      />
+                      <EditableCell value={standing.pj} standing={standing} field="pj" onUpdate={handleUpdate} />
+                      <EditableCell value={standing.won} standing={standing} field="won" onUpdate={handleUpdate} />
+                      <EditableCell value={standing.drawn} standing={standing} field="drawn" onUpdate={handleUpdate} />
+                      <EditableCell value={standing.lost} standing={standing} field="lost" onUpdate={handleUpdate} />
+                      <EditableCell value={standing.goalsFor} standing={standing} field="goalsFor" onUpdate={handleUpdate} />
+                      <EditableCell value={standing.goalsAgainst} standing={standing} field="goalsAgainst" onUpdate={handleUpdate} />
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-center">
+                        {standing.goalsFor - standing.goalsAgainst}
+                      </td>
+                      <EditableCell value={standing.puntos} standing={standing} field="puntos" onUpdate={handleUpdate} />
+                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                        <div className="flex justify-end space-x-2">
+                          {isModified && (
+                            <button
+                              onClick={() => handleSaveRow(String(standing.id))}
+                              className="text-green-600 hover:text-green-900"
+                              title="Confirmar cambios"
+                              disabled={isLoading}
+                            >
+                              <Save size={18} />
+                            </button>
+                          )}
                           <button
-                            onClick={() => handleSaveRow(String(standing.id))}
-                            className="text-green-600 hover:text-green-900"
-                            title="Confirmar cambios"
+                            onClick={() => moveStanding(index, 'up')}
+                            className="btn btn-xs btn-outline"
+                            disabled={isLoading || index === 0}
+                            title="Subir equipo"
+                            aria-label="Subir equipo"
+                          >
+                            <span style={{ display: 'inline-block', transform: 'rotate(-90deg)' }}>▲</span>
+                          </button>
+                          <button
+                            onClick={() => moveStanding(index, 'down')}
+                            className="btn btn-xs btn-outline"
+                            disabled={isLoading || index === filteredStandings.length - 1}
+                            title="Bajar equipo"
+                            aria-label="Bajar equipo"
+                          >
+                            <span style={{ display: 'inline-block', transform: 'rotate(90deg)' }}>▲</span>
+                          </button>
+                          <button
+                            onClick={() => handleDeletePosition(standing)}
+                            className="text-red-600 hover:text-red-900"
+                            title="Eliminar equipo"
                             disabled={isLoading}
                           >
-                            <Save size={18} />
+                            <Trash2 size={18} />
                           </button>
-                        )}
-                        <button
-                          onClick={() => moveStanding(index, 'up')}
-                          className="btn btn-xs btn-outline"
-                          disabled={isLoading || index === 0}
-                          title="Subir equipo"
-                          aria-label="Subir equipo"
-                        >
-                          <span style={{ display: 'inline-block', transform: 'rotate(-90deg)' }}>▲</span>
-                        </button>
-                        <button
-                          onClick={() => moveStanding(index, 'down')}
-                          className="btn btn-xs btn-outline"
-                          disabled={isLoading || index === displayStandings.length - 1}
-                          title="Bajar equipo"
-                          aria-label="Bajar equipo"
-                        >
-                          <span style={{ display: 'inline-block', transform: 'rotate(90deg)' }}>▲</span>
-                        </button>
-                        <button
-                          onClick={() => handleDeletePosition(standing)}
-                          className="text-red-600 hover:text-red-900"
-                          title="Eliminar equipo"
-                          disabled={isLoading}
-                        >
-                          <Trash2 size={18} />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
             )}
           </tbody>
         </table>
       </div>
       {/* Vista tipo lista para mobile: más ancha y cómoda */}
       <div className="md:hidden space-y-3 w-full p-0" key={refreshKey}>
-        {allRows.map((standing, idx) => {
+        {filteredStandings.map((standing, idx) => {
           const team = teams.find(t => t.id === standing.teamId);
           const isModified = modifiedRows.has(String(standing.id));
           return (
@@ -1198,7 +1304,7 @@ const StandingsTable: React.FC<{ zoneId: string; leagueId: string; categoryId: s
                     onClick={() => moveStanding(idx, 'down')}
                     className="text-gray-500 hover:text-gray-900 disabled:opacity-30"
                     title="Bajar"
-                    disabled={idx === allRows.length - 1 || isLoading}
+                    disabled={idx === filteredStandings.length - 1 || isLoading}
                   >
                     ▼
                   </button>
@@ -1228,7 +1334,7 @@ const StandingsTable: React.FC<{ zoneId: string; leagueId: string; categoryId: s
             </div>
           );
         })}
-        {allRows.length === 0 && !isAddingTeam && (
+        {filteredStandings.length === 0 && !isAddingTeam && (
           <div className="text-center py-8 text-gray-500 bg-gray-50 rounded-md">
             No hay equipos en esta zona. Agrega el primer equipo para comenzar.
           </div>
