@@ -169,10 +169,25 @@ const LeaguePage: React.FC = () => {
   if (viewMode === 'fixture') {
     // Obtener todos los fixtures de la liga
     const { fixtures } = useLeague();
-    // Ordenar fixtures por fecha_partido ascendente
+    // Ordenar fixtures por zona y luego por fecha
     const leagueFixtures = fixtures
       .filter(f => f.leagueId === leagueId)
-      .sort((a, b) => new Date(a.matchDate).getTime() - new Date(b.matchDate).getTime());
+      .sort((a, b) => {
+        // Obtener nombre de zona real
+        const zonaA = zones.find(z => z.id === a.zoneId)?.name || '';
+        const zonaB = zones.find(z => z.id === b.zoneId)?.name || '';
+        // Si ambos tienen '1-2' o '3-4' en el nombre, ordenar por ese número
+        const getZonaNum = (zona: string) => {
+          const match = zona.match(/(\d+)[^\d]?(\d+)?/);
+          if (!match) return 999;
+          return parseInt(match[1], 10);
+        };
+        const numA = getZonaNum(zonaA);
+        const numB = getZonaNum(zonaB);
+        if (numA !== numB) return numA - numB;
+        // Si zona igual, ordenar por fecha
+        return new Date(a.matchDate).getTime() - new Date(b.matchDate).getTime();
+      });
     return (
       <div className="min-h-[80vh] flex flex-col items-center justify-center bg-gradient-to-br from-gray-50 to-white py-10">
         <div className="w-full max-w-2xl mx-auto">
