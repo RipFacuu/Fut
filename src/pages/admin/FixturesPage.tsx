@@ -4,6 +4,7 @@ import { useForm, useFieldArray } from 'react-hook-form';
 import { Plus, Edit, Trash2, Calendar, Save, X, Users } from 'lucide-react';
 import { cn } from '../../utils/cn';
 import { SupabaseService } from '../../services/supabaseService';
+import { formatLocalDate } from '../../utils/dateUtils';
 
 interface FixtureFormData {
   date: string;
@@ -644,12 +645,7 @@ const FixturesPage: React.FC = () => {
                     <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-4 space-y-1 sm:space-y-0 w-full">
                       <h3 className="font-semibold text-lg break-words">{fixture.date}</h3>
                       <span className="text-sm text-gray-600 break-words">
-                        {new Date(fixture.matchDate).toLocaleDateString('es-ES', {
-                          weekday: 'long',
-                          year: 'numeric',
-                          month: 'long',
-                          day: 'numeric'
-                        })}
+                        {formatLocalDate(fixture.matchDate)}
                       </span>
                     </div>
                     <div className="flex flex-col sm:flex-row w-full sm:w-auto space-y-2 sm:space-y-0 sm:space-x-2 mt-2 sm:mt-0">

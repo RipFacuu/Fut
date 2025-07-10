@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useLeague, Fixture, } from '../../contexts/LeagueContext';
 import { cn } from '../../utils/cn';
+import { formatShortDate } from '../../utils/dateUtils';
 
 interface FixtureListProps {
   zoneId: string;
@@ -77,7 +78,7 @@ const FixtureList: React.FC<FixtureListProps> = ({ zoneId, resultsOnly = false }
             <h3 className="font-heading text-base sm:text-lg font-semibold text-gray-800">
               {fixture.date}
               <span className="ml-2 text-gray-500 text-xs sm:text-sm font-normal">
-                {fixture.matchDate}
+                {fixture.matchDate ? formatShortDate(fixture.matchDate) : ''}
               </span>
             </h3>
           </div>
