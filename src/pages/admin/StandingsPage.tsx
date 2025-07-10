@@ -353,9 +353,16 @@ const StandingsPage: React.FC = () => {
   
   // Ordenar standings solo por puntos de mayor a menor
   const sortedStandings = [...localStandings].sort((a, b) => {
-    const aPuntos = typeof a.puntos === 'number' ? a.puntos : parseInt(a.puntos) || 0;
-    const bPuntos = typeof b.puntos === 'number' ? b.puntos : parseInt(b.puntos) || 0;
-    return bPuntos - aPuntos;
+    // Ordenar por puntos (desc)
+    if (b.puntos !== a.puntos) return b.puntos - a.puntos;
+    // Diferencia de gol (desc)
+    const aDiff = (a.goalsFor || 0) - (a.goalsAgainst || 0);
+    const bDiff = (b.goalsFor || 0) - (b.goalsAgainst || 0);
+    if (bDiff !== aDiff) return bDiff - aDiff;
+    // Goles a favor (desc)
+    if ((b.goalsFor || 0) !== (a.goalsFor || 0)) return (b.goalsFor || 0) - (a.goalsFor || 0);
+    // Menos partidos jugados primero (asc)
+    return (a.pj || 0) - (b.pj || 0);
   });
   
   // Handlers de cambio de filtros
@@ -899,45 +906,14 @@ const StandingsPage: React.FC = () => {
   // Filtrado de equipos y standings
   const filteredEquipos = useMemo(() => {
     if (isMundialito) {
-      // Mostrar todos los equipos de la categoría seleccionada, sin importar la zona
-      const result = teams.filter(
+      return teams.filter(
         e => String(e.leagueId) === String(selectedLeague) &&
              String(e.categoryId) === String(selectedCategory)
       );
-      if (selectedCategory) {
-        console.log('🔎 filteredEquipos (mundialito):', {
-          selectedLeague,
-          selectedCategory,
-          equiposFiltrados: result.map(e => ({
-            id: e.id,
-            name: e.name,
-            leagueId: e.leagueId,
-            categoryId: e.categoryId,
-            zoneId: e.zoneId
-          }))
-        });
-      }
-      return result;
     } else {
-      // Filtro normal por zona
-      const result = teams.filter(
+      return teams.filter(
         e => String(e.zoneId) === String(selectedZone)
       );
-      if (selectedZone) {
-        console.log('🔎 filteredEquipos:', {
-          selectedLeague,
-          selectedZone,
-          selectedCategory,
-          equiposFiltrados: result.map(e => ({
-            id: e.id,
-            name: e.name,
-            leagueId: e.leagueId,
-            categoryId: e.categoryId,
-            zoneId: e.zoneId
-          }))
-        });
-      }
-      return result;
     }
   }, [teams, selectedLeague, selectedCategory, selectedZone, isMundialito]);
 

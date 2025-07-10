@@ -180,10 +180,12 @@ export async function createZoneWithStructure(
 
 export const mapSupabaseToTeam = (supabaseTeam: any): Team => {
   if (!supabaseTeam) {
+    console.error('Team data is required', supabaseTeam);
     throw new Error('Team data is required');
   }
   
   if (!supabaseTeam.id || !supabaseTeam.nombre) {
+    console.error('Team must have id and name', supabaseTeam);
     throw new Error('Team must have id and name');
   }
   

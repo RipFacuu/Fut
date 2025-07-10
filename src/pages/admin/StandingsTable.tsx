@@ -4,7 +4,7 @@ import { Trash2, Save, Plus, X, Download, Upload, RefreshCw } from 'lucide-react
 import { cn } from '../../utils/cn';
 import { useForm } from 'react-hook-form';
 import { useAuth } from '../../contexts/AuthContext';
-import { standingsLegendService } from '../../services/standingsLegendService';
+import { standingsLegendService, updateEditablePositionsOrder } from '../../services/standingsLegendService';
 
 // 1. INTERFACES CORREGIDAS
 interface Standing {
@@ -20,6 +20,7 @@ interface Standing {
   goalsFor: number;
   goalsAgainst: number;
   puntos: number;
+  orden?: number;
 }
 
 interface NewTeamFormData {
@@ -182,13 +183,20 @@ const StandingsTable: React.FC<{ zoneId: string; leagueId: string; categoryId: s
   // 3. ORDENAMIENTO CON useMemo
   const sortedStandings = useMemo(() => {
     return [...zoneStandings].sort((a, b) => {
+      // 1. Orden manual si existe
+      if (typeof a.orden === 'number' && typeof b.orden === 'number' && a.orden !== b.orden) {
+        return a.orden - b.orden;
+      }
+      // 2. Automático si no hay orden manual
       const aPuntos = Number(a.puntos) || 0;
       const bPuntos = Number(b.puntos) || 0;
       if (bPuntos !== aPuntos) return bPuntos - aPuntos;
       const aDiff = (Number(a.goalsFor) || 0) - (Number(a.goalsAgainst) || 0);
       const bDiff = (Number(b.goalsFor) || 0) - (Number(b.goalsAgainst) || 0);
       if (bDiff !== aDiff) return bDiff - aDiff;
-      return (Number(b.goalsFor) || 0) - (Number(a.goalsFor) || 0);
+      if ((Number(b.goalsFor) || 0) !== (Number(a.goalsFor) || 0)) return (Number(b.goalsFor) || 0) - (Number(a.goalsFor) || 0);
+      if ((Number(a.pj) || 0) !== (Number(b.pj) || 0)) return (Number(a.pj) || 0) - (Number(b.pj) || 0);
+      return 0;
     });
   }, [zoneStandings]);
 
@@ -653,6 +661,178 @@ const StandingsTable: React.FC<{ zoneId: string; leagueId: string; categoryId: s
     setLegendLoading(false);
   };
 
+  // ============ SECCIÓN 1: Estado para ordenamiento manual ============
+  const [manualOrder, setManualOrder] = useState<(Standing & { orden?: number })[]>([]);
+  const [hasManualOrder, setHasManualOrder] = useState(false);
+
+  // ============ SECCIÓN 2: Sincronización mejorada ============
+  useEffect(() => {
+    // Detectar si hay orden manual en los datos
+    const realStandings = sortedStandings.filter(s => 
+      !String(s.id).startsWith('missing_') && 
+      !String(s.id).startsWith('draft_')
+    );
+    const hasOrderValues = realStandings.some(s => 
+      typeof s.orden === 'number' && s.orden > 0
+    );
+    if (hasOrderValues) {
+      // Hay orden manual en los datos
+      const orderedStandings = [...realStandings].sort((a, b) => {
+        if (typeof a.orden === 'number' && typeof b.orden === 'number') {
+          return a.orden - b.orden;
+        }
+        return 0;
+      });
+      setManualOrder(orderedStandings.map(s => ({ ...s, id: String(s.id) })));
+      setHasManualOrder(true);
+    } else {
+      // No hay orden manual, usar orden automático
+      setManualOrder(realStandings.map(s => ({ ...s, id: String(s.id) })));
+      setHasManualOrder(false);
+    }
+  }, [sortedStandings]);
+
+  // ============ SECCIÓN 3: Función moveStanding corregida ============
+  // 6. DEBUGGING: función para logs
+  const debugMoveStanding = (index: number, direction: 'up' | 'down') => {
+    console.log('=== DEBUG MOVE STANDING ===');
+    console.log('Index:', index);
+    console.log('Direction:', direction);
+    console.log('displayStandings.length:', displayStandings.length);
+    console.log('hasManualOrder:', hasManualOrder);
+    console.log('manualOrder.length:', manualOrder.length);
+    console.log('Current displayStandings:', displayStandings);
+    console.log('Current manualOrder:', manualOrder);
+    console.log('=============================');
+  };
+  // 2. moveStanding robusto y asíncrono
+  const moveStanding = async (index: number, direction: 'up' | 'down') => {
+    debugMoveStanding(index, direction);
+    // Validaciones
+    if ((direction === 'up' && index === 0) || (direction === 'down' && index === displayStandings.length - 1)) {
+      return;
+    }
+    try {
+      setIsLoading(true);
+      // Obtener el orden actual
+      const currentOrder = hasManualOrder ? manualOrder : displayStandings;
+      const newOrder = [...currentOrder];
+      // Intercambiar posiciones
+      const swapWithIdx = direction === 'up' ? index - 1 : index + 1;
+      [newOrder[index], newOrder[swapWithIdx]] = [newOrder[swapWithIdx], newOrder[index]];
+      // Asignar números de orden
+      const orderedStandings = newOrder.map((standing, idx) => ({
+        ...standing,
+        orden: idx + 1
+      }));
+      // Actualizar estado local inmediatamente
+      setManualOrder(orderedStandings);
+      setHasManualOrder(true);
+      console.log('Nuevo orden manualOrder:', orderedStandings);
+      // Preparar datos para la API
+      const updates = orderedStandings.map((standing, idx) => ({
+        equipo_id: Number(standing.teamId),
+        zona_id: Number(standing.zoneId),
+        categoria_id: Number(standing.categoryId),
+        orden: idx + 1
+      }));
+      // Actualizar en la base de datos
+      const resp = await updateEditablePositionsOrder(updates);
+      console.log('Respuesta updateEditablePositionsOrder:', resp);
+      await refreshStandings();
+    } catch (error) {
+      console.error('Error al actualizar orden:', error);
+      // Revertir cambios en caso de error
+      setHasManualOrder(false);
+      setManualOrder(displayStandings.map(s => ({ ...s, id: String(s.id) })));
+      alert('Error al actualizar el orden. Intenta de nuevo.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // ============ SECCIÓN 4: Función para resetear orden manual ============
+  // 4. resetManualOrder robusto
+  const resetManualOrder = async () => {
+    try {
+      setIsLoading(true);
+      // Obtener standings reales para resetear
+      const realStandings = sortedStandings.filter(s => 
+        !String(s.id).startsWith('missing_') && 
+        !String(s.id).startsWith('draft_')
+      );
+      // Limpiar órdenes en la base de datos
+      const updates = realStandings.map((standing) => ({
+        equipo_id: Number(standing.teamId),
+        zona_id: Number(standing.zoneId),
+        categoria_id: Number(standing.categoryId),
+        orden: 0 // Resetear a 0
+      }));
+      await updateEditablePositionsOrder(updates);
+      await refreshStandings();
+      // Actualizar estado local
+      setHasManualOrder(false);
+      setManualOrder(realStandings.map(s => ({ ...s, id: String(s.id) })));
+    } catch (error) {
+      console.error('Error al resetear orden:', error);
+      alert('Error al resetear el orden. Intenta de nuevo.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // ============ SECCIÓN 5: Detectar si hay orden manual en los datos ============
+  // 5. Detectar si hay orden manual en los datos
+  useEffect(() => {
+    // Solo verificar en standings reales
+    const realStandings = sortedStandings.filter(s => 
+      !String(s.id).startsWith('missing_') && 
+      !String(s.id).startsWith('draft_')
+    );
+    const hasOrderValues = realStandings.some(s => 
+      typeof s.orden === 'number' && s.orden > 0
+    );
+    if (hasOrderValues && !hasManualOrder) {
+      setHasManualOrder(true);
+      const orderedStandings = [...realStandings].sort((a, b) => {
+        if (typeof a.orden === 'number' && typeof b.orden === 'number') {
+          return a.orden - b.orden;
+        }
+        return 0;
+      });
+      setManualOrder(orderedStandings.map(s => ({ ...s, id: String(s.id) })));
+    }
+  }, [sortedStandings, hasManualOrder]);
+
+  // ============ SECCIÓN 6: Agregar botón de reseteo en la UI ============
+  // En la sección de botones:
+  // {hasManualOrder && (
+  //   <button
+  //     onClick={resetManualOrder}
+  //     className="btn btn-sm btn-outline flex items-center space-x-1"
+  //     disabled={isLoading}
+  //     title="Resetear orden manual y volver al automático"
+  //   >
+  //     <RefreshCw size={16} />
+  //     <span>Orden Auto</span>
+  //   </button>
+  // )}
+
+  // ============ SECCIÓN 7: Usar los datos correctos en el render ============
+  // 1. displayStandings con useMemo y solo standings reales
+  const displayStandings = useMemo(() => {
+    if (hasManualOrder) {
+      return manualOrder.map(s => ({ ...s, id: String(s.id) }));
+    }
+    // Usar solo standings reales ordenados automáticamente
+    return sortedStandings
+      .filter(standing => 
+        !String(standing.id).startsWith('missing_') && 
+        !String(standing.id).startsWith('draft_')
+      )
+      .map(s => ({ ...s, id: String(s.id) }));
+  }, [hasManualOrder, manualOrder, sortedStandings]);
+
   return (
     <div key={refreshKey} className="bg-white shadow overflow-hidden sm:rounded-lg">
       {/* Campo de leyenda editable */}
@@ -726,6 +906,17 @@ const StandingsTable: React.FC<{ zoneId: string; leagueId: string; categoryId: s
           >
             <RefreshCw size={16} />
           </button>
+          {hasManualOrder && (
+            <button
+              onClick={resetManualOrder}
+              className="btn btn-sm btn-outline flex items-center space-x-1"
+              disabled={isLoading}
+              title="Resetear orden manual y volver al automático"
+            >
+              <RefreshCw size={16} />
+              <span>Orden Auto</span>
+            </button>
+          )}
         </div>
       </div>
       
@@ -888,7 +1079,7 @@ const StandingsTable: React.FC<{ zoneId: string; leagueId: string; categoryId: s
                 </td>
               </tr>
             ) : (
-              allRows.map((standing, index) => {
+              displayStandings.map((standing, index) => {
                 const team = teams.find(t => t.id === standing.teamId);
                 const isModified = modifiedRows.has(String(standing.id));
                 
@@ -932,6 +1123,24 @@ const StandingsTable: React.FC<{ zoneId: string; leagueId: string; categoryId: s
                             <Save size={18} />
                           </button>
                         )}
+                        <button
+                          onClick={() => moveStanding(index, 'up')}
+                          className="btn btn-xs btn-outline"
+                          disabled={isLoading || index === 0}
+                          title="Subir equipo"
+                          aria-label="Subir equipo"
+                        >
+                          <span style={{ display: 'inline-block', transform: 'rotate(-90deg)' }}>▲</span>
+                        </button>
+                        <button
+                          onClick={() => moveStanding(index, 'down')}
+                          className="btn btn-xs btn-outline"
+                          disabled={isLoading || index === displayStandings.length - 1}
+                          title="Bajar equipo"
+                          aria-label="Bajar equipo"
+                        >
+                          <span style={{ display: 'inline-block', transform: 'rotate(90deg)' }}>▲</span>
+                        </button>
                         <button
                           onClick={() => handleDeletePosition(standing)}
                           className="text-red-600 hover:text-red-900"
@@ -977,6 +1186,22 @@ const StandingsTable: React.FC<{ zoneId: string; leagueId: string; categoryId: s
                       <Save size={18} />
                     </button>
                   )}
+                  <button
+                    onClick={() => moveStanding(idx, 'up')}
+                    className="text-gray-500 hover:text-gray-900 disabled:opacity-30"
+                    title="Subir"
+                    disabled={idx === 0 || isLoading}
+                  >
+                    ▲
+                  </button>
+                  <button
+                    onClick={() => moveStanding(idx, 'down')}
+                    className="text-gray-500 hover:text-gray-900 disabled:opacity-30"
+                    title="Bajar"
+                    disabled={idx === allRows.length - 1 || isLoading}
+                  >
+                    ▼
+                  </button>
                   <button
                     onClick={() => handleDeletePosition(standing)}
                     className="text-red-600 hover:text-red-900"

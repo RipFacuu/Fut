@@ -106,16 +106,22 @@ const PublicStandingsTable: React.FC<PublicStandingsTableProps> = ({ leagueId, z
     });
   }, [zoneId, categoryId, leagueId]);
 
-  // Ordenar standings por puntos y luego por diferencia de gol
+  // Ordenar standings por puntos, diferencia de gol, goles a favor, menos partidos jugados y nombre
   const sortedStandings = standings.slice().sort((a, b) => {
-    if (typeof a.orden === 'number' && typeof b.orden === 'number' && a.orden !== b.orden) {
-      return a.orden - b.orden;
-    }
+    // 1. Puntos (desc)
     if (b.puntos !== a.puntos) return b.puntos - a.puntos;
+    // 2. Diferencia de gol (desc)
     const aDiff = a.goalsFor - a.goalsAgainst;
     const bDiff = b.goalsFor - b.goalsAgainst;
     if (bDiff !== aDiff) return bDiff - aDiff;
-    return b.goalsFor - a.goalsFor;
+    // 3. Goles a favor (desc)
+    if (b.goalsFor !== a.goalsFor) return b.goalsFor - a.goalsFor;
+    // 4. Menos partidos jugados (asc)
+    if (a.pj !== b.pj) return a.pj - b.pj;
+    // 5. Nombre de equipo (asc, opcional)
+    const teamA = (a.equipo_nombre && a.equipo_nombre.trim() !== '' ? a.equipo_nombre : teams.find(t => t.id === a.teamId)?.name || '').toLowerCase();
+    const teamB = (b.equipo_nombre && b.equipo_nombre.trim() !== '' ? b.equipo_nombre : teams.find(t => t.id === b.teamId)?.name || '').toLowerCase();
+    return teamA.localeCompare(teamB);
   });
 
   // Log para depuración

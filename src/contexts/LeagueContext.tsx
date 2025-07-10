@@ -281,11 +281,16 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
   useEffect(() => {
     const loadAllTeams = async () => {
       try {
-        const allTeams = await SupabaseService.getAllTeams();
-        allTeams.sort((a, b) => String(a.id).localeCompare(String(b.id)));
+        const allTeamsRaw = await SupabaseService.getAllTeams();
+        console.log('Equipos crudos de Supabase:', allTeamsRaw);
+        // Si tienes un mapeo, hazlo aquí y loguea el resultado
+        // const allTeams = allTeamsRaw.map(mapSupabaseToTeam);
+        // console.log('Equipos mapeados:', allTeams);
+        allTeamsRaw.sort((a, b) => String(a.id).localeCompare(String(b.id)));
         const currentSorted = [...teams].sort((a, b) => String(a.id).localeCompare(String(b.id)));
-        if (JSON.stringify(allTeams) !== JSON.stringify(currentSorted)) {
-          setTeams(allTeams);
+        if (JSON.stringify(allTeamsRaw) !== JSON.stringify(currentSorted)) {
+          setTeams(allTeamsRaw);
+          console.log('Equipos guardados en estado:', allTeamsRaw);
         }
       } catch (error) {
         console.error('Error loading teams:', error);
@@ -895,16 +900,20 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
   useEffect(() => {
     const loadAllStandings = async () => {
       try {
-        let allStandings: Standing[] = [];
+        let allStandingsRaw: Standing[] = [];
         for (const zone of zones) {
           const zoneStandings = await SupabaseService.getStandingsByZone(zone.id);
-          allStandings = allStandings.concat(zoneStandings);
+          allStandingsRaw = allStandingsRaw.concat(zoneStandings);
         }
-        // Ordena por id para comparación estable
-        allStandings.sort((a, b) => String(a.id).localeCompare(String(b.id)));
+        console.log('Standings crudos de Supabase:', allStandingsRaw);
+        // Si tienes un mapeo, hazlo aquí y loguea el resultado
+        // const allStandings = allStandingsRaw.map(mapSupabaseToStanding);
+        // console.log('Standings mapeados:', allStandings);
+        allStandingsRaw.sort((a, b) => String(a.id).localeCompare(String(b.id)));
         const currentSorted = [...standings].sort((a, b) => String(a.id).localeCompare(String(b.id)));
-        if (JSON.stringify(allStandings) !== JSON.stringify(currentSorted)) {
-          setStandings(allStandings);
+        if (JSON.stringify(allStandingsRaw) !== JSON.stringify(currentSorted)) {
+          setStandings(allStandingsRaw);
+          console.log('Standings guardados en estado:', allStandingsRaw);
         }
       } catch (error) {
         console.error('Error loading standings:', error);
