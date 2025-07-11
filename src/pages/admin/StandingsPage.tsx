@@ -410,42 +410,74 @@ const StandingsPage: React.FC = () => {
     return team?.name || 'Equipo desconocido';
   }, [teams]);
 
-  // Asegura que manualOrder esté declarado como estado:
-  const [manualOrder, setManualOrder] = useState<StandingWithOrder[]>([]);
-  
-  // Estado para saber si hay cambios de orden no guardados
+  // 1. Estado único para standings ordenados manualmente
+  const [standings, setStandings] = useState<StandingWithOrder[]>([]);
   const [orderDirty, setOrderDirty] = useState(false);
   const [savingOrder, setSavingOrder] = useState(false);
   const [orderSaved, setOrderSaved] = useState(false);
   
-  // 1. Funciones para mover arriba/abajo
-  const moveStanding = (index: number, direction: 'up' | 'down') => {
-    setManualOrder(prev => {
-      const newOrder: StandingWithOrder[] = [...prev];
-      if (direction === 'up' && index > 0) {
-        [newOrder[index - 1], newOrder[index]] = [newOrder[index], newOrder[index - 1]];
-      } else if (direction === 'down' && index < newOrder.length - 1) {
-        [newOrder[index], newOrder[index + 1]] = [newOrder[index + 1], newOrder[index]];
+  // 2. Al cargar standings desde la base:
+  useEffect(() => {
+    async function fetchStandings() {
+      if (!selectedZone || !selectedCategory) {
+        setStandings([]);
+        return;
       }
+      setLoading(true);
+      setError(null);
+      try {
+        const data = await obtenerPosicionesPorZonaYCategoria(selectedZone, selectedCategory);
+        // Ordenar por campo 'orden' si existe, si no por puntos
+        const ordered = [...data].sort((a, b) => (a.orden ?? 9999) - (b.orden ?? 9999));
+        setStandings(ordered.map(pos => ({
+          id: String(pos.id),
+          teamId: String(pos.equipo_id),
+          leagueId: selectedLeague,
+          categoryId: String(pos.categoria_id),
+          zoneId: String(pos.zona_id),
+          puntos: Number(pos.puntos) || 0,
+          pj: Number(pos.pj) || 0,
+          orden: typeof pos.orden === 'number' ? pos.orden : 0,
+          equipo_nombre: pos.equipo_nombre || ''
+        })));
+        setOrderDirty(false);
+        setOrderSaved(false);
+      } catch (error) {
+        setError('Error al cargar las posiciones.');
+        setStandings([]);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchStandings();
+  }, [selectedZone, selectedCategory, selectedLeague]);
+
+  // 3. Las flechas modifican standings directamente
+  const moveStanding = (index: number, direction: 'up' | 'down') => {
+    setStandings(prev => {
+      const arr = [...prev];
+      const newIndex = direction === 'up' ? index - 1 : index + 1;
+      if (newIndex < 0 || newIndex >= arr.length) return arr;
+      [arr[index], arr[newIndex]] = [arr[newIndex], arr[index]];
       // Actualizar campo 'orden'
-      return newOrder.map((s, idx) => ({ ...s, orden: idx }));
+      return arr.map((s, idx) => ({ ...s, orden: idx + 1 }));
     });
+    setOrderDirty(true);
   };
 
-  // Guardar el orden en Supabase
+  // 4. El render usa standings
+  // Reemplaza sortedStandings.map(...) por standings.map(...)
+  // ... existing code ...
+  // 5. Al guardar, persiste el orden de standings
   const handleSaveOrder = async () => {
     setSavingOrder(true);
     setOrderSaved(false);
-    const payload = manualOrder
-      .filter(s => !!s.teamId && !!s.zoneId && !!s.categoryId)
-      .map((s, idx) => ({
-        equipo_id: Number(s.teamId),
-        zona_id: Number(s.zoneId),
-        categoria_id: Number(s.categoryId),
-        orden: typeof s.orden === 'number' ? s.orden : idx
-      }));
-    // Log detallado para depuración
-    console.log('Payload a actualizar:', JSON.stringify(payload, null, 2));
+    const payload = standings.map((s, idx) => ({
+      equipo_id: Number(s.teamId),
+      zona_id: Number(s.zoneId),
+      categoria_id: Number(s.categoryId),
+      orden: idx + 1
+    }));
     if (payload.length === 0) {
       alert('No hay datos válidos para guardar el orden.');
       setSavingOrder(false);
@@ -455,8 +487,20 @@ const StandingsPage: React.FC = () => {
       await updateEditablePositionsOrder(payload);
       setOrderDirty(false);
       setOrderSaved(true);
-      await loadStandings(); // Recargar standings desde Supabase
-      alert('¡Orden guardado!');
+      // Recargar standings desde la base
+      const data = await obtenerPosicionesPorZonaYCategoria(selectedZone, selectedCategory);
+      const ordered = [...data].sort((a, b) => (a.orden ?? 9999) - (b.orden ?? 9999));
+      setStandings(ordered.map(pos => ({
+        id: String(pos.id),
+        teamId: String(pos.equipo_id),
+        leagueId: selectedLeague,
+        categoryId: String(pos.categoria_id),
+        zoneId: String(pos.zona_id),
+        puntos: Number(pos.puntos) || 0,
+        pj: Number(pos.pj) || 0,
+        orden: typeof pos.orden === 'number' ? pos.orden : 0,
+        equipo_nombre: pos.equipo_nombre || ''
+      })));
     } catch (e) {
       alert('Error al guardar el orden');
       console.error('Error al guardar el orden en Supabase:', e);
@@ -509,8 +553,8 @@ const StandingsPage: React.FC = () => {
       return newSet;
     });
     // Actualizar manualOrder para reflejar el nuevo orden
-    setManualOrder([...sortedStandings]);
-  }, [localStandings, updateTeam, sortedStandings]);
+    // setManualOrder([...sortedStandings]); // This line is no longer needed
+  }, [localStandings, updateTeam]); // Removed sortedStandings from dependencies
   
   // Función para guardar una fila - ACTUALIZADA para el nuevo esquema
   const handleSaveRow = useCallback(async (standing: Standing) => {
@@ -1169,7 +1213,7 @@ const StandingsPage: React.FC = () => {
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-100">
-                      {sortedStandings.map((standing: Standing, index: number) => (
+                      {standings.map((standing: Standing, index: number) => (
                         <tr 
                           key={standing.id} 
                           className={cn(
@@ -1221,7 +1265,7 @@ const StandingsPage: React.FC = () => {
                             <div className="flex justify-center space-x-2">
                               {/* Flechas de orden */}
                               <button onClick={() => moveStanding(index, 'up')} disabled={index === 0} title="Subir" className="text-gray-500 hover:text-violet-600 disabled:opacity-30"><span>▲</span></button>
-                              <button onClick={() => moveStanding(index, 'down')} disabled={index === sortedStandings.length - 1} title="Bajar" className="text-gray-500 hover:text-violet-600 disabled:opacity-30"><span>▼</span></button>
+                              <button onClick={() => moveStanding(index, 'down')} disabled={index === standings.length - 1} title="Bajar" className="text-gray-500 hover:text-violet-600 disabled:opacity-30"><span>▼</span></button>
                               <button
                                 onClick={() => handleSaveRow(standing)}
                                 disabled={loading || !modifiedRows.has(String(standing.id))}
@@ -1252,7 +1296,7 @@ const StandingsPage: React.FC = () => {
                 </div>
                 {/* Vista tipo lista para mobile */}
                 <div className="md:hidden space-y-3 p-0">
-                  {sortedStandings.map((standing: Standing, idx: number) => (
+                  {standings.map((standing: Standing, idx: number) => (
                     <div
                       key={standing.id}
                       className={
@@ -1274,7 +1318,7 @@ const StandingsPage: React.FC = () => {
                         <div className="flex flex-row gap-3">
                           {/* Flechas de orden */}
                           <button onClick={() => moveStanding(idx, 'up')} disabled={idx === 0} title="Subir" className="text-gray-500 hover:text-violet-600 disabled:opacity-30"><span>▲</span></button>
-                          <button onClick={() => moveStanding(idx, 'down')} disabled={idx === sortedStandings.length - 1} title="Bajar" className="text-gray-500 hover:text-violet-600 disabled:opacity-30"><span>▼</span></button>
+                          <button onClick={() => moveStanding(idx, 'down')} disabled={idx === standings.length - 1} title="Bajar" className="text-gray-500 hover:text-violet-600 disabled:opacity-30"><span>▼</span></button>
                           <button
                             onClick={() => handleSaveRow(standing)}
                             className="text-indigo-600 hover:text-indigo-900"
@@ -1302,7 +1346,7 @@ const StandingsPage: React.FC = () => {
                       </div>
                     </div>
                   ))}
-                  {sortedStandings.length === 0 && (
+                  {standings.length === 0 && (
                     <div className="text-center py-8 text-gray-500 bg-gray-50 rounded-md">
                       No hay equipos en esta zona. Agrega el primer equipo para comenzar.
                     </div>
@@ -1310,7 +1354,7 @@ const StandingsPage: React.FC = () => {
                 </div>
 
                 {/* Botón Guardar Orden */}
-                {orderDirty && sortedStandings.length > 1 && (
+                {orderDirty && standings.length > 1 && (
                   <div className="flex justify-end mb-2">
                     <button
                       onClick={handleSaveOrder}
