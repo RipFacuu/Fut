@@ -12,8 +12,8 @@ export interface Team {
   name: string;
   logo?: string;
   leagueId: string;
-  categoryId: string;
-  zoneId: string;
+  categoryId?: string;
+  zoneId?: string;
 }
 
 export interface Category {
@@ -426,7 +426,7 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
         .filter(cat => String(cat.leagueId) === String(leagueId))
         .map(cat => cat.id);
       
-      const missingCategoryIds = usedCategoryIds.filter(id => !existingCategoryIds.includes(id));
+      const missingCategoryIds = usedCategoryIds.filter(id => !existingCategoryIds.includes(String(id || '')));
       
       console.log('❌ Categorías faltantes:', missingCategoryIds);
       
@@ -436,13 +436,13 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
         
         try {
           // Crear usando el servicio de Supabase
-          const newCategory = await SupabaseService.createCategory(categoryName, leagueId);
+          const newCategory = await SupabaseService.createCategory(categoryName, leagueId || '');
           
           if (newCategory) {
             console.log(`✅ Categoría creada: ${categoryName} (ID: ${newCategory.id})`);
             
             // Si necesitas que tenga un ID específico, actualízalo
-            if (String(newCategory.id) !== String(categoryId)) {
+            if (String(newCategory.id || '') !== String(categoryId || '')) {
               console.warn(`⚠️ ID generado (${newCategory.id}) != ID esperado (${categoryId})`);
               // Aquí podrías actualizar los equipos o crear una nueva categoría con el ID correcto
             }
@@ -453,9 +453,9 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
       }
       
       // Recargar categorías
-      const updatedCategories = await SupabaseService.getCategoriesByLeague(leagueId);
+      const updatedCategories = await SupabaseService.getCategoriesByLeague(leagueId || '');
       setCategories(prev => {
-        const otherLeagueCategories = prev.filter(cat => String(cat.leagueId) !== String(leagueId));
+        const otherLeagueCategories = prev.filter(cat => String(cat.leagueId || '') !== String(leagueId || ''));
         return [...otherLeagueCategories, ...updatedCategories];
       });
       
@@ -624,28 +624,17 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
     try {
       const savedTeam = await SupabaseService.createTeam(
         team.name,
-        team.zoneId,
-        team.leagueId,
-        team.categoryId,
-        team.logo
+        '',
+        team.leagueId || '',
+        '',
+        team.logo || ''
       );
       if (savedTeam && savedTeam.id) {
         setTeams(prev => [...prev, savedTeam]);
-        // Crear posición editable automáticamente SOLO si los IDs son válidos
-        const categoriaIdValida = savedTeam.categoryId && savedTeam.categoryId !== '' ? savedTeam.categoryId : null;
-        await crearPosicion({
-          equipo_id: savedTeam.id,
-          zona_id: savedTeam.zoneId,
-          categoria_id: categoriaIdValida,
-          equipo_nombre: savedTeam.name,
-          puntos: standingData?.puntos || 0,
-          pj: standingData?.pj || 0
-        });
         return savedTeam;
       }
     } catch (error) {
       console.error('Error adding team:', error);
-      // NO agregar al estado local si falla la creación en Supabase
       alert('Error al crear el equipo. Verifica los datos e inténtalo de nuevo.');
       return undefined;
     }
@@ -653,28 +642,21 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
 
   const updateTeam = async (id: string, data: Partial<Team>) => {
     try {
-      // Buscar el equipo actual para obtener todos los datos
       const currentTeam = teams.find(team => team.id === id);
       if (!currentTeam) {
         console.error('Team not found:', id);
         return;
       }
-  
-      // Combinar datos actuales con los nuevos
       const updatedData = { ...currentTeam, ...data };
-      
-      // Actualizar en Supabase
       const updatedTeam = await SupabaseService.updateTeam(
         id,
-        updatedData.name,
-        updatedData.zoneId,
-        updatedData.leagueId,
-        updatedData.categoryId,
-        updatedData.logo
+        updatedData.name || '',
+        updatedData.zoneId || '',
+        updatedData.leagueId || '',
+        updatedData.categoryId || '',
+        updatedData.logo || ''
       );
-  
       if (updatedTeam) {
-        // Actualizar estado local solo si la actualización en DB fue exitosa
         setTeams(teams.map(team =>
           team.id === id ? updatedTeam : team
         ));
@@ -888,7 +870,8 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
     
     // Actualizar solo los standings de esta zona
     setStandings(prevStandings => {
-      const otherZoneStandings = prevStandings.filter(s => s.zoneId !== zoneId);
+      const zoneIdStr = String(zoneId ?? '');
+      const otherZoneStandings = prevStandings.filter(s => String(s.zoneId ?? '') !== zoneIdStr);
       return [...otherZoneStandings, ...calculatedStandings];
     });
     
@@ -932,7 +915,15 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
       const result = await SupabaseService.getFixtures();
       console.log('Refreshed fixtures:', result);
       console.log('Number of fixtures loaded:', result.length);
-      setFixtures(result);
+      // Usar variable temporal para asegurar que todos los partidos estén cargados
+      const allFixturesLoaded = result.every(fixture => Array.isArray(fixture.matches));
+      if (allFixturesLoaded) {
+        setFixtures(result);
+      } else {
+        // Si algún fixture no tiene los partidos cargados, esperar y volver a intentar
+        console.warn('Algunos fixtures no tienen partidos cargados, reintentando en 300ms...');
+        setTimeout(() => refreshFixtures(), 300);
+      }
     } catch (error) {
       console.error('Error refreshing fixtures:', error);
       setFixtures([]);

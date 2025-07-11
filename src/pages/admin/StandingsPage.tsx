@@ -290,80 +290,93 @@ const StandingsPage: React.FC = () => {
       console.log('Respuesta de obtenerPosicionesPorZonaYCategoria:', posiciones);
       const standingsData = posiciones.map(pos => ({
         id: String(pos.id), // Usar el id único de la base
-        teamId: String(pos.equipo_id),
+        teamId: String(pos.equipo_id), // Asegurar que es string
         leagueId: selectedLeague,
         categoryId: String(pos.categoria_id),
         zoneId: String(pos.zona_id),
         puntos: Number(pos.puntos) || 0,
         pj: Number(pos.pj) || 0,
         orden: typeof pos.orden === 'number' ? pos.orden : 0,
-        equipo_nombre: pos.equipo_nombre || '',
-        won: 0,
-        drawn: 0,
-        lost: 0,
-        goalsFor: 0,
-        goalsAgainst: 0
+        equipo_nombre: pos.equipo_nombre || ''
       }));
       setLocalStandings(standingsData);
+      
+      // Log de depuración para verificar relación equipos-standings
+      console.log("Relación equipos-standings:", {
+        standings: standingsData.map(s => ({
+          id: s.teamId, 
+          nombreStanding: s.equipo_nombre,
+          nombreEncontrado: teams.find(t => String(t.id) === String(s.teamId))?.name
+        })),
+        todosEquipos: teams.map(t => ({id: t.id, name: t.name}))
+      });
     } catch (error) {
       setError('Error al cargar las posiciones.');
       setLocalStandings([]);
     } finally {
       setLoading(false);
     }
-  }, [selectedZone, selectedCategory, selectedLeague]);
+  }, [selectedZone, selectedCategory, selectedLeague, teams]);
 
   // useEffect para cargar standings al cambiar zona/categoría
   useEffect(() => {
-    loadStandings();
-  }, [selectedZone, selectedCategory, selectedLeague]);
-  
-  // Create standings for teams that don't have them yet - MEJORADA
-  const completeStandings = useMemo(() => {
-    if (!selectedZone || zoneTeams.length === 0) return [];
-    const seenTeams = new Set();
-    const standingsMap = new Map(localStandings.map(s => [s.teamId, s]));
-    const result = zoneTeams
-      .filter(team => team && team.id)
-      .map(team => {
-        if (seenTeams.has(team.id)) return null;
-        seenTeams.add(team.id);
-        const existingStanding = standingsMap.get(team.id);
-        if (existingStanding) {
-          return existingStanding;
-        }
-        return {
-          id: `temp-${team.id}`,
-          teamId: team.id,
-          leagueId: team.leagueId || selectedLeague,
-          categoryId: team.categoryId || selectedCategory,
-          zoneId: team.zoneId || selectedZone,
-          puntos: 0,
-          pj: 0,
-          won: 0,
-          drawn: 0,
-          lost: 0,
-          goalsFor: 0,
-          goalsAgainst: 0
-        };
-      })
-      .filter((s): s is Standing => !!s); // Filtra nulls
-    return result;
-  }, [selectedZone, zoneTeams, localStandings, selectedLeague, selectedCategory]);
-  
-  // Ordenar standings solo por puntos de mayor a menor
-  const sortedStandings = [...localStandings].sort((a, b) => {
-    // Ordenar por puntos (desc)
-    if (b.puntos !== a.puntos) return b.puntos - a.puntos;
-    // Diferencia de gol (desc)
-    const aDiff = (a.goalsFor || 0) - (a.goalsAgainst || 0);
-    const bDiff = (b.goalsFor || 0) - (b.goalsAgainst || 0);
-    if (bDiff !== aDiff) return bDiff - aDiff;
-    // Goles a favor (desc)
-    if ((b.goalsFor || 0) !== (a.goalsFor || 0)) return (b.goalsFor || 0) - (a.goalsFor || 0);
-    // Menos partidos jugados primero (asc)
-    return (a.pj || 0) - (b.pj || 0);
-  });
+    const loadData = async () => {
+      if (!selectedZone || !selectedCategory) return;
+      setLoading(true);
+      try {
+        const posiciones = await obtenerPosicionesPorZonaYCategoria(
+          String(selectedZone),
+          String(selectedCategory)
+        );
+        const standingsData = posiciones.map(pos => ({
+          id: `${pos.equipo_id}-${pos.zona_id}-${pos.categoria_id}`,
+          teamId: String(pos.equipo_id),
+          leagueId: selectedLeague,
+          categoryId: String(pos.categoria_id),
+          zoneId: String(pos.zona_id),
+          puntos: Number(pos.puntos) || 0,
+          pj: Number(pos.pj) || 0,
+          equipo_nombre: pos.equipo_nombre || ''
+        }));
+        setLocalStandings(standingsData);
+        console.log('Equipos globales:', teams);
+        console.log('Standings cargados:', standingsData);
+      } catch (error) {
+        console.error('Error loading standings:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadData();
+  }, [selectedZone, selectedCategory, selectedLeague, teams]);
+
+  // Elimina completeStandings y zoneTeams del render y lógica de standings
+  // Simplifica sortedStandings para que use solo localStandings y teams, igual que la tabla pública
+  const sortedStandings = useMemo(() => {
+    // Filtrar standings que tengan un equipo válido en teams
+    const validStandings = localStandings.filter(standing => 
+      teams.some(team => String(team.id) === String(standing.teamId))
+    );
+    // Ordenar igual que la tabla pública
+    return validStandings.sort((a, b) => {
+      if (b.puntos !== a.puntos) return b.puntos - a.puntos;
+      const aDiff = (a.goalsFor || 0) - (a.goalsAgainst || 0);
+      const bDiff = (b.goalsFor || 0) - (b.goalsAgainst || 0);
+      if (bDiff !== aDiff) return bDiff - aDiff;
+      if ((b.goalsFor || 0) !== (a.goalsFor || 0)) return (b.goalsFor || 0) - (a.goalsFor || 0);
+      if ((a.pj || 0) !== (b.pj || 0)) return (a.pj || 0) - (b.pj || 0);
+      const teamA = teams.find(t => t.id === a.teamId)?.name || '';
+      const teamB = teams.find(t => t.id === b.teamId)?.name || '';
+      return teamA.localeCompare(teamB);
+    });
+  }, [localStandings, teams]);
+
+  // Logs de depuración para comparar con la tabla pública
+  useEffect(() => {
+    console.log('Raw standings data (admin):', localStandings);
+    console.log('All teams (admin):', teams);
+    console.log('Sorted standings (admin):', sortedStandings);
+  }, [localStandings, teams, sortedStandings]);
   
   // Handlers de cambio de filtros
   const handleLeagueChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -384,51 +397,28 @@ const StandingsPage: React.FC = () => {
   };
   
   // Get team name by ID
-  const getTeamName = useCallback((teamId: string): string => {
-    const team = teams.find(team => team.id === teamId);
-    return team ? team.name : 'Equipo desconocido';
+  const getTeamName = useCallback((teamId: string | number): string => {
+    // Normalizar a string para comparación
+    const idToFind = String(teamId);
+    const team = teams.find(t => String(t.id) === idToFind);
+    
+    console.log(`Buscando equipo: ID ${teamId}`, {
+      encontrado: !!team,
+      equiposDisponibles: teams.map(t => ({id: t.id, name: t.name}))
+    });
+    
+    return team?.name || 'Equipo desconocido';
   }, [teams]);
+
+  // Asegura que manualOrder esté declarado como estado:
+  const [manualOrder, setManualOrder] = useState<StandingWithOrder[]>([]);
   
   // Estado para saber si hay cambios de orden no guardados
   const [orderDirty, setOrderDirty] = useState(false);
   const [savingOrder, setSavingOrder] = useState(false);
   const [orderSaved, setOrderSaved] = useState(false);
-
-  // getOrderedStandings debe ir antes de cualquier uso
-  const getOrderedStandings = (): StandingWithOrder[] => {
-    // Usar 0 si orden es undefined
-    const allOrden = sortedStandings.map(s => s.orden ?? 0);
-    // Solo usar el campo 'orden' si hay algún valor realmente distinto Y el usuario guardó el orden manual
-    const hayOrdenManual = allOrden.some((v, _, arr) => v !== arr[0]) && orderDirty === false;
-    if (hayOrdenManual) {
-      // Ordenar por orden manual, luego puntos
-      return [...(sortedStandings as StandingWithOrder[])]
-        .sort((a, b) => {
-          const ordenA = a.orden ?? 0;
-          const ordenB = b.orden ?? 0;
-          if (ordenA !== ordenB) {
-            return ordenA - ordenB;
-          }
-          return Number(b.puntos) - Number(a.puntos);
-        });
-    }
-    // Si no hay orden manual, ordenar solo por puntos (y criterios secundarios)
-    return [...(sortedStandings as StandingWithOrder[])]
-      .sort((a, b) => {
-        if (Number(b.puntos) !== Number(a.puntos)) {
-          return Number(b.puntos) - Number(a.puntos);
-        }
-        // Si puntos iguales, diferencia de gol
-        const aDiff = Number(a.goalsFor) - Number(a.goalsAgainst);
-        const bDiff = Number(b.goalsFor) - Number(b.goalsAgainst);
-        if (bDiff !== aDiff) return bDiff - aDiff;
-        // Si igual, goles a favor
-        return Number(b.goalsFor) - Number(a.goalsFor);
-      });
-  };
-  const [manualOrder, setManualOrder] = useState<StandingWithOrder[]>(getOrderedStandings());
-
-  // 2. Funciones para mover arriba/abajo
+  
+  // 1. Funciones para mover arriba/abajo
   const moveStanding = (index: number, direction: 'up' | 'down') => {
     setManualOrder(prev => {
       const newOrder: StandingWithOrder[] = [...prev];
@@ -487,7 +477,7 @@ const StandingsPage: React.FC = () => {
     }
     
     if (field === 'teamName') {
-      const standing = completeStandings.find(s => s.id === id);
+      const standing = localStandings.find(s => s.id === id);
       if (standing) {
         updateTeam(standing.teamId, { name: value });
       }
@@ -519,99 +509,76 @@ const StandingsPage: React.FC = () => {
       return newSet;
     });
     // Actualizar manualOrder para reflejar el nuevo orden
-    setManualOrder(getOrderedStandings());
-  }, [completeStandings, updateTeam, getOrderedStandings]);
+    setManualOrder([...sortedStandings]);
+  }, [localStandings, updateTeam, sortedStandings]);
   
   // Función para guardar una fila - ACTUALIZADA para el nuevo esquema
   const handleSaveRow = useCallback(async (standing: Standing) => {
-    forceAllRowsBlur();
-    if (editingCell !== null) {
-      setTimeout(() => handleSaveRow(standing), 0);
-      return;
-    }
-    // Buscar el standing actualizado por id o por combinación de claves
-    const currentStanding = sortedStandings.find(s => s.id === standing.id)
-      || sortedStandings.find(s =>
-        s.teamId === standing.teamId &&
-        s.zoneId === standing.zoneId &&
-        s.categoryId === standing.categoryId
-      );
-    if (!currentStanding) {
-      setError('Error: No se encontraron los datos actualizados.');
-      return;
-    }
-    const standingToSave = {
-      ...currentStanding,
-      leagueId: selectedLeague,
-      categoryId: selectedCategory,
-      zoneId: selectedZone
-    };
-    if (!validateStandingData(standingToSave)) {
-      setError('Datos inválidos. Verifica puntos y partidos jugados.');
-      return;
-    }
-    setLoading(true);
-    setError(null);
     try {
-      // Buscar el nombre real del equipo desde la base
-      let teamName = '';
-      try {
-        teamName = await obtenerEquipoPorId(standingToSave.teamId);
-      } catch (e) {
-        teamName = '';
+      setLoading(true);
+      setError(null);
+
+      // Validar existencia del equipo
+      const teamExists = teams.some(t => String(t.id) === String(standing.teamId));
+      if (!teamExists) {
+        throw new Error(`El equipo con ID ${standing.teamId} no existe`);
       }
-      if (String(standingToSave.id).startsWith('temp-')) {
-        // Crear nueva posición con categoria_id y valores editados
-        const posicionData = {
-          equipo_id: standingToSave.teamId,
-          zona_id: standingToSave.zoneId,
-          categoria_id: standingToSave.categoryId,
-          equipo_nombre: teamName,
-          puntos: Number(standingToSave.puntos) ?? 0,
-          pj: Number(standingToSave.pj) ?? 0
-        };
-        const result = await crearPosicion(posicionData);
-        if (!result || !result[0]) {
-          throw new Error('No se recibió respuesta válida de la base de datos');
-        }
-        const newId = `${standingToSave.teamId}-${standingToSave.zoneId}-${standingToSave.categoryId}`;
-        setLocalStandings(prev => {
-          return prev.map(s =>
-            s.id === standingToSave.id
-              ? { ...standingToSave, id: newId }
-              : s
-          );
-        });
-        await loadStandings();
+
+      // Normalizar tipos y validar datos
+      const dataToSave = {
+        equipo_id: String(standing.teamId),
+        zona_id: String(standing.zoneId),
+        categoria_id: String(standing.categoryId),
+        puntos: Number(standing.puntos),
+        pj: Number(standing.pj),
+        equipo_nombre: standing.equipo_nombre?.trim() || getTeamName(standing.teamId)
+      };
+      if (dataToSave.puntos < 0) throw new Error('Los puntos no pueden ser negativos');
+      if (dataToSave.pj < 0) throw new Error('Los partidos jugados no pueden ser negativos');
+
+      console.log('Contexto al guardar:', {
+        standing,
+        dataToSave,
+        team: teams.find(t => String(t.id) === String(standing.teamId)),
+        // zones, categories pueden agregarse si están en contexto
+      });
+
+      if (String(standing.id).startsWith('temp-')) {
+        // Crear nueva posición
+        const result = await crearPosicion(dataToSave);
+        console.log('Resultado creación:', result);
       } else {
-        // Actualizar posición existente usando los tres IDs
-        const updateData = {
-          equipo_nombre: teamName,
-          puntos: Number(standingToSave.puntos) ?? 0,
-          pj: Number(standingToSave.pj) ?? 0
-        };
-        await actualizarPosicion(
-          standingToSave.teamId,
-          standingToSave.zoneId,
-          standingToSave.categoryId,
-          updateData
+        // Actualizar existente
+        const result = await actualizarPosicion(
+          dataToSave.equipo_id,
+          dataToSave.zona_id,
+          dataToSave.categoria_id,
+          {
+            puntos: dataToSave.puntos,
+            pj: dataToSave.pj,
+            equipo_nombre: dataToSave.equipo_nombre
+          }
         );
-        await loadStandings();
+        console.log('Resultado actualización:', result);
       }
+
+      await loadStandings();
       setModifiedRows(prev => {
         const newSet = new Set(prev);
-        newSet.delete(String(standing.id));
+        newSet.delete(standing.id);
         return newSet;
       });
-      setError(null);
-      // Actualizar manualOrder para reflejar el nuevo orden
-      setManualOrder(getOrderedStandings());
-    } catch (error) {
-      setError(`Error al guardar: ${error instanceof Error ? error.message : 'Error desconocido'}`);
+    } catch (error: any) {
+      console.error('Error detallado:', {
+        error,
+        standing,
+        team: teams.find(t => String(t.id) === String(standing.teamId))
+      });
+      setError(`Error al guardar: ${error.message}`);
     } finally {
       setLoading(false);
     }
-  }, [editingCell, sortedStandings, selectedLeague, selectedCategory, selectedZone, validateStandingData, getTeamName, crearPosicion, actualizarPosicion, loadStandings, setManualOrder, getOrderedStandings]);
+  }, [teams, getTeamName, crearPosicion, actualizarPosicion, loadStandings, setModifiedRows]);
   
   // Forzar blur de todos los inputs editables antes de guardar todo
   const forceAllRowsBlur = () => {
@@ -753,9 +720,8 @@ const StandingsPage: React.FC = () => {
     console.log(' Estado actual:'); 
     console.log('- selectedZone:', selectedZone); 
     console.log('- localStandings:', localStandings); 
-    console.log('- completeStandings:', completeStandings); 
     console.log('- modifiedRows:', Array.from(modifiedRows)); 
-  }, [selectedZone, localStandings, completeStandings, modifiedRows]); 
+  }, [selectedZone, localStandings, modifiedRows]); 
   
   // 6. VERIFICAR que las funciones de Supabase estén bien importadas 
   // Agregar logging en las funciones de Supabase para depuración 
@@ -788,92 +754,32 @@ const StandingsPage: React.FC = () => {
     testSupabaseFunctions(); 
   }, []);
   
-  // Al agregar un equipo, solo agregarlo al estado local con id temporal, sin forzar edición
-  const handleAddExistingTeam = useCallback(async () => {
-    if (!selectedTeamId || !selectedZone || !selectedCategory) return;
-    const alreadyExists = localStandings.some(
-      s => s.teamId === selectedTeamId &&
-          String(s.zoneId) === String(selectedZone) &&
-          String(s.categoryId) === String(selectedCategory)
-    );
-    if (alreadyExists) {
-      setError('Ese equipo ya está en la zona y categoría seleccionada.');
+  // 1. Eliminar referencias a createStanding y SupabaseService.createStanding, usar solo crearPosicion y obtenerPosicionesPorZonaYCategoria
+  // 2. Modificar handleAddStanding para usar crearPosicion y refrescar posiciones
+  const handleAddStanding = async (newStandingData: any) => {
+    // Obtener el nombre del equipo usando getTeamName
+    const equipoNombre = getTeamName(newStandingData.teamId);
+    
+    // Validar que zona y categoría sean válidas
+    if (!selectedZone || !selectedCategory) {
+      setError('Debes seleccionar una zona y una categoría válidas.');
       return;
     }
-    const team = teams.find(t => t.id === selectedTeamId);
-    if (!team) return;
-    setLoading(true);
-    setError(null);
-    try {
-      const newStanding: any = {
-        id: `temp-${Date.now()}`,
-        teamId: team.id,
-        leagueId: selectedLeague,
-        categoryId: selectedCategory,
-        zoneId: selectedZone,
-        puntos: 0,
-        pj: 0,
-        won: 0,
-        drawn: 0,
-        lost: 0,
-        goalsFor: 0,
-        goalsAgainst: 0,
-        equipo_nombre: team.name
-      };
-      setLocalStandings(prev => [...prev, newStanding]);
-      addStanding(newStanding);
-      setIsAddingTeam(false);
-      setSelectedTeamId('');
-    } catch (error) {
-      console.error('Error agregando equipo:', error);
-      setError('Error al agregar el equipo.');
-    } finally {
-      setLoading(false);
-    }
-  }, [selectedTeamId, selectedZone, selectedCategory, localStandings, teams, selectedLeague, addStanding]);
 
-  const onSubmitNewTeam = useCallback(async (data: any) => {
-    if (!data.teamName || !selectedLeague || !selectedCategory || !selectedZone) {
-      setError('Faltan datos requeridos para crear el equipo.');
-      return;
-    }
-    setLoading(true);
-    setError(null);
-    try {
-      const newTeam: Team = {
-        id: `team-${Date.now()}`,
-        name: data.teamName,
-        leagueId: selectedLeague,
-        categoryId: selectedCategory,
-        zoneId: selectedZone
-      };
-      await addTeam(newTeam);
-      const newStanding: any = {
-        id: `temp-${Date.now()}`,
-        teamId: newTeam.id,
-        leagueId: selectedLeague,
-        categoryId: selectedCategory,
-        zoneId: selectedZone,
-        puntos: 0,
-        pj: 0,
-        won: 0,
-        drawn: 0,
-        lost: 0,
-        goalsFor: 0,
-        goalsAgainst: 0,
-        equipo_nombre: newTeam.name
-      };
-      setLocalStandings(prev => [...prev, newStanding]);
-      addStanding(newStanding);
-      setIsAddingTeam(false);
-    } catch (error) {
-      console.error('Error creando equipo:', error);
-      setError('Error al crear el equipo.');
-    } finally {
-      setLoading(false);
-    }
-  }, [selectedLeague, selectedCategory, selectedZone, addTeam, addStanding]);
-
+    const newPosicion = {
+      equipo_id: String(newStandingData.teamId),
+      zona_id: String(selectedZone), // Usar el valor real
+      categoria_id: String(selectedCategory), // Usar el valor real
+      equipo_nombre: equipoNombre, // Usar el nombre del equipo obtenido
+      puntos: 0,
+      pj: 0
+    };
+    console.log('Guardando nueva posición:', newPosicion);
+    const result = await crearPosicion(newPosicion);
+    console.log('Respuesta de crearPosicion:', result);
+    await loadStandings(); // Refresca desde posiciones_editable
+  };
+  
   // Handler para eliminar posición/standing
   const handleDeletePosition = async (standing: Standing) => {
     console.log('Intentando eliminar standing:', standing);
@@ -901,63 +807,6 @@ const StandingsPage: React.FC = () => {
     } catch (error) {
       setError(`Error al eliminar la posición: ${error instanceof Error ? error.message : 'Error desconocido'}`);
     }
-  };
-  
-  // Filtrado de equipos y standings
-  const filteredEquipos = useMemo(() => {
-    if (isMundialito) {
-      return teams.filter(
-        e => String(e.leagueId) === String(selectedLeague) &&
-             String(e.categoryId) === String(selectedCategory)
-      );
-    } else {
-      return teams.filter(
-        e => String(e.zoneId) === String(selectedZone)
-      );
-    }
-  }, [teams, selectedLeague, selectedCategory, selectedZone, isMundialito]);
-
-  const filteredStandings = useMemo(() => {
-    return localStandings.filter(
-      s => String(s.leagueId) === String(selectedLeague) &&
-          String(s.zoneId) === String(selectedZone) &&
-          String(s.categoryId) === String(selectedCategory)
-    );
-  }, [localStandings, selectedLeague, selectedZone, selectedCategory]);
-  
-  // Optimistic update para standings
-  const optimisticUpdateStanding = (id: string, data: Partial<Standing>) => {
-    setLocalStandings(prev => prev.map(s =>
-      s.id === id
-        ? { ...s, ...data, zoneId: selectedZone, categoryId: selectedCategory, leagueId: selectedLeague }
-        : s
-    ));
-    setModifiedRows(prev => new Set(prev).add(id));
-  };
-
-  // 1. Eliminar referencias a createStanding y SupabaseService.createStanding, usar solo crearPosicion y obtenerPosicionesPorZonaYCategoria
-  // 2. Modificar handleAddStanding para usar crearPosicion y refrescar posiciones
-  const handleAddStanding = async (newStandingData: any) => {
-    // Buscar el nombre real del equipo desde la base
-    let equipoNombre = '';
-    try {
-      equipoNombre = await obtenerEquipoPorId(newStandingData.teamId);
-    } catch (e) {
-      equipoNombre = '';
-    }
-
-    const newPosicion = {
-      equipo_id: newStandingData.teamId,
-      zona_id: String(Number(selectedZone)),
-      categoria_id: String(Number(selectedCategory)),
-      equipo_nombre: equipoNombre,
-      puntos: 0,
-      pj: 0
-    };
-    console.log('Guardando nueva posición:', newPosicion);
-    const result = await crearPosicion(newPosicion);
-    console.log('Respuesta de crearPosicion:', result);
-    await loadStandings(); // Refresca desde posiciones_editable
   };
   
   // 2. Limpieza robusta al cambiar filtros
@@ -1348,7 +1197,7 @@ const StandingsPage: React.FC = () => {
                             </div>
                           </td>
                           <EditableCell
-                            value={standing.equipo_nombre || getTeamName(standing.teamId)}
+                            value={getTeamName(standing.teamId)}
                             standing={standing}
                             field="teamName"
                             onUpdate={handleUpdate}
@@ -1445,7 +1294,7 @@ const StandingsPage: React.FC = () => {
                         </div>
                       </div>
                       <div className="flex flex-col space-y-1">
-                        <div className="text-base font-semibold text-gray-900">{standing.equipo_nombre || getTeamName(standing.teamId)}</div>
+                        <div className="text-base font-semibold text-gray-900">{getTeamName(standing.teamId) || 'Equipo desconocido'}</div>
                         <div className="flex flex-wrap gap-2 mt-1">
                           <span className="bg-gray-200 text-gray-700 px-2 py-0.5 rounded text-xs font-semibold">PJ: {standing.pj}</span>
                           <span className="bg-indigo-200 text-indigo-800 px-2 py-0.5 rounded text-xs font-semibold">PTS: {standing.puntos}</span>

@@ -646,11 +646,35 @@ static async updateTeam(
 
       const fixtureId = fixtureResult[0].id;
 
+      // Obtener todos los equipos para mapear UUID a ID numérico
+      const allTeams = await SupabaseService.getAllTeams();
+      // Crear un mapa de UUID a ID numérico
+      const uuidToNumericId: Record<string, number> = {};
+      for (const team of allTeams) {
+        if (team.id && (team as any).numericId) {
+          uuidToNumericId[team.id] = (team as any).numericId;
+        }
+      }
+
+      // Obtener todas las zonas para mapear UUID a ID numérico de zona
+      const allZones = await SupabaseService.getZonesByLeague(fixtureData.ligaId);
+      const zoneUuidToNumericId: Record<string, number> = {};
+      for (const zone of allZones) {
+        if (zone.id && (zone as any).numericId) {
+          zoneUuidToNumericId[zone.id] = (zone as any).numericId;
+        }
+      }
+
       for (const match of fixtureData.matches) {
+        // Mapear los IDs de equipo y zona a numérico si es posible
+        const homeTeamNumericId = uuidToNumericId[match.homeTeamId] || Number(match.homeTeamId);
+        const awayTeamNumericId = uuidToNumericId[match.awayTeamId] || Number(match.awayTeamId);
+        const zoneNumericId = zoneUuidToNumericId[fixtureData.zonaId] || Number(fixtureData.zonaId);
+
         const matchResult = await crearPartidoConFixture(
-          Number(match.homeTeamId),
-          Number(match.awayTeamId),
-          Number(fixtureData.zonaId),
+          homeTeamNumericId,
+          awayTeamNumericId,
+          zoneNumericId,
           fixtureData.fechaPartido,
           Number(fixtureId)
         );

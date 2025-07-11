@@ -192,7 +192,7 @@ const PublicStandingsTable: React.FC<PublicStandingsTableProps> = ({ leagueId, z
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <span className="text-lg font-bold text-gray-900">{standing.equipo_nombre && standing.equipo_nombre.trim() !== '' ? standing.equipo_nombre : team?.name || standing.teamId}</span>
+                        <span className="text-lg font-bold text-gray-900">{team?.name || standing.equipo_nombre || standing.teamId}</span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700 text-center font-medium">{standing.pj}</td>
                       <td className="px-6 py-4 whitespace-nowrap text-center"><span className="text-lg font-bold">{standing.puntos}</span></td>

@@ -1,10 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useLeague, Match, Team } from '../../contexts/LeagueContext';
 import { useForm, useFieldArray } from 'react-hook-form';
-import { Plus, Edit, Trash2, Calendar, Save, X, Users } from 'lucide-react';
+import { Plus, Edit, Trash2, Calendar, Save, X, Users, AlertTriangle } from 'lucide-react';
 import { cn } from '../../utils/cn';
 import { SupabaseService } from '../../services/supabaseService';
 import { formatLocalDate } from '../../utils/dateUtils';
+import FixtureForm from './FixtureForm';
+import FixtureList from './FixtureList';
 
 interface FixtureFormData {
   date: string;
@@ -23,14 +25,18 @@ interface FixtureFormData {
   }[];
 }
 
-// Remover completamente la línea de hasLoadedOnce
-// const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
+interface FormState {
+  isAdding: boolean;
+  editingId: string | null;
+  isLoading: boolean;
+  isSubmitting: boolean;
+}
 
 const FixturesPage: React.FC = () => {
   const { 
     leagues, 
     fixtures, 
-    teams, // Agregar teams aquí
+    teams,
     addFixture, 
     updateFixture, 
     deleteFixture, 
@@ -42,28 +48,34 @@ const FixturesPage: React.FC = () => {
     getCategoriesByZone
   } = useLeague();
   
-  const [isAdding, setIsAdding] = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [selectedLeague, setSelectedLeague] = useState<string>('');
-  const [selectedCategory, setSelectedCategory] = useState<string>('');
-  const [selectedZone, setSelectedZone] = useState<string>('');
-  const [refreshKey, setRefreshKey] = useState(0);
-  const [isLoading, setIsLoading] = useState(true);
+  // Consolidar estado del formulario
+  const [formState, setFormState] = useState<FormState>({
+    isAdding: false,
+    editingId: null,
+    isLoading: true,
+    isSubmitting: false
+  });
   
-  // ELIMINADO: Verificar si la liga seleccionada es "Liga Participando"
-  // const isLigaParticipando = selectedLeague === 'liga_masculina';
+  // Estados de filtros
+  const [filters, setFilters] = useState({
+    selectedLeague: '',
+    selectedCategory: '',
+    selectedZone: ''
+  });
   
-  // Get form handling
-  const { register, handleSubmit, control, reset, watch, setValue, formState: { errors } } = useForm<FixtureFormData>({
+  // Form handling
+  const form = useForm<FixtureFormData>({
     defaultValues: {
-      leagueId: selectedLeague,
-      categoryId: selectedCategory,
-      zoneId: selectedZone,
+      leagueId: '',
+      categoryId: '',
+      zoneId: '',
       date: '',
       matchDate: '',
       matches: [{ homeTeamId: '', awayTeamId: '', played: false }]
     }
   });
+  
+  const { register, handleSubmit, control, reset, watch, setValue, formState: { errors } } = form;
   
   // Field array for matches
   const { fields, append, remove } = useFieldArray({
@@ -71,133 +83,161 @@ const FixturesPage: React.FC = () => {
     name: 'matches'
   });
   
-  // Watch form values for dynamic dropdowns
-  const watchLeagueId = watch('leagueId');
-  const watchCategoryId = watch('categoryId');
-  const watchZoneId = watch('zoneId');
+  // Memoized computed values
+  const watchedValues = {
+    leagueId: watch('leagueId'),
+    categoryId: watch('categoryId'),
+    zoneId: watch('zoneId')
+  };
   
-  // Get categories for selected league
-  const leagueCategories = getCategoriesByLeague(selectedLeague);
+  const isLigaMasculina = useMemo(() => 
+    filters.selectedLeague === 'liga_masculina', 
+    [filters.selectedLeague]
+  );
   
-  // Get zones for selected category
-  const categoryZones = getZonesByCategory(selectedCategory);
+  const computedData = useMemo(() => {
+    const leagueCategories = getCategoriesByLeague(filters.selectedLeague);
+    const categoryZones = getZonesByCategory(filters.selectedCategory);
+    const zoneTeams = getTeamsByZone(filters.selectedZone);
+    const formZoneTeams = getTeamsByZone(watchedValues.zoneId);
+    const leagueTeams = teams.filter(team => team.leagueId === watchedValues.leagueId);
+    
+    const availableZones = isLigaMasculina 
+      ? getZonesByLeague(filters.selectedLeague) 
+      : getZonesByCategory(filters.selectedCategory);
+      
+    const availableCategories = isLigaMasculina && filters.selectedZone 
+      ? getCategoriesByZone(filters.selectedZone) 
+      : getCategoriesByLeague(filters.selectedLeague);
+    
+    return {
+      leagueCategories,
+      categoryZones,
+      zoneTeams,
+      formZoneTeams,
+      leagueTeams,
+      availableZones,
+      availableCategories
+    };
+  }, [
+    filters.selectedLeague,
+    filters.selectedCategory,
+    filters.selectedZone,
+    watchedValues.leagueId,
+    watchedValues.zoneId,
+    isLigaMasculina,
+    teams,
+    getCategoriesByLeague,
+    getZonesByCategory,
+    getTeamsByZone,
+    getZonesByLeague,
+    getCategoriesByZone
+  ]);
   
-  // Get teams for selected zone
-  const zoneTeams = getTeamsByZone(selectedZone);
+  // Filtrado de fixtures
+  const filteredFixtures = useMemo(() => {
+    if (!filters.selectedLeague) return [];
+    // Ordenar por fecha y luego por número de zona
+    return fixtures
+      .filter(fixture => fixture.leagueId === filters.selectedLeague)
+      .sort((a, b) => {
+        // 1. Ordenar por fecha
+        if (a.matchDate && b.matchDate) {
+          const dateDiff = new Date(a.matchDate).getTime() - new Date(b.matchDate).getTime();
+          if (dateDiff !== 0) return dateDiff;
+        }
+        // 2. Ordenar por número de zona
+        const getZoneNumber = (zoneId: string) => {
+          const zone = computedData.availableZones.find(z => z.id === zoneId);
+          // Extraer el primer número que aparezca en el nombre de la zona
+          const match = zone?.name?.match(/\d+/);
+          return match ? parseInt(match[0], 10) : 9999;
+        };
+        return getZoneNumber(a.zoneId) - getZoneNumber(b.zoneId);
+      });
+  }, [fixtures, filters.selectedLeague, computedData.availableZones]);
   
-  // Modificar el useEffect para cargar fixtures
+  // Fixtures inválidos
+  const invalidFixtures = useMemo(() => 
+    fixtures.filter(f => f.invalidLeagueId), 
+    [fixtures]
+  );
+  
+  // Función para obtener nombre del equipo
+  const getTeamName = useCallback((teamId: string): string => {
+    const team = teams.find(team => team.id === teamId);
+    return team ? team.name : 'Equipo desconocido';
+  }, [teams]);
+  
+  // Carga inicial
   useEffect(() => {
     const loadFixtures = async () => {
       try {
         console.log('Loading fixtures from Supabase...');
-        setIsLoading(true);
         await refreshFixtures();
         console.log('Fixtures loaded successfully.');
       } catch (error) {
         console.error('Error loading fixtures:', error);
       } finally {
-        setIsLoading(false);
+        setFormState(prev => ({ ...prev, isLoading: false }));
       }
     };
-  
-    loadFixtures();
-  }, []); // Remover refreshFixtures de las dependencias
-
-  // Inicializar filtros correctamente
-  // 1. Inicialización de liga (sin dependencias circulares)
-  useEffect(() => {
-    if (leagues.length > 0 && !selectedLeague) {
-      const firstLeague = leagues[0];
-      setSelectedLeague(firstLeague.id);
-      setSelectedCategory('');
-      setSelectedZone('');
-    }
-  }, [leagues]); // Solo depende de leagues
-  
-  // 2. Auto-selección de categoría cuando cambia la liga
-  useEffect(() => {
-    if (selectedLeague) {
-      const categories = getCategoriesByLeague(selectedLeague);
-      if (categories.length > 0 && !selectedCategory) {
-        setSelectedCategory(categories[0].id);
-      }
-    }
-  }, [selectedLeague, getCategoriesByLeague]);
-  
-  // 3. Auto-selección de zona cuando cambia la categoría
-  useEffect(() => {
-    if (selectedCategory) {
-      const zones = getZonesByCategory(selectedCategory);
-      if (zones.length > 0 && !selectedZone) {
-        setSelectedZone(zones[0].id);
-      }
-    }
-  }, [selectedCategory, getZonesByCategory]);
-  
-  // Forzar valores vacíos al cargar la página
-  useEffect(() => {
-    setSelectedCategory('');
-    setSelectedZone('');
-  }, []); // Solo se ejecuta una vez al montar el componente
-  
-  // Effect para debugging - SIN llamadas a refreshFixtures
-  useEffect(() => {
-    console.log('=== FIXTURES UPDATED IN COMPONENT ===');
-    console.log('Total fixtures:', fixtures.length);
-    console.log('Selected filters:', {
-      league: selectedLeague,
-      category: selectedCategory, 
-      zone: selectedZone
-    });
-    console.log('Current isLoading state:', isLoading);
     
-    // Mostrar los IDs únicos de cada fixture
-    if (fixtures.length > 0) {
-      console.log('Fixture IDs breakdown:');
-      fixtures.forEach((fixture, index) => {
-        console.log(`Fixture ${index + 1}:`, {
-          id: fixture.id,
-          leagueId: fixture.leagueId,
-          categoryId: fixture.categoryId,
-          zoneId: fixture.zoneId,
-          date: fixture.date
-        });
-      });
-    } else {
-      console.log('No fixtures found in state');
+    loadFixtures();
+  }, [refreshFixtures]);
+  
+  // Inicialización de filtros
+  useEffect(() => {
+    if (leagues.length > 0 && !filters.selectedLeague) {
+      const firstLeague = leagues[0];
+      setFilters(prev => ({
+        ...prev,
+        selectedLeague: firstLeague.id,
+        selectedCategory: '',
+        selectedZone: ''
+      }));
     }
-  }, [fixtures, selectedLeague, selectedCategory, selectedZone, isLoading]);
+  }, [leagues, filters.selectedLeague]);
   
-  // Filtrado de fixtures solo por liga seleccionada
-  const filteredFixtures = React.useMemo(() => {
-    if (!selectedLeague) return [];
-    return fixtures.filter(fixture => fixture.leagueId === selectedLeague);
-  }, [fixtures, selectedLeague]);
+  // Auto-selección de categoría
+  useEffect(() => {
+    if (filters.selectedLeague && computedData.availableCategories.length > 0 && !filters.selectedCategory) {
+      setFilters(prev => ({
+        ...prev,
+        selectedCategory: computedData.availableCategories[0].id
+      }));
+    }
+  }, [filters.selectedLeague, computedData.availableCategories, filters.selectedCategory]);
   
-  // --- ADVERTENCIA DE FIXTURES INVÁLIDOS ---
-  const invalidFixtures = fixtures.filter(f => f.invalidLeagueId);
-
-  const handleAddClick = () => {
-    setIsAdding(true);
-    setEditingId(null);
+  // Auto-selección de zona
+  useEffect(() => {
+    if (filters.selectedCategory && computedData.availableZones.length > 0 && !filters.selectedZone) {
+      setFilters(prev => ({
+        ...prev,
+        selectedZone: computedData.availableZones[0].id
+      }));
+    }
+  }, [filters.selectedCategory, computedData.availableZones, filters.selectedZone]);
+  
+  // Handlers
+  const handleAddClick = useCallback(() => {
+    setFormState(prev => ({ ...prev, isAdding: true, editingId: null }));
     reset({
-      leagueId: selectedLeague,
-      categoryId: selectedCategory,
-      zoneId: selectedZone,
+      leagueId: filters.selectedLeague,
+      categoryId: filters.selectedCategory,
+      zoneId: filters.selectedZone,
       date: '',
       matchDate: '',
       matches: [{ homeTeamId: '', awayTeamId: '', played: false }]
     });
-  };
+  }, [filters, reset]);
   
-  const handleEditClick = (fixtureId: string) => {
+  const handleEditClick = useCallback((fixtureId: string) => {
     const fixture = fixtures.find(f => f.id === fixtureId);
     if (!fixture) return;
     
-    setIsAdding(false);
-    setEditingId(fixtureId);
+    setFormState(prev => ({ ...prev, isAdding: false, editingId: fixtureId }));
     
-    // Convert matches to form format
     const formattedMatches = fixture.matches.map(match => ({
       homeTeamId: match.homeTeamId,
       awayTeamId: match.awayTeamId,
@@ -217,185 +257,200 @@ const FixturesPage: React.FC = () => {
       matches: formattedMatches
     });
     
-    // Update selections
-    setSelectedLeague(fixture.leagueId);
-    setSelectedCategory(fixture.categoryId);
-    setSelectedZone(fixture.zoneId);
-  };
+    setFilters({
+      selectedLeague: fixture.leagueId,
+      selectedCategory: fixture.categoryId,
+      selectedZone: fixture.zoneId
+    });
+  }, [fixtures, reset]);
   
-  const handleCancelClick = () => {
-    setIsAdding(false);
-    setEditingId(null);
-  };
+  const handleCancelClick = useCallback(() => {
+    setFormState(prev => ({ ...prev, isAdding: false, editingId: null }));
+    reset();
+  }, [reset]);
   
-  const handleDeleteFixture = (id: string) => {
-    if (window.confirm('¿Estás seguro de eliminar este fixture? Esta acción no se puede deshacer.')) {
-      deleteFixture(id);
-    }
-  };
-  
-  // Función onSubmit corregida
-  const onSubmit = async (data: FixtureFormData) => {
+  const handleDeleteFixture = useCallback(async (id: string) => {
+    const confirmed = window.confirm('¿Estás seguro de eliminar este fixture? Esta acción no se puede deshacer.');
+    if (!confirmed) return;
+    
     try {
-      setIsLoading(true);
-      // Filtrar partidos válidos
+      setFormState(prev => ({ ...prev, isLoading: true }));
+      await deleteFixture(id);
+      await refreshFixtures();
+    } catch (error) {
+      console.error('Error deleting fixture:', error);
+      alert('Error al eliminar el fixture');
+    } finally {
+      setFormState(prev => ({ ...prev, isLoading: false }));
+    }
+  }, [deleteFixture, refreshFixtures]);
+  
+  const handleFilterChange = useCallback((type: 'league' | 'category' | 'zone', value: string) => {
+    setFilters(prev => {
+      const newFilters = { ...prev };
+      
+      switch (type) {
+        case 'league':
+          newFilters.selectedLeague = value;
+          newFilters.selectedCategory = '';
+          newFilters.selectedZone = '';
+          break;
+        case 'category':
+          newFilters.selectedCategory = value;
+          if (!isLigaMasculina) {
+            newFilters.selectedZone = '';
+          }
+          break;
+        case 'zone':
+          newFilters.selectedZone = value;
+          break;
+      }
+      
+      return newFilters;
+    });
+  }, [isLigaMasculina]);
+  
+  const onSubmit = useCallback(async (data: FixtureFormData) => {
+    try {
+      setFormState(prev => ({ ...prev, isSubmitting: true }));
+      
+      // Validar partidos
       const validMatches = data.matches.filter(
-        match => match.homeTeamId && match.awayTeamId && match.homeTeamId !== match.awayTeamId
+        match => match.homeTeamId && 
+                match.awayTeamId && 
+                match.homeTeamId !== match.awayTeamId
       );
+      
       if (validMatches.length === 0) {
         alert('Debes agregar al menos un partido válido con ambos equipos seleccionados y diferentes.');
-        setIsLoading(false);
         return;
       }
       
-      if (isAdding) {
-        console.log('Creando fixture con datos:', {
-          ligaId: data.leagueId,
-          categoriaId: data.categoryId,
-          zonaId: data.zoneId
-        });
-        
-        const result = await SupabaseService.createFixture({
-          nombre: data.date,
-          fechaPartido: data.matchDate,
-          ligaId: data.leagueId,
-          categoriaId: data.categoryId,
-          zonaId: data.zoneId,
-          leyenda: data.leyenda,
-          texto_central: data.texto_central,
-          matches: validMatches.map(match => ({
-            homeTeamId: match.homeTeamId,
-            awayTeamId: match.awayTeamId
-          }))
-        });
-  
-        console.log('Resultado de createFixture:', result);
-  
-        if (result.success) {
-          console.log('Fixture creado, refrescando lista...');
-          
-          // Refrescar fixtures
-          await refreshFixtures();
-          
-          // Establecer los filtros para mostrar el nuevo fixture
-          setSelectedLeague(data.leagueId);
-          setSelectedCategory(data.categoryId);
-          setSelectedZone(data.zoneId);
-          
-          setRefreshKey(prev => prev + 1);
-          alert('Fixture creado exitosamente!');
-        } else {
-          console.error('Error creando fixture:', result.error);
-          alert(`Error creando fixture: ${result.error}`);
-          return;
+      const fixtureData = {
+        nombre: data.date,
+        fechaPartido: data.matchDate,
+        ligaId: data.leagueId,
+        categoriaId: data.categoryId,
+        zonaId: data.zoneId,
+        leyenda: data.leyenda,
+        texto_central: data.texto_central,
+        matches: validMatches.map(match => ({
+          homeTeamId: match.homeTeamId,
+          awayTeamId: match.awayTeamId
+        }))
+      };
+      
+      let result;
+      if (formState.isAdding) {
+        console.log('[onSubmit] Creando fixture con datos:', fixtureData);
+        result = await SupabaseService.createFixture(fixtureData);
+        if (!result.success) {
+          throw new Error(result.error || 'Error creando fixture');
         }
-      } else if (editingId) {
-        // Al editar, toma todos los partidos válidos del formulario
-        await SupabaseService.updateFixtureWithMatches(editingId, {
-          nombre: data.date,
-          fechaPartido: data.matchDate,
-          ligaId: data.leagueId,
-          categoriaId: data.categoryId,
-          zonaId: data.zoneId,
-          leyenda: data.leyenda,
-          texto_central: data.texto_central,
-          matches: validMatches.map(match => ({
-            homeTeamId: match.homeTeamId,
-            awayTeamId: match.awayTeamId
-          }))
-        });
-        // Refresca los fixtures para ver los cambios
-        await refreshFixtures();
+        // Esperar un poco para asegurar que los partidos se guarden en la base
+        await new Promise(res => setTimeout(res, 400));
+        console.log('[onSubmit] Fixture creado con ID:', result.fixtureId);
+      } else if (formState.editingId) {
+        console.log('[onSubmit] Actualizando fixture con ID:', formState.editingId, fixtureData);
+        await SupabaseService.updateFixtureWithMatches(formState.editingId, fixtureData);
       }
       
-      setIsAdding(false);
-      setEditingId(null);
+      // Refrescar fixtures
+      console.log('[onSubmit] Refrescando fixtures...');
+      await refreshFixtures();
+      console.log('[onSubmit] Fixtures refrescados.');
+      
+      setFilters({
+        selectedLeague: data.leagueId,
+        selectedCategory: data.categoryId,
+        selectedZone: data.zoneId
+      });
+      
+      setFormState(prev => ({ ...prev, isAdding: false, editingId: null }));
       reset();
+      
+      alert(`Fixture ${formState.isAdding ? 'creado' : 'actualizado'} exitosamente!`);
+      
     } catch (error) {
       console.error('Error saving fixture:', error);
-      alert('Error inesperado guardando fixture');
+      alert(`Error ${formState.isAdding ? 'creando' : 'actualizando'} fixture: ${error instanceof Error ? error.message : 'Error desconocido'}`);
     } finally {
-      setIsLoading(false);
+      setFormState(prev => ({ ...prev, isSubmitting: false }));
     }
-  };
+  }, [formState.isAdding, formState.editingId, refreshFixtures, reset]);
   
-  const handleLeagueChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const leagueId = e.target.value;
-    setSelectedLeague(leagueId);
-    setSelectedZone('');
-    setSelectedCategory('');
-  };
+  // Validación de partidos duplicados
+  const validateMatches = useCallback((matches: FixtureFormData['matches']) => {
+    const duplicates = new Set();
+    return matches.filter(match => {
+      const key = `${match.homeTeamId}-${match.awayTeamId}`;
+      const reverseKey = `${match.awayTeamId}-${match.homeTeamId}`;
+      
+      if (duplicates.has(key) || duplicates.has(reverseKey)) {
+        return false;
+      }
+      
+      duplicates.add(key);
+      return true;
+    });
+  }, []);
   
-  const handleCategoryChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const categoryId = e.target.value;
-    setSelectedCategory(categoryId);
-    // NO resetear zona en liga_masculina
-  };
-  
-  const handleZoneChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const zoneId = e.target.value;
-    setSelectedZone(zoneId);
-    // Ya no se resetea la categoría al cambiar zona
-  };
-  
-  // Get team name by ID
-  const getTeamName = (teamId: string): string => {
-    const team = teams.find(team => team.id === teamId);
-    return team ? team.name : 'Equipo desconocido';
-  };
-  
-  // Filtros para Liga Participando (liga_masculina): primero zona, luego categoría
-  const isLigaMasculina = selectedLeague === 'liga_masculina';
-  const availableZones = isLigaMasculina ? getZonesByLeague(selectedLeague) : getZonesByCategory(selectedCategory);
-  const availableCategories = isLigaMasculina && selectedZone ? getCategoriesByZone(selectedZone) : getCategoriesByLeague(selectedLeague);
-  
-  const formZoneTeams = getTeamsByZone(watch('zoneId'));
-  
-  const leagueTeams = teams.filter(team => team.leagueId === watch('leagueId'));
+  const isFormDisabled = formState.isSubmitting || formState.isLoading;
   
   return (
-    <div key={refreshKey}>
-      <div className="flex items-center justify-between mb-6">
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Fixtures</h1>
-        
         <button
           className="btn btn-primary flex items-center space-x-2"
           onClick={handleAddClick}
-          disabled={isAdding || !!editingId || !selectedLeague}
+          disabled={isFormDisabled || formState.isAdding || !!formState.editingId || !filters.selectedLeague}
         >
           <Plus size={18} />
           <span>Agregar Fixture</span>
         </button>
       </div>
       
-      {/* Mensaje de advertencia si hay fixtures inválidos */}
+      {/* Warning for invalid fixtures */}
       {invalidFixtures.length > 0 && (
-        <div className="mb-6 p-4 bg-yellow-100 border-l-4 border-yellow-500 text-yellow-800 rounded">
-          <strong>¡Atención!</strong> Hay {invalidFixtures.length} fixture(s) con <b>liga_id inválido o nulo</b> en la base de datos.<br/>
-          Estos fixtures no se mostrarán correctamente en la web.<br/>
-          <ul className="mt-2 list-disc list-inside">
-            {invalidFixtures.map(f => (
-              <li key={f.id}>ID: <b>{f.id}</b> - Nombre: <b>{f.date || '(sin nombre)'}</b></li>
-            ))}
-          </ul>
-          <span className="block mt-2">Por favor, corrige el <b>liga_id</b> de estos fixtures en Supabase.</span>
+        <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded-md">
+          <div className="flex items-start">
+            <AlertTriangle className="h-5 w-5 text-yellow-400 mt-0.5 mr-3" />
+            <div>
+              <h3 className="text-sm font-medium text-yellow-800">
+                Fixtures con problemas detectados
+              </h3>
+              <div className="mt-2 text-sm text-yellow-700">
+                <p>Se encontraron {invalidFixtures.length} fixture(s) con liga_id inválido:</p>
+                <ul className="mt-1 list-disc list-inside space-y-1">
+                  {invalidFixtures.map(fixture => (
+                    <li key={fixture.id}>
+                      <span className="font-medium">ID:</span> {fixture.id} - 
+                      <span className="font-medium"> Nombre:</span> {fixture.date || '(sin nombre)'}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 
       {/* Filters */}
-      <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-200 mb-8">
+      <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
         <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
           <Users size={20} className="mr-2 text-indigo-600" />
           Filtros de Búsqueda
         </h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
             <label htmlFor="leagueFilter" className="form-label">Liga</label>
             <select
               id="leagueFilter"
               className="form-input"
-              value={selectedLeague}
-              onChange={handleLeagueChange}
+              value={filters.selectedLeague}
+              onChange={(e) => handleFilterChange('league', e.target.value)}
             >
               <option value="">Seleccionar liga</option>
               {leagues.map(league => (
@@ -407,286 +462,37 @@ const FixturesPage: React.FC = () => {
       </div>
       
       {/* Add/Edit Form */}
-      {(isAdding || editingId) && (
-        <div className="bg-gray-50 p-4 rounded-md mb-6 border">
-          <form onSubmit={handleSubmit(onSubmit)}>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-              <div>
-                <label className="form-label" htmlFor="date">
-                  Fecha (nombre)
-                </label>
-                <input
-                  id="date"
-                  type="text"
-                  className={cn(
-                    "form-input",
-                    errors.date && "border-red-500"
-                  )}
-                  placeholder="Ej: 1° FECHA"
-                  autoComplete="off"
-                  {...register('date', { required: 'La fecha es requerida' })}
-                />
-                {errors.date && (
-                  <p className="mt-1 text-sm text-red-600">{errors.date.message}</p>
-                )}
-              </div>
-              
-              <div>
-                <label className="form-label" htmlFor="matchDate">
-                  Fecha del partido
-                </label>
-                <input
-                  id="matchDate"
-                  type="date"
-                  className={cn(
-                    "form-input",
-                    errors.matchDate && "border-red-500"
-                  )}
-                  autoComplete="off"
-                  {...register('matchDate', { required: 'La fecha del partido es requerida' })}
-                />
-                {errors.matchDate && (
-                  <p className="mt-1 text-sm text-red-600">{errors.matchDate.message}</p>
-                )}
-              </div>
-              
-              <div>
-                <label className="form-label" htmlFor="formLeagueId">
-                  Liga
-                </label>
-                <select
-                  id="formLeagueId"
-                  className={cn(
-                    "form-input",
-                    errors.leagueId && "border-red-500"
-                  )}
-                  {...register('leagueId', { required: 'La liga es requerida' })}
-                  onChange={(e) => {
-                    setValue('leagueId', e.target.value);
-                  }}
-                  value={watch('leagueId')}
-                >
-                  <option value="">Seleccionar liga</option>
-                  {leagues.map(league => (
-                    <option key={league.id} value={league.id}>
-                      {league.name}
-                    </option>
-                  ))}
-                </select>
-                {errors.leagueId && <p className="mt-1 text-sm text-red-600">{errors.leagueId.message}</p>}
-              </div>
-              
-              <div>
-                <label className="form-label" htmlFor="leyenda">Leyenda (opcional)</label>
-                <input
-                  id="leyenda"
-                  type="text"
-                  className={cn("form-input", errors.leyenda && "border-red-500")}
-                  placeholder="Ej: Fecha especial, Apertura 2024, Final, etc."
-                  autoComplete="off"
-                  {...register('leyenda')}
-                />
-              </div>
-              
-              <div>
-                <label className="form-label" htmlFor="texto_central">Texto central (opcional)</label>
-                <input
-                  id="texto_central"
-                  type="text"
-                  className={cn("form-input", errors.texto_central && "border-red-500")}
-                  placeholder="Ej: Zona 1, Zona 2, etc."
-                  autoComplete="off"
-                  {...register('texto_central')}
-                />
-              </div>
-            </div>
-            
-            {/* Matches Section */}
-            <div className="mb-4">
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="text-lg font-medium">Partidos</h3>
-                <button
-                  type="button"
-                  onClick={() => append({ homeTeamId: '', awayTeamId: '' })}
-                  className="btn btn-secondary btn-sm flex items-center space-x-1"
-                >
-                  <Plus size={16} />
-                  <span>Agregar Partido</span>
-                </button>
-              </div>
-              
-              {fields.map((field, index) => (
-                <div key={field.id} className="bg-white p-4 rounded-md border mb-3">
-                  <div className="flex items-center justify-between mb-3">
-                    <h4 className="font-medium">Partido {index + 1}</h4>
-                    {fields.length > 1 && (
-                      <button
-                        type="button"
-                        onClick={() => remove(index)}
-                        className="text-red-600 hover:text-red-800"
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                    )}
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="form-label">
-                        Equipo Local
-                      </label>
-                      <select
-                        className={cn(
-                          "form-input",
-                          errors.matches?.[index]?.homeTeamId && "border-red-500"
-                        )}
-                        {...register(`matches.${index}.homeTeamId`, {
-                          required: 'El equipo local es requerido'
-                        })}
-                      >
-                        <option value="">Seleccionar equipo local</option>
-                        {leagueTeams.map(team => (
-                          <option key={team.id} value={team.id}>
-                            {team.name}
-                          </option>
-                        ))}
-                      </select>
-                      {errors.matches?.[index]?.homeTeamId && (
-                        <p className="mt-1 text-sm text-red-600">
-                          {errors.matches[index]?.homeTeamId?.message}
-                        </p>
-                      )}
-                    </div>
-                    
-                    <div>
-                      <label className="form-label">
-                        Equipo Visitante
-                      </label>
-                      <select
-                        className={cn(
-                          "form-input",
-                          errors.matches?.[index]?.awayTeamId && "border-red-500"
-                        )}
-                        {...register(`matches.${index}.awayTeamId`, {
-                          required: 'El equipo visitante es requerido'
-                        })}
-                      >
-                        <option value="">Seleccionar equipo visitante</option>
-                        {leagueTeams.map(team => (
-                          <option key={team.id} value={team.id}>
-                            {team.name}
-                          </option>
-                        ))}
-                      </select>
-                      {errors.matches?.[index]?.awayTeamId && (
-                        <p className="mt-1 text-sm text-red-600">
-                          {errors.matches[index]?.awayTeamId?.message}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-            
-            <div className="flex space-x-2">
-              <button
-                type="submit"
-                className="btn btn-primary flex items-center space-x-2"
-                disabled={isLoading}
-              >
-                <Save size={18} />
-                <span>{isAdding ? 'Crear Fixture' : 'Actualizar Fixture'}</span>
-              </button>
-              <button
-                type="button"
-                onClick={handleCancelClick}
-                className="btn btn-secondary flex items-center space-x-2"
-              >
-                <X size={18} />
-                <span>Cancelar</span>
-              </button>
-            </div>
-          </form>
-        </div>
+      {(formState.isAdding || formState.editingId) && (
+        <FixtureForm
+          formState={formState}
+          setFormState={setFormState}
+          filters={filters}
+          setFilters={setFilters}
+          leagues={leagues}
+          teams={teams}
+          computedData={computedData}
+          reset={reset}
+          handleSubmit={handleSubmit}
+          onSubmit={onSubmit}
+          register={register}
+          errors={errors}
+          fields={fields}
+          append={append}
+          remove={remove}
+          isFormDisabled={isFormDisabled}
+          handleCancelClick={handleCancelClick}
+        />
       )}
       
       {/* Fixtures List */}
-      <div className="bg-white rounded-xl shadow-lg border border-gray-200">
-        <div className="p-6 border-b border-gray-200">
-          <h2 className="text-lg font-semibold text-gray-900 flex items-center">
-            <Calendar size={20} className="mr-2 text-indigo-600" />
-            Lista de Fixtures
-            {filteredFixtures.length > 0 && (
-              <span className="ml-2 text-sm text-gray-500">({filteredFixtures.length})</span>
-            )}
-          </h2>
-        </div>
-        
-        <div className="p-6">
-          {isLoading ? (
-            <div className="text-center py-8">
-              <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
-              <p className="mt-2 text-gray-600">Cargando fixtures...</p>
-            </div>
-          ) : filteredFixtures.length === 0 ? (
-            <div className="text-center py-8">
-              <Calendar size={48} className="mx-auto text-gray-400 mb-4" />
-              <p className="text-gray-600">
-                {!selectedLeague
-                  ? 'Selecciona una liga para ver los fixtures'
-                  : 'No hay fixtures para la liga seleccionada'}
-              </p>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {filteredFixtures.map(fixture => (
-                <div key={fixture.id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
-                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-3 space-y-2 sm:space-y-0">
-                    <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-4 space-y-1 sm:space-y-0 w-full">
-                      <h3 className="font-semibold text-lg break-words">{fixture.date}</h3>
-                      <span className="text-sm text-gray-600 break-words">
-                        {formatLocalDate(fixture.matchDate)}
-                      </span>
-                    </div>
-                    <div className="flex flex-col sm:flex-row w-full sm:w-auto space-y-2 sm:space-y-0 sm:space-x-2 mt-2 sm:mt-0">
-                      <button
-                        onClick={() => handleEditClick(fixture.id)}
-                        className="btn btn-secondary btn-sm flex items-center justify-center space-x-1 w-full sm:w-auto"
-                        disabled={isAdding || !!editingId}
-                      >
-                        <Edit size={16} />
-                        <span>Editar</span>
-                      </button>
-                      <button
-                        onClick={() => handleDeleteFixture(fixture.id)}
-                        className="btn btn-danger btn-sm flex items-center justify-center space-x-1 w-full sm:w-auto"
-                        disabled={isAdding || !!editingId}
-                      >
-                        <Trash2 size={16} />
-                        <span>Eliminar</span>
-                      </button>
-                    </div>
-                  </div>
-                  
-                  <div className="space-y-2">
-                    {fixture.matches.filter(match => match.homeTeamId && match.awayTeamId && getTeamName(match.homeTeamId) !== 'Equipo desconocido' && getTeamName(match.awayTeamId) !== 'Equipo desconocido').map((match, index) => (
-                      <div key={match.id || index} className="bg-gray-50 p-3 rounded-md">
-                        <div className="flex flex-col xs:flex-row xs:items-center xs:justify-between space-y-2 xs:space-y-0">
-                          <div className="flex flex-col xs:flex-row xs:items-center xs:space-x-4 space-y-1 xs:space-y-0">
-                            <span className="font-medium break-words">{getTeamName(match.homeTeamId)}</span>
-                            <span className="text-gray-500">vs</span>
-                            <span className="font-medium break-words">{getTeamName(match.awayTeamId)}</span>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
+      <FixtureList
+        fixtures={filteredFixtures}
+        isLoading={formState.isLoading}
+        selectedLeague={filters.selectedLeague}
+        onEdit={handleEditClick}
+        onDelete={handleDeleteFixture}
+        getTeamName={getTeamName}
+      />
     </div>
   );
 };

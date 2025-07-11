@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useParams } from 'react-router-dom';
-import { useLeague } from '../contexts/LeagueContext';
+import { useLeague, Fixture } from '../contexts/LeagueContext';
 import CategoryPanel from '../components/league/CategoryPanel';
 import FixtureList from '../components/league/FixtureList';
 import StandingsTable from '../components/league/StandingsTable';
@@ -15,47 +15,75 @@ type Tab = 'fixtures' | 'results' | 'standings' | 'teams';
 
 const LeaguePage: React.FC = () => {
   const { leagueId } = useParams<{ leagueId: string }>();
-  const { getLeague, getCategoriesByLeague, getZonesByLeague, refreshFixtures, refreshCategories, refreshZones } = useLeague();
+  // Extraer todos los valores de useLeague() al inicio
+  const {
+    getLeague,
+    refreshFixtures,
+    zones,
+    fixtures: globalFixtures,
+    categories: allCategories,
+    teams
+  } = useLeague();
+
   const [activeTab, setActiveTab] = useState<Tab>('fixtures');
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
   const [selectedZoneId, setSelectedZoneId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [viewMode, setViewMode] = useState<'init' | 'fixture' | 'standings'>('init');
-  
-  // Refrescar zonas y categorías al montar la página
-  useEffect(() => {
-    const refreshData = async () => {
-      await refreshCategories();
-      await refreshZones();
+  const [sortedFixtures, setSortedFixtures] = useState<Fixture[]>([]);
+  const standingsRef = useRef<HTMLDivElement>(null);
+
+  // Función de ordenamiento robusta
+  const getFixtureOrder = useCallback((fixture: Fixture) => {
+    const dateNumbers = fixture.date?.match(/\d+/g)?.map(Number) || [9999];
+    return {
+      primary: Math.min(...dateNumbers),
+      secondary: fixture.date || '',
+      zone: Number(zones.find(z => z.id === fixture.zoneId)?.name?.match(/\d+/)?.[0] || 9999)
     };
-    refreshData();
-  }, [refreshCategories, refreshZones]); // ❌ Estas funciones se recrean en cada render
-  
-  // Cargar fixtures al montar el componente
+  }, [zones]);
+
+  // Ordenamiento principal
+  const sortFixtures = useCallback((fixturesToSort: Fixture[]) => {
+    return [...fixturesToSort].sort((a, b) => {
+      const orderA = getFixtureOrder(a);
+      const orderB = getFixtureOrder(b);
+      if (orderA.primary !== orderB.primary) return orderA.primary - orderB.primary;
+      if (orderA.secondary !== orderB.secondary) return orderA.secondary.localeCompare(orderB.secondary);
+      return orderA.zone - orderB.zone;
+    });
+  }, [getFixtureOrder]);
+
+  // Cargar y ordenar fixtures
   useEffect(() => {
-    const loadFixtures = async () => {
-      try {
-        setIsLoading(true);
-        await refreshFixtures();
-        console.log('Fixtures loaded in LeaguePage');
-      } catch (error) {
-        console.error('Error loading fixtures in LeaguePage:', error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    
-    loadFixtures();
-  }, [refreshFixtures]);
-  
+    const leagueFixtures = globalFixtures.filter(f => f.leagueId === leagueId);
+    setSortedFixtures(sortFixtures(leagueFixtures));
+    // Debug
+    console.log('Fixtures ordenados:', sortFixtures(leagueFixtures).map(f => ({
+      date: f.date,
+      order: getFixtureOrder(f),
+      zone: zones.find(z => z.id === f.zoneId)?.name
+    })));
+  }, [globalFixtures, leagueId, sortFixtures, zones, getFixtureOrder]);
+
+  // Actualizar al cambiar a vista fixture
+  useEffect(() => {
+    if (viewMode === 'fixture') {
+      refreshFixtures().then(() => {
+        const leagueFixtures = globalFixtures.filter(f => f.leagueId === leagueId);
+        setSortedFixtures(sortFixtures(leagueFixtures));
+      });
+    }
+  }, [viewMode, leagueId, refreshFixtures, sortFixtures]);
+
   // Get league data
   const league = getLeague(leagueId || '');
-  
+
   // Get categories for this league
-  const categories = getCategoriesByLeague(leagueId || '');
+  const categories = useMemo(() => allCategories.filter(cat => cat.leagueId === leagueId), [allCategories, leagueId]);
   
-  // Get zones for this league
-  const zones = getZonesByLeague(leagueId || '');
+  // Filtrar zonas por liga
+  const leagueZones = useMemo(() => zones.filter(z => z.leagueId === leagueId), [zones, leagueId]);
   
   // CÓDIGO DE DEBUGGING TEMPORAL - Agregar después de obtener categories y zones
   useEffect(() => {
@@ -102,6 +130,13 @@ const LeaguePage: React.FC = () => {
       setViewMode('standings');
     }
   }, [league]);
+  
+  // Scroll automático a la tabla de posiciones cuando se selecciona categoría y zona
+  useEffect(() => {
+    if (selectedCategoryId && selectedZoneId && standingsRef.current) {
+      standingsRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, [selectedCategoryId, selectedZoneId]);
   
   if (!league) {
     return <div className="text-center py-12">Liga no encontrada</div>;
@@ -168,32 +203,13 @@ const LeaguePage: React.FC = () => {
 
   // NUEVO: Vista de todos los fixtures de la liga
   if (viewMode === 'fixture') {
-    // Obtener todos los fixtures de la liga
-    const { fixtures } = useLeague();
-    // Ordenar fixtures por fecha (creciente) y luego por zona
-    const leagueFixtures = fixtures
-      .filter(f => f.leagueId === leagueId)
-      .sort((a, b) => {
-        // Primero ordenar por fecha (creciente - fecha 1 primero)
-        const dateA = new Date(a.matchDate).getTime();
-        const dateB = new Date(b.matchDate).getTime();
-        if (dateA !== dateB) return dateA - dateB; // Creciente
-        
-        // Si la fecha es igual, ordenar por zona
-        const zonaA = zones.find(z => z.id === a.zoneId)?.name || '';
-        const zonaB = zones.find(z => z.id === b.zoneId)?.name || '';
-        
-        // Extraer número de zona para ordenamiento numérico
-        const getZonaNum = (zona: string) => {
-          const match = zona.match(/(\d+)[^\d]?(\d+)?/);
-          if (!match) return 999;
-          return parseInt(match[1], 10);
-        };
-        
-        const numA = getZonaNum(zonaA);
-        const numB = getZonaNum(zonaB);
-        return numA - numB; // Creciente por zona (menor número primero)
-      });
+    // Usar sortedFixtures para la vista pública
+    const leagueFixtures = sortedFixtures.filter(f => f.leagueId === leagueId);
+
+    // Obtener todas las fechas únicas y ordenarlas
+    const uniqueDates = Array.from(new Set(leagueFixtures.map(f => f.matchDate)))
+      .sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
+
     return (
       <div className="min-h-[80vh] flex flex-col items-center justify-center bg-gradient-to-br from-gray-50 to-white py-10">
         <div className="w-full max-w-2xl mx-auto">
@@ -203,32 +219,30 @@ const LeaguePage: React.FC = () => {
             <div className="text-center py-12 text-gray-500 bg-white rounded-xl shadow">No hay fixtures cargados para esta liga.</div>
           ) : (
             <div className="space-y-12">
-              {/* Agrupar fixtures por fecha */}
-              {(() => {
-                const fixturesByDate = leagueFixtures.reduce((acc, fixture) => {
-                  const dateKey = fixture.matchDate;
-                  if (!acc[dateKey]) {
-                    acc[dateKey] = [];
-                  }
-                  acc[dateKey].push(fixture);
-                  return acc;
-                }, {} as Record<string, typeof leagueFixtures>);
+              {uniqueDates.map(dateKey => {
+                // Para cada fecha, obtener los fixtures y ordenarlos por zona de menor a mayor
+                const fixturesForDate = leagueFixtures
+                  .filter(f => f.matchDate === dateKey)
+                  .sort((a, b) => {
+                    const textA = a.texto_central || '';
+                    const textB = b.texto_central || '';
+                    return extractFirstZoneNumber(textA) - extractFirstZoneNumber(textB);
+                  });
 
-                return Object.entries(fixturesByDate).map(([dateKey, dateFixtures]) => (
+                return (
                   <div key={dateKey} className="space-y-6">
                     {/* Header de fecha */}
                     <div className="text-center">
                       <h3 className="text-2xl font-bold text-gray-800 mb-2">
-                        {dateFixtures[0]?.date || 'Fecha'}
+                        {fixturesForDate[0]?.date || 'Fecha'}
                       </h3>
                       <p className="text-lg text-gray-600">
                         {formatShortDate(dateKey)}
                       </p>
                     </div>
-                    
-                    {/* Fixtures de esta fecha */}
+                    {/* Fixtures de esta fecha, ordenados por zona */}
                     <div className="space-y-6">
-                      {dateFixtures.map((fixture) => (
+                      {fixturesForDate.map((fixture) => (
                         <div key={fixture.id} className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
                           {/* Header con zona */}
                           <div className="bg-gradient-to-r from-indigo-600 to-blue-500 p-3 rounded-t-2xl flex flex-col items-center justify-center sm:flex-row sm:items-center sm:justify-between text-center sm:text-left">
@@ -266,11 +280,11 @@ const LeaguePage: React.FC = () => {
                                         </div>
                                       </div>
                                       <span className="font-medium text-gray-800 text-sm text-left col-span-4 truncate">
-                                        {(useLeague().teams.find(t => t.id === match.homeTeamId)?.name) || 'Equipo ' + match.homeTeamId}
+                                        {(teams.find(t => t.id === match.homeTeamId)?.name) || 'Equipo ' + match.homeTeamId}
                                       </span>
                                       <span className="col-span-2 text-indigo-500 font-bold text-base text-center group-hover:scale-110 transition-transform">VS</span>
                                       <span className="font-medium text-gray-800 text-sm text-right col-span-5 truncate">
-                                        {(useLeague().teams.find(t => t.id === match.awayTeamId)?.name) || 'Equipo ' + match.awayTeamId}
+                                        {(teams.find(t => t.id === match.awayTeamId)?.name) || 'Equipo ' + match.awayTeamId}
                                       </span>
                                     </div>
                                   </div>
@@ -286,8 +300,8 @@ const LeaguePage: React.FC = () => {
                       ))}
                     </div>
                   </div>
-                ));
-              })()}
+                );
+              })}
             </div>
           )}
         </div>
@@ -313,7 +327,7 @@ const LeaguePage: React.FC = () => {
         {/* Categories/Zones y lógica de selección */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 my-6">
           {league.id === 'liga_masculina' ? (
-            zones.map((zone) => (
+            leagueZones.map((zone) => (
               <ZonePanel
                 key={zone.id}
                 zone={zone}
@@ -339,19 +353,21 @@ const LeaguePage: React.FC = () => {
           )}
         </div>
         {/* Render de la tabla de posiciones */}
-        {selectedCategoryId && selectedZoneId ? (
-          <PublicStandingsTable
-            leagueId={league.id}
-            zoneId={selectedZoneId}
-            categoryId={selectedCategoryId}
-          />
-        ) : (
-          <div className="text-center py-12 text-gray-500">
-            {league.id === 'liga_masculina'
-              ? 'Selecciona una zona y categoría para ver la información'
-              : 'Selecciona una categoría y zona para ver la información'}
-          </div>
-        )}
+        <div ref={standingsRef}>
+          {selectedCategoryId && selectedZoneId ? (
+            <PublicStandingsTable
+              leagueId={league.id}
+              zoneId={selectedZoneId}
+              categoryId={selectedCategoryId}
+            />
+          ) : (
+            <div className="text-center py-12 text-gray-500">
+              {league.id === 'liga_masculina'
+                ? 'Selecciona una zona y categoría para ver la información'
+                : 'Selecciona una categoría y zona para ver la información'}
+            </div>
+          )}
+        </div>
       </div>
     );
   }
@@ -372,7 +388,7 @@ const LeaguePage: React.FC = () => {
       {/* Categories/Zones */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {league.id === 'liga_masculina' ? (
-          zones.map((zone) => (
+          leagueZones.map((zone) => (
             <ZonePanel
               key={zone.id}
               zone={zone}
@@ -444,3 +460,22 @@ export default LeaguePage;
 
 // No necesitamos modificar más este archivo ya que el botón de exportar CSV
 // está incluido directamente en el componente StandingsTable
+
+// Utilidad para extraer el primer número de un string (nombre de zona)
+function extractFirstZoneNumber(zoneName: string): number {
+  if (!zoneName) return 9999;
+  // Caso 1: Formato "Zona X-Y"
+  const rangeMatch = zoneName.match(/Zona\s*(\d+)\s*-\s*(\d+)/i);
+  if (rangeMatch) return parseInt(rangeMatch[1]);
+  // Caso 2: Formato "Zona X"
+  const singleMatch = zoneName.match(/Zona\s*(\d+)/i);
+  if (singleMatch) return parseInt(singleMatch[1]);
+  // Caso 3: Solo números "X-Y"
+  const simpleRange = zoneName.match(/(\d+)\s*-\s*(\d+)/);
+  if (simpleRange) return parseInt(simpleRange[1]);
+  // Caso 4: Solo número
+  const simpleNumber = zoneName.match(/\d+/);
+  if (simpleNumber) return parseInt(simpleNumber[0]);
+  // Default para zonas sin número
+  return 9999;
+}
