@@ -106,8 +106,13 @@ const PublicStandingsTable: React.FC<PublicStandingsTableProps> = ({ leagueId, z
     });
   }, [zoneId, categoryId, leagueId]);
 
-  // Ordenar standings por puntos, diferencia de gol, goles a favor, menos partidos jugados y nombre
+  // Ordenar standings por el mismo criterio que el admin: si hay algún 'orden' > 0, usarlo; si no, usar el orden tradicional
+  const hasManualOrder = standings.some(s => typeof s.orden === 'number' && s.orden > 0);
   const sortedStandings = standings.slice().sort((a, b) => {
+    if (hasManualOrder) {
+      // Ordenar por 'orden' ascendente (1,2,3...)
+      return (a.orden ?? 9999) - (b.orden ?? 9999);
+    }
     // 1. Puntos (desc)
     if (b.puntos !== a.puntos) return b.puntos - a.puntos;
     // 2. Diferencia de gol (desc)
