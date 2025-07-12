@@ -565,9 +565,9 @@ static async updateTeam(
       .from('equipos')
       .update({
         nombre: name,
-        zona_id: zoneId,
+        zona_id: zoneId === '' ? null : zoneId,
         liga_id: numericLeagueId,
-        categoria_id: categoryId,
+        categoria_id: categoryId === '' ? null : categoryId,
         logo: logo || null
       })
       .eq('id', id)

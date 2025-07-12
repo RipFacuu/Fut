@@ -648,13 +648,21 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
         return;
       }
       const updatedData = { ...currentTeam, ...data };
+      
+      // Validar que los campos requeridos no estén vacíos
+      if (!updatedData.name || !updatedData.leagueId) {
+        console.error('Missing required fields:', { name: updatedData.name, leagueId: updatedData.leagueId });
+        alert('El nombre y la liga son campos requeridos');
+        return;
+      }
+      
       const updatedTeam = await SupabaseService.updateTeam(
         id,
-        updatedData.name || '',
-        updatedData.zoneId || '',
-        updatedData.leagueId || '',
-        updatedData.categoryId || '',
-        updatedData.logo || ''
+        updatedData.name,
+        updatedData.zoneId || '',  // Usar cadena vacía para campos opcionales
+        updatedData.leagueId,
+        updatedData.categoryId || '',  // Usar cadena vacía para campos opcionales
+        updatedData.logo || ''  // Usar cadena vacía para campos opcionales
       );
       if (updatedTeam) {
         setTeams(teams.map(team =>
@@ -812,8 +820,8 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
         id: uuidv4(),
         teamId: team.id,
         leagueId: team.leagueId,
-        categoryId: team.categoryId,
-        zoneId: team.zoneId,
+        categoryId: team.categoryId || '',
+        zoneId: team.zoneId || '',
         puntos: 0,    // Cambio: points -> puntos
         pj: 0,        // Cambio: played -> pj
         won: 0,
