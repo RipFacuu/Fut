@@ -1,11 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { useLeague, Match, Team } from '../../contexts/LeagueContext';
-import { useForm, useFieldArray } from 'react-hook-form';
-import { Plus, Edit, Trash2, Calendar, Save, X, Users, AlertTriangle } from 'lucide-react';
-import { cn } from '../../utils/cn';
-import { SupabaseService } from '../../services/supabaseService';
-import { formatLocalDate } from '../../utils/dateUtils';
-import FixtureForm from './FixtureForm';
+import { useLeague, Team, League } from '../../contexts/LeagueContext';
+import { useForm } from 'react-hook-form';
+import { Plus, Users, AlertTriangle } from 'lucide-react';
 import FixtureList from './FixtureList';
 
 interface FixtureFormData {
@@ -16,13 +12,13 @@ interface FixtureFormData {
   zoneId: string;
   leyenda?: string;
   texto_central?: string;
-  matches: {
+  matches: Array<{
     homeTeamId: string;
     awayTeamId: string;
     played?: boolean;
     homeScore?: number;
     awayScore?: number;
-  }[];
+  }>;
 }
 
 interface FormState {
@@ -32,38 +28,90 @@ interface FormState {
   isSubmitting: boolean;
 }
 
+interface Filters {
+  selectedLeague: string;
+  selectedCategory: string;
+  selectedZone: string;
+}
+
+interface ComputedData {
+  leagueCategories: unknown[];
+  categoryZones: unknown[];
+  zoneTeams: Team[];
+  formZoneTeams: Team[];
+  leagueTeams: Team[];
+  availableZones: unknown[];
+  availableCategories: unknown[];
+}
+
+const INITIAL_FORM_STATE: FormState = {
+  isAdding: false,
+  editingId: null,
+  isLoading: true,
+  isSubmitting: false
+};
+
+const INITIAL_FILTERS: Filters = {
+  selectedLeague: '',
+  selectedCategory: '',
+  selectedZone: ''
+};
+
+const FiltersSection: React.FC<{
+  filters: Filters;
+  leagues: League[];
+  onChange: (type: keyof Filters, value: string) => void;
+  isDisabled: boolean;
+}> = ({ filters, leagues, onChange, isDisabled }) => (
+  <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 mb-4">
+    <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+      <Users size={20} className="mr-2 text-indigo-600" />
+      Filtros de Búsqueda
+    </h2>
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div>
+        <label htmlFor="leagueFilter" className="form-label">Liga</label>
+        <select
+          id="leagueFilter"
+          className="form-input"
+          value={filters.selectedLeague}
+          onChange={e => onChange('selectedLeague', e.target.value)}
+          disabled={isDisabled}
+        >
+          <option value="">Seleccionar liga</option>
+          {leagues.map(league => (
+            <option key={league.id} value={league.id}>{league.name}</option>
+          ))}
+        </select>
+      </div>
+    </div>
+  </div>
+);
+
+const ErrorBanner: React.FC<{ error: string | null }> = ({ error }) => (
+  error ? (
+    <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-4" role="alert">
+      <p>{error}</p>
+    </div>
+  ) : null
+);
+
 const FixturesPage: React.FC = () => {
   const { 
     leagues, 
     fixtures, 
     teams,
-    addFixture, 
-    updateFixture, 
-    deleteFixture, 
     getCategoriesByLeague, 
     getZonesByCategory,
-    getTeamsByZone,
     refreshFixtures,
     getZonesByLeague,
     getCategoriesByZone
   } = useLeague();
-  
-  // Consolidar estado del formulario
-  const [formState, setFormState] = useState<FormState>({
-    isAdding: false,
-    editingId: null,
-    isLoading: true,
-    isSubmitting: false
-  });
-  
-  // Estados de filtros
-  const [filters, setFilters] = useState({
-    selectedLeague: '',
-    selectedCategory: '',
-    selectedZone: ''
-  });
-  
-  // Form handling
+
+  const [formState, setFormState] = useState<FormState>(INITIAL_FORM_STATE);
+  const [filters, setFilters] = useState<Filters>(INITIAL_FILTERS);
+  const [error, setError] = useState<string | null>(null);
+
   const form = useForm<FixtureFormData>({
     defaultValues: {
       leagueId: '',
@@ -74,42 +122,45 @@ const FixturesPage: React.FC = () => {
       matches: [{ homeTeamId: '', awayTeamId: '', played: false }]
     }
   });
-  
-  const { register, handleSubmit, control, reset, watch, setValue, formState: { errors } } = form;
-  
-  // Field array for matches
-  const { fields, append, remove } = useFieldArray({
-    control,
-    name: 'matches'
-  });
-  
-  // Memoized computed values
-  const watchedValues = {
-    leagueId: watch('leagueId'),
-    categoryId: watch('categoryId'),
-    zoneId: watch('zoneId')
-  };
-  
-  const isLigaMasculina = useMemo(() => 
-    filters.selectedLeague === 'liga_masculina', 
-    [filters.selectedLeague]
-  );
-  
-  const computedData = useMemo(() => {
+
+  const { watch } = form;
+
+  const teamsByZone = useMemo(() => {
+    const cache = new Map<string, Team[]>();
+    teams.forEach(team => {
+      if (!cache.has(team.zoneId)) {
+        cache.set(team.zoneId, []);
+      }
+      cache.get(team.zoneId)!.push(team);
+    });
+    return cache;
+  }, [teams]);
+
+  const teamNamesCache = useMemo(() => {
+    const cache = new Map<string, string>();
+    teams.forEach(team => {
+      cache.set(team.id, team.name);
+    });
+    return cache;
+  }, [teams]);
+
+  const isLigaMasculina = filters.selectedLeague === 'liga_masculina';
+
+  const computedData: ComputedData = useMemo(() => {
     const leagueCategories = getCategoriesByLeague(filters.selectedLeague);
     const categoryZones = getZonesByCategory(filters.selectedCategory);
-    const zoneTeams = getTeamsByZone(filters.selectedZone);
-    const formZoneTeams = getTeamsByZone(watchedValues.zoneId);
-    const leagueTeams = teams.filter(team => team.leagueId === watchedValues.leagueId);
-    
+    const zoneTeams = teamsByZone.get(filters.selectedZone) || [];
+    const formZoneTeams = teamsByZone.get(watch('zoneId') || '') || [];
+    const leagueTeams = teams.filter(team => team.leagueId === (watch('leagueId') || ''));
+
     const availableZones = isLigaMasculina 
-      ? getZonesByLeague(filters.selectedLeague) 
+      ? getZonesByLeague(filters.selectedLeague)
       : getZonesByCategory(filters.selectedCategory);
-      
+
     const availableCategories = isLigaMasculina && filters.selectedZone 
-      ? getCategoriesByZone(filters.selectedZone) 
+      ? getCategoriesByZone(filters.selectedZone)
       : getCategoriesByLeague(filters.selectedLeague);
-    
+
     return {
       leagueCategories,
       categoryZones,
@@ -123,296 +174,95 @@ const FixturesPage: React.FC = () => {
     filters.selectedLeague,
     filters.selectedCategory,
     filters.selectedZone,
-    watchedValues.leagueId,
-    watchedValues.zoneId,
-    isLigaMasculina,
     teams,
+    teamsByZone,
     getCategoriesByLeague,
     getZonesByCategory,
-    getTeamsByZone,
     getZonesByLeague,
-    getCategoriesByZone
+    getCategoriesByZone,
+    isLigaMasculina,
+    watch
   ]);
-  
-  // Filtrado de fixtures
+
+  const sortFixtures = useCallback((fixturesToSort: typeof fixtures) => {
+    return [...fixturesToSort].sort((a, b) => {
+      if (a.matchDate && b.matchDate) {
+        const dateDiff = new Date(a.matchDate).getTime() - new Date(b.matchDate).getTime();
+        if (dateDiff !== 0) return dateDiff;
+      }
+      const getZoneNumber = (zoneId: string) => {
+        const zone = computedData.availableZones.find((z: any) => z.id === zoneId);
+        const match = zone?.name?.match(/\d+/);
+        return match ? parseInt(match[0], 10) : 9999;
+      };
+      return getZoneNumber(a.zoneId) - getZoneNumber(b.zoneId);
+    });
+  }, [computedData.availableZones]);
+
   const filteredFixtures = useMemo(() => {
     if (!filters.selectedLeague) return [];
-    // Ordenar por fecha y luego por número de zona
-    return fixtures
-      .filter(fixture => fixture.leagueId === filters.selectedLeague)
-      .sort((a, b) => {
-        // 1. Ordenar por fecha
-        if (a.matchDate && b.matchDate) {
-          const dateDiff = new Date(a.matchDate).getTime() - new Date(b.matchDate).getTime();
-          if (dateDiff !== 0) return dateDiff;
-        }
-        // 2. Ordenar por número de zona
-        const getZoneNumber = (zoneId: string) => {
-          const zone = computedData.availableZones.find(z => z.id === zoneId);
-          // Extraer el primer número que aparezca en el nombre de la zona
-          const match = zone?.name?.match(/\d+/);
-          return match ? parseInt(match[0], 10) : 9999;
-        };
-        return getZoneNumber(a.zoneId) - getZoneNumber(b.zoneId);
-      });
-  }, [fixtures, filters.selectedLeague, computedData.availableZones]);
-  
-  // Fixtures inválidos
+    const filtered = fixtures.filter(fixture => fixture.leagueId === filters.selectedLeague);
+    return sortFixtures(filtered);
+  }, [fixtures, filters.selectedLeague, sortFixtures]);
+
   const invalidFixtures = useMemo(() => 
     fixtures.filter(f => f.invalidLeagueId), 
     [fixtures]
   );
-  
-  // Función para obtener nombre del equipo
+
   const getTeamName = useCallback((teamId: string): string => {
-    const team = teams.find(team => team.id === teamId);
-    return team ? team.name : 'Equipo desconocido';
-  }, [teams]);
-  
-  // Carga inicial
+    return teamNamesCache.get(teamId) || 'Equipo desconocido';
+  }, [teamNamesCache]);
+
+  const handleFilterChange = useCallback((type: keyof Filters, value: string) => {
+    setFilters(prev => ({ ...prev, [type]: value }));
+  }, []);
+
   useEffect(() => {
     const loadFixtures = async () => {
+      if (leagues.length === 0) return;
       try {
-        console.log('Loading fixtures from Supabase...');
+        setFormState(prev => ({ ...prev, isLoading: true }));
+        setError(null);
         await refreshFixtures();
-        console.log('Fixtures loaded successfully.');
-      } catch (error) {
-        console.error('Error loading fixtures:', error);
+      } catch (err) {
+        setError('Error al cargar los fixtures.');
       } finally {
         setFormState(prev => ({ ...prev, isLoading: false }));
       }
     };
-    
     loadFixtures();
-  }, [refreshFixtures]);
-  
-  // Inicialización de filtros
-  useEffect(() => {
-    if (leagues.length > 0 && !filters.selectedLeague) {
-      const firstLeague = leagues[0];
-      setFilters(prev => ({
-        ...prev,
-        selectedLeague: firstLeague.id,
-        selectedCategory: '',
-        selectedZone: ''
-      }));
-    }
-  }, [leagues, filters.selectedLeague]);
-  
-  // Auto-selección de categoría
-  useEffect(() => {
-    if (filters.selectedLeague && computedData.availableCategories.length > 0 && !filters.selectedCategory) {
-      setFilters(prev => ({
-        ...prev,
-        selectedCategory: computedData.availableCategories[0].id
-      }));
-    }
-  }, [filters.selectedLeague, computedData.availableCategories, filters.selectedCategory]);
-  
-  // Auto-selección de zona
-  useEffect(() => {
-    if (filters.selectedCategory && computedData.availableZones.length > 0 && !filters.selectedZone) {
-      setFilters(prev => ({
-        ...prev,
-        selectedZone: computedData.availableZones[0].id
-      }));
-    }
-  }, [filters.selectedCategory, computedData.availableZones, filters.selectedZone]);
-  
-  // Handlers
-  const handleAddClick = useCallback(() => {
-    setFormState(prev => ({ ...prev, isAdding: true, editingId: null }));
-    reset({
-      leagueId: filters.selectedLeague,
-      categoryId: filters.selectedCategory,
-      zoneId: filters.selectedZone,
-      date: '',
-      matchDate: '',
-      matches: [{ homeTeamId: '', awayTeamId: '', played: false }]
-    });
-  }, [filters, reset]);
-  
-  const handleEditClick = useCallback((fixtureId: string) => {
-    const fixture = fixtures.find(f => f.id === fixtureId);
-    if (!fixture) return;
-    
-    setFormState(prev => ({ ...prev, isAdding: false, editingId: fixtureId }));
-    
-    const formattedMatches = fixture.matches.map(match => ({
-      homeTeamId: match.homeTeamId,
-      awayTeamId: match.awayTeamId,
-      played: match.played,
-      homeScore: match.homeScore,
-      awayScore: match.awayScore
-    }));
-    
-    reset({
-      date: fixture.date,
-      matchDate: fixture.matchDate,
-      leagueId: fixture.leagueId,
-      categoryId: fixture.categoryId,
-      zoneId: fixture.zoneId,
-      leyenda: fixture.leyenda || '',
-      texto_central: fixture.texto_central || '',
-      matches: formattedMatches
-    });
-    
-    setFilters({
-      selectedLeague: fixture.leagueId,
-      selectedCategory: fixture.categoryId,
-      selectedZone: fixture.zoneId
-    });
-  }, [fixtures, reset]);
-  
-  const handleCancelClick = useCallback(() => {
-    setFormState(prev => ({ ...prev, isAdding: false, editingId: null }));
-    reset();
-  }, [reset]);
-  
-  const handleDeleteFixture = useCallback(async (id: string) => {
-    const confirmed = window.confirm('¿Estás seguro de eliminar este fixture? Esta acción no se puede deshacer.');
-    if (!confirmed) return;
-    
-    try {
-      setFormState(prev => ({ ...prev, isLoading: true }));
-      await deleteFixture(id);
-      await refreshFixtures();
-    } catch (error) {
-      console.error('Error deleting fixture:', error);
-      alert('Error al eliminar el fixture');
-    } finally {
-      setFormState(prev => ({ ...prev, isLoading: false }));
-    }
-  }, [deleteFixture, refreshFixtures]);
-  
-  const handleFilterChange = useCallback((type: 'league' | 'category' | 'zone', value: string) => {
-    setFilters(prev => {
-      const newFilters = { ...prev };
-      
-      switch (type) {
-        case 'league':
-          newFilters.selectedLeague = value;
-          newFilters.selectedCategory = '';
-          newFilters.selectedZone = '';
-          break;
-        case 'category':
-          newFilters.selectedCategory = value;
-          if (!isLigaMasculina) {
-            newFilters.selectedZone = '';
-          }
-          break;
-        case 'zone':
-          newFilters.selectedZone = value;
-          break;
-      }
-      
-      return newFilters;
-    });
-  }, [isLigaMasculina]);
-  
-  const onSubmit = useCallback(async (data: FixtureFormData) => {
-    try {
-      setFormState(prev => ({ ...prev, isSubmitting: true }));
-      
-      // Validar partidos
-      const validMatches = data.matches.filter(
-        match => match.homeTeamId && 
-                match.awayTeamId && 
-                match.homeTeamId !== match.awayTeamId
-      );
-      
-      if (validMatches.length === 0) {
-        alert('Debes agregar al menos un partido válido con ambos equipos seleccionados y diferentes.');
-        return;
-      }
-      
-      const fixtureData = {
-        nombre: data.date,
-        fechaPartido: data.matchDate,
-        ligaId: data.leagueId,
-        categoriaId: data.categoryId,
-        zonaId: data.zoneId,
-        leyenda: data.leyenda,
-        texto_central: data.texto_central,
-        matches: validMatches.map(match => ({
-          homeTeamId: match.homeTeamId,
-          awayTeamId: match.awayTeamId
-        }))
-      };
-      
-      let result;
-      if (formState.isAdding) {
-        console.log('[onSubmit] Creando fixture con datos:', fixtureData);
-        result = await SupabaseService.createFixture(fixtureData);
-        if (!result.success) {
-          throw new Error(result.error || 'Error creando fixture');
-        }
-        // Esperar un poco para asegurar que los partidos se guarden en la base
-        await new Promise(res => setTimeout(res, 400));
-        console.log('[onSubmit] Fixture creado con ID:', result.fixtureId);
-      } else if (formState.editingId) {
-        console.log('[onSubmit] Actualizando fixture con ID:', formState.editingId, fixtureData);
-        await SupabaseService.updateFixtureWithMatches(formState.editingId, fixtureData);
-      }
-      
-      // Refrescar fixtures
-      console.log('[onSubmit] Refrescando fixtures...');
-      await refreshFixtures();
-      console.log('[onSubmit] Fixtures refrescados.');
-      
-      setFilters({
-        selectedLeague: data.leagueId,
-        selectedCategory: data.categoryId,
-        selectedZone: data.zoneId
-      });
-      
-      setFormState(prev => ({ ...prev, isAdding: false, editingId: null }));
-      reset();
-      
-      alert(`Fixture ${formState.isAdding ? 'creado' : 'actualizado'} exitosamente!`);
-      
-    } catch (error) {
-      console.error('Error saving fixture:', error);
-      alert(`Error ${formState.isAdding ? 'creando' : 'actualizando'} fixture: ${error instanceof Error ? error.message : 'Error desconocido'}`);
-    } finally {
-      setFormState(prev => ({ ...prev, isSubmitting: false }));
-    }
-  }, [formState.isAdding, formState.editingId, refreshFixtures, reset]);
-  
-  // Validación de partidos duplicados
-  const validateMatches = useCallback((matches: FixtureFormData['matches']) => {
-    const duplicates = new Set();
-    return matches.filter(match => {
-      const key = `${match.homeTeamId}-${match.awayTeamId}`;
-      const reverseKey = `${match.awayTeamId}-${match.homeTeamId}`;
-      
-      if (duplicates.has(key) || duplicates.has(reverseKey)) {
-        return false;
-      }
-      
-      duplicates.add(key);
-      return true;
-    });
-  }, []);
-  
-  const isFormDisabled = formState.isSubmitting || formState.isLoading;
-  
+  }, [leagues, refreshFixtures]);
+
   return (
     <div className="space-y-6">
-      {/* Header */}
+      <FiltersSection
+        filters={filters}
+        leagues={leagues}
+        onChange={handleFilterChange}
+        isDisabled={formState.isLoading}
+      />
+      <ErrorBanner error={error} />
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Fixtures</h1>
         <button
           className="btn btn-primary flex items-center space-x-2"
-          onClick={handleAddClick}
-          disabled={isFormDisabled || formState.isAdding || !!formState.editingId || !filters.selectedLeague}
+          disabled={formState.isLoading || formState.isAdding || !!formState.editingId || !filters.selectedLeague}
         >
           <Plus size={18} />
           <span>Agregar Fixture</span>
         </button>
       </div>
-      
-      {/* Warning for invalid fixtures */}
+      <div style={{ maxHeight: '70vh', overflowY: 'auto' }}>
+        <FixtureList
+          fixtures={filteredFixtures}
+          isLoading={formState.isLoading}
+          selectedLeague={filters.selectedLeague}
+          onEdit={() => {}}
+          onDelete={() => {}}
+          getTeamName={getTeamName}
+        />
+      </div>
       {invalidFixtures.length > 0 && (
         <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded-md">
           <div className="flex items-start">
@@ -436,63 +286,6 @@ const FixturesPage: React.FC = () => {
           </div>
         </div>
       )}
-
-      {/* Filters */}
-      <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-          <Users size={20} className="mr-2 text-indigo-600" />
-          Filtros de Búsqueda
-        </h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div>
-            <label htmlFor="leagueFilter" className="form-label">Liga</label>
-            <select
-              id="leagueFilter"
-              className="form-input"
-              value={filters.selectedLeague}
-              onChange={(e) => handleFilterChange('league', e.target.value)}
-            >
-              <option value="">Seleccionar liga</option>
-              {leagues.map(league => (
-                <option key={league.id} value={league.id}>{league.name}</option>
-              ))}
-            </select>
-          </div>
-        </div>
-      </div>
-      
-      {/* Add/Edit Form */}
-      {(formState.isAdding || formState.editingId) && (
-        <FixtureForm
-          formState={formState}
-          setFormState={setFormState}
-          filters={filters}
-          setFilters={setFilters}
-          leagues={leagues}
-          teams={teams}
-          computedData={computedData}
-          reset={reset}
-          handleSubmit={handleSubmit}
-          onSubmit={onSubmit}
-          register={register}
-          errors={errors}
-          fields={fields}
-          append={append}
-          remove={remove}
-          isFormDisabled={isFormDisabled}
-          handleCancelClick={handleCancelClick}
-        />
-      )}
-      
-      {/* Fixtures List */}
-      <FixtureList
-        fixtures={filteredFixtures}
-        isLoading={formState.isLoading}
-        selectedLeague={filters.selectedLeague}
-        onEdit={handleEditClick}
-        onDelete={handleDeleteFixture}
-        getTeamName={getTeamName}
-      />
     </div>
   );
 };

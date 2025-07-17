@@ -11,6 +11,8 @@ const FixtureList = ({
   getTeamName
 }) => {
   const [expanded, setExpanded] = useState(new Set());
+  const [loadingMatches, setLoadingMatches] = useState({}); // { [fixtureId]: boolean }
+  const [matchesByFixture, setMatchesByFixture] = useState({}); // { [fixtureId]: Match[] }
 
   const toggleExpand = (fixtureId) => {
     setExpanded(prev => {
@@ -19,6 +21,16 @@ const FixtureList = ({
         newSet.delete(fixtureId);
       } else {
         newSet.add(fixtureId);
+        // Lazy load matches if not loaded
+        if (!matchesByFixture[fixtureId]) {
+          setLoadingMatches(lm => ({ ...lm, [fixtureId]: true }));
+          // Simular fetch de partidos (reemplazar por fetch real si tienes endpoint)
+          setTimeout(() => {
+            const fixture = fixtures.find(f => f.id === fixtureId);
+            setMatchesByFixture(mbf => ({ ...mbf, [fixtureId]: fixture?.matches || [] }));
+            setLoadingMatches(lm => ({ ...lm, [fixtureId]: false }));
+          }, 600); // Simula retardo de red
+        }
       }
       return newSet;
     });
@@ -55,6 +67,8 @@ const FixtureList = ({
     <div className="space-y-4">
       {fixtures.map(fixture => {
         const isOpen = expanded.has(fixture.id);
+        const isLoadingMatches = loadingMatches[fixture.id];
+        const matches = matchesByFixture[fixture.id] || [];
         return (
           <div key={fixture.id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow bg-white">
             <div className="flex items-center justify-between mb-2 cursor-pointer" onClick={() => toggleExpand(fixture.id)}>
@@ -90,29 +104,38 @@ const FixtureList = ({
             )}
             {isOpen && (
               <div className="space-y-2 transition-all duration-200">
-                {fixture.matches
-                  .filter(match =>
-                    match.homeTeamId &&
-                    match.awayTeamId &&
-                    getTeamName(match.homeTeamId) !== 'Equipo desconocido' &&
-                    getTeamName(match.awayTeamId) !== 'Equipo desconocido'
-                  )
-                  .map((match, index) => (
-                    <div key={match.id || index} className="bg-gray-50 p-3 rounded-md">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-4">
-                          <span className="font-medium">{getTeamName(match.homeTeamId)}</span>
-                          <span className="text-gray-500">vs</span>
-                          <span className="font-medium">{getTeamName(match.awayTeamId)}</span>
-                        </div>
-                        {match.played && match.homeScore !== undefined && match.awayScore !== undefined && (
-                          <div className="text-sm font-medium text-green-600">
-                            {match.homeScore} - {match.awayScore}
+                {isLoadingMatches ? (
+                  <div className="flex items-center justify-center py-4">
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 mr-2" />
+                    <span className="text-blue-600">Cargando partidos...</span>
+                  </div>
+                ) : matches.length === 0 ? (
+                  <div className="text-gray-500 text-center py-2">No hay partidos para este fixture.</div>
+                ) : (
+                  matches
+                    .filter(match =>
+                      match.homeTeamId &&
+                      match.awayTeamId &&
+                      getTeamName(match.homeTeamId) !== 'Equipo desconocido' &&
+                      getTeamName(match.awayTeamId) !== 'Equipo desconocido'
+                    )
+                    .map((match, index) => (
+                      <div key={match.id || index} className="bg-gray-50 p-3 rounded-md">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center space-x-4">
+                            <span className="font-medium">{getTeamName(match.homeTeamId)}</span>
+                            <span className="text-gray-500">vs</span>
+                            <span className="font-medium">{getTeamName(match.awayTeamId)}</span>
                           </div>
-                        )}
+                          {match.played && match.homeScore !== undefined && match.awayScore !== undefined && (
+                            <div className="text-sm font-medium text-green-600">
+                              {match.homeScore} - {match.awayScore}
+                            </div>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    ))
+                )}
               </div>
             )}
           </div>

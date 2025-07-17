@@ -705,17 +705,19 @@ static async updateTeam(
       const fixtures = data.map(mapSupabaseToFixture);
       console.log('Mapped fixtures:', fixtures);
       
-      // Cargar matches para cada fixture
-      for (const fixture of fixtures) {
-        try {
-          const matchesData = await obtenerPartidosPorFixture(fixture.id);
-          fixture.matches = matchesData.map(mapSupabaseToMatch);
-          console.log(`Loaded ${fixture.matches.length} matches for fixture ${fixture.id}`);
-        } catch (error) {
-          console.error(`Error loading matches for fixture ${fixture.id}:`, error);
-          fixture.matches = [];
-        }
-      }
+      // Cargar matches para cada fixture EN PARALELO
+      await Promise.all(
+        fixtures.map(async (fixture) => {
+          try {
+            const matchesData = await obtenerPartidosPorFixture(fixture.id);
+            fixture.matches = matchesData.map(mapSupabaseToMatch);
+            console.log(`Loaded ${fixture.matches.length} matches for fixture ${fixture.id}`);
+          } catch (error) {
+            console.error(`Error loading matches for fixture ${fixture.id}:`, error);
+            fixture.matches = [];
+          }
+        })
+      );
       
       console.log('Final fixtures with matches:', fixtures);
       return fixtures;
