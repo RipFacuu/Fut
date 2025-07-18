@@ -19,6 +19,7 @@ import CoursesPage from './pages/CoursesPage';
 import AdminCoursesPage from './pages/admin/CoursesPage';
 import FlyersPage from './pages/admin/FlyersPage';
 import CourseDetailPage from './pages/CourseDetailPage';
+import LeaguesPage from './pages/admin/LeaguesPage';
 
 const App: React.FC = () => {
   return (
@@ -38,6 +39,7 @@ const App: React.FC = () => {
                   <AdminDashboard />
                 </ProtectedRoute>
               }>
+                <Route path="leagues" element={<LeaguesPage />} />
                 <Route path="teams" element={<TeamsPage />} />
                 <Route path="fixtures" element={<FixturesPage />} />
                 <Route path="results" element={<ResultsPage />} />

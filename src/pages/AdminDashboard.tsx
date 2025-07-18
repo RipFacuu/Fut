@@ -30,6 +30,18 @@ const AdminDashboard: React.FC = () => {
               </div>
               <div className="p-2">
                 <NavLink
+                  to="/admin/leagues"
+                  className={({ isActive }) => cn(
+                    "flex items-center space-x-3 px-3 py-2 rounded-md text-sm transition-colors",
+                    isActive
+                      ? "bg-primary-50 text-primary-700"
+                      : "text-gray-700 hover:bg-gray-50"
+                  )}
+                >
+                  <ClipboardList size={18} />
+                  <span>Ligas</span>
+                </NavLink>
+                <NavLink
                   to="/admin/teams"
                   className={({ isActive }) => cn(
                     "flex items-center space-x-3 px-3 py-2 rounded-md text-sm transition-colors",

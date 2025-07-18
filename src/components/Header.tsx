@@ -3,12 +3,14 @@ import { Link, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { Trophy, Menu, X, User, LogOut, Sparkles } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { cn } from '../utils/cn';
+import { useLeague } from '../contexts/LeagueContext';
 
 const Header: React.FC = () => {
   const { isAuthenticated, logout } = useAuth();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
+  const { leagues } = useLeague();
 
   const handleLogout = () => {
     logout();
@@ -17,6 +19,20 @@ const Header: React.FC = () => {
 
   const toggleMenu = () => {
     setIsMenuOpen(!isMenuOpen);
+  };
+
+  // Helper para mostrar nombre especial si es liga conocida
+  const getLeagueDisplayName = (league: { id: string; name: string }) => {
+    switch (league.id) {
+      case 'liga_masculina':
+        return 'Liga Participando';
+      case 'lifufe':
+        return 'LIFUFE';
+      case 'mundialito':
+        return 'Mundialito';
+      default:
+        return league.name;
+    }
   };
 
   return (
@@ -54,60 +70,28 @@ const Header: React.FC = () => {
                 </>
               )}
             </NavLink>
-            <NavLink 
-              to="/league/liga_masculina" 
-              className={({ isActive }) => cn(
-                "px-4 py-2 rounded-xl text-sm font-semibold transition-all duration-300 relative overflow-hidden group",
-                isActive 
-                  ? "bg-white/20 text-white shadow-lg backdrop-blur-sm" 
-                  : "text-white/90 hover:text-white hover:bg-white/10 hover:scale-105"
-              )}
-            >
-              {({ isActive }) => (
-                <>
-                  <span className="relative z-10">Liga Participando</span>
-                  {isActive && (
-                    <div className="absolute inset-0 bg-gradient-to-r from-white/20 to-transparent"></div>
-                  )}
-                </>
-              )}
-            </NavLink>
-            <NavLink 
-              to="/league/lifufe" 
-              className={({ isActive }) => cn(
-                "px-4 py-2 rounded-xl text-sm font-semibold transition-all duration-300 relative overflow-hidden group",
-                isActive 
-                  ? "bg-white/20 text-white shadow-lg backdrop-blur-sm" 
-                  : "text-white/90 hover:text-white hover:bg-white/10 hover:scale-105"
-              )}
-            >
-              {({ isActive }) => (
-                <>
-                  <span className="relative z-10">LIFUFE</span>
-                  {isActive && (
-                    <div className="absolute inset-0 bg-gradient-to-r from-white/20 to-transparent"></div>
-                  )}
-                </>
-              )}
-            </NavLink>
-            <NavLink 
-              to="/league/mundialito" 
-              className={({ isActive }) => cn(
-                "px-4 py-2 rounded-xl text-sm font-semibold transition-all duration-300 relative overflow-hidden group",
-                isActive 
-                  ? "bg-white/20 text-white shadow-lg backdrop-blur-sm" 
-                  : "text-white/90 hover:text-white hover:bg-white/10 hover:scale-105"
-              )}
-            >
-              {({ isActive }) => (
-                <>
-                  <span className="relative z-10">Mundialito</span>
-                  {isActive && (
-                    <div className="absolute inset-0 bg-gradient-to-r from-white/20 to-transparent"></div>
-                  )}
-                </>
-              )}
-            </NavLink>
+            {/* Mostrar todas las ligas dinámicamente */}
+            {leagues.map((league) => (
+              <NavLink
+                key={league.id}
+                to={`/league/${league.id}`}
+                className={({ isActive }) => cn(
+                  "px-4 py-2 rounded-xl text-sm font-semibold transition-all duration-300 relative overflow-hidden group",
+                  isActive 
+                    ? "bg-white/20 text-white shadow-lg backdrop-blur-sm" 
+                    : "text-white/90 hover:text-white hover:bg-white/10 hover:scale-105"
+                )}
+              >
+                {({ isActive }) => (
+                  <>
+                    <span className="relative z-10">{getLeagueDisplayName(league)}</span>
+                    {isActive && (
+                      <div className="absolute inset-0 bg-gradient-to-r from-white/20 to-transparent"></div>
+                    )}
+                  </>
+                )}
+              </NavLink>
+            ))}
             <NavLink 
               to="/courses" 
               className={({ isActive }) => cn(
@@ -185,36 +169,20 @@ const Header: React.FC = () => {
             >
               Inicio
             </NavLink>
-            <NavLink
-              to="/league/liga_masculina"
-              className={({ isActive }) => cn(
-                "px-4 py-3 rounded-xl text-sm font-semibold transition-all duration-300",
-                isActive ? "bg-white/20 text-white shadow-lg" : "text-white/90 hover:bg-white/10 hover:text-white"
-              )}
-              onClick={toggleMenu}
-            >
-              Liga Participando
-            </NavLink>
-            <NavLink
-              to="/league/lifufe"
-              className={({ isActive }) => cn(
-                "px-4 py-3 rounded-xl text-sm font-semibold transition-all duration-300",
-                isActive ? "bg-white/20 text-white shadow-lg" : "text-white/90 hover:bg-white/10 hover:text-white"
-              )}
-              onClick={toggleMenu}
-            >
-              LIFUFE
-            </NavLink>
-            <NavLink
-              to="/league/mundialito"
-              className={({ isActive }) => cn(
-                "px-4 py-3 rounded-xl text-sm font-semibold transition-all duration-300",
-                isActive ? "bg-white/20 text-white shadow-lg" : "text-white/90 hover:bg-white/10 hover:text-white"
-              )}
-              onClick={toggleMenu}
-            >
-              Mundialito
-            </NavLink>
+            {/* Mostrar todas las ligas dinámicamente en mobile */}
+            {leagues.map((league) => (
+              <NavLink
+                key={league.id}
+                to={`/league/${league.id}`}
+                className={({ isActive }) => cn(
+                  "px-4 py-3 rounded-xl text-sm font-semibold transition-all duration-300",
+                  isActive ? "bg-white/20 text-white shadow-lg" : "text-white/90 hover:bg-white/10 hover:text-white"
+                )}
+                onClick={toggleMenu}
+              >
+                {getLeagueDisplayName(league)}
+              </NavLink>
+            ))}
             <NavLink
               to="/courses"
               className={({ isActive }) => cn(

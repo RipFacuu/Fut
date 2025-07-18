@@ -7,12 +7,8 @@ import FlyerCarousel from '../components/FlyerCarousel';
 const HomePage: React.FC = () => {
   const { leagues } = useLeague();
   
-  // Ordenar ligas manualmente
-  const orderedLeagues = [
-    leagues.find(l => l.id === 'liga_masculina'),
-    leagues.find(l => l.id === 'lifufe'),
-    leagues.find(l => l.id === 'mundialito'),
-  ].filter(Boolean);
+  // Mostrar todas las ligas, no solo las predefinidas
+  const orderedLeagues = leagues;
   
   return (
     <div className="space-y-12 px-4 sm:px-8">
@@ -57,6 +53,7 @@ const HomePage: React.FC = () => {
                   <div className="relative flex justify-center mb-6">
                     <div className="relative">
                       <div className="absolute inset-0 bg-gradient-to-r from-primary-400 to-accent-400 rounded-full blur-lg opacity-50 group-hover:opacity-75 transition-opacity duration-300"></div>
+                      {/* Mostrar imagen solo para ligas conocidas, si no mostrar ícono por defecto */}
                       {league.id === 'liga_masculina' && (
                         <div className="w-24 h-24 bg-gradient-to-br from-primary-100 to-primary-200 rounded-full flex items-center justify-center relative">
                           <img src="/liga_participando.jpeg" alt="Liga Masculina" className="w-24 h-24 object-cover rounded-full scale-110 group-hover:scale-125 transition-transform duration-300" />
@@ -70,6 +67,12 @@ const HomePage: React.FC = () => {
                       {league.id === 'mundialito' && (
                         <div className="w-24 h-24 bg-gradient-to-br from-yellow-100 to-yellow-200 rounded-full flex items-center justify-center relative">
                           <img src="/mundialito.jpeg" alt="Mundialito" className="w-24 h-24 object-cover rounded-full scale-110 group-hover:scale-125 transition-transform duration-300" />
+                        </div>
+                      )}
+                      {/* Para ligas nuevas, mostrar un ícono por defecto */}
+                      {league.id !== 'liga_masculina' && league.id !== 'lifufe' && league.id !== 'mundialito' && (
+                        <div className="w-24 h-24 bg-gradient-to-br from-gray-100 to-gray-200 rounded-full flex items-center justify-center relative">
+                          <span className="text-4xl text-gray-400 font-bold">{league.name[0]?.toUpperCase() || '?'}</span>
                         </div>
                       )}
                     </div>
