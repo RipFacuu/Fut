@@ -73,10 +73,10 @@ const HomePage: React.FC = () => {
                           <img src="/mundialito.jpeg" alt="Mundialito" className="w-24 h-24 object-cover rounded-full scale-110 group-hover:scale-125 transition-transform duration-300" />
                         </div>
                       )}
-                      {/* Para ligas nuevas, mostrar un ícono por defecto */}
+                      {/* Para ligas nuevas, mostrar un ícono de copa */}
                       {league.id !== 'liga_masculina' && league.id !== 'lifufe' && league.id !== 'mundialito' && (
                         <div className="w-24 h-24 bg-gradient-to-br from-gray-100 to-gray-200 rounded-full flex items-center justify-center relative">
-                          <span className="text-4xl text-gray-400 font-bold">{league.name[0]?.toUpperCase() || '?'}</span>
+                          <Trophy className="text-gray-400" size={48} />
                         </div>
                       )}
                     </div>
