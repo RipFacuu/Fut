@@ -367,8 +367,9 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
 
   const getZonesByCategory = useCallback((categoryId: string): Zone[] => {
     if (!categoryId) return [];
-    return zonesByCategory.get(String(categoryId)) || [];
-  }, [zonesByCategory]);
+    // Comparar siempre como string
+    return zones.filter(zone => String(zone.categoryId) === String(categoryId));
+  }, [zones]);
 
   const getZonesByLeague = useCallback((leagueId: string): Zone[] => {
     if (!leagueId) return [];

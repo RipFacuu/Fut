@@ -211,7 +211,9 @@ const StandingsPage: React.FC = () => {
   const isLigaMasculina = selectedLeague === 'liga_masculina';
   const isLifufe = selectedLeague === 'lifufe';
   const isMundialito = selectedLeague === 'mundialito';
-  const isCategoriaPrimero = isLifufe || isMundialito;
+  // IDs de ligas que deben ser "categoría primero"
+  const categoriaPrimeroIds = ['lifufe', 'mundialito', '5']; // '5' es el id de Tu Torneo
+  const isCategoriaPrimero = categoriaPrimeroIds.includes(selectedLeague);
   
   // Get categories for selected league and zone (como en CategoriesPage)
   const filteredZones = useMemo(() => {
