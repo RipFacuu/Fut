@@ -7,8 +7,12 @@ import FlyerCarousel from '../components/FlyerCarousel';
 const HomePage: React.FC = () => {
   const { leagues } = useLeague();
   
-  // Mostrar todas las ligas, no solo las predefinidas
-  const orderedLeagues = leagues;
+  // Ordenar: primero las conocidas, luego el resto por id ascendente
+  const knownOrder = ['liga_masculina', 'lifufe', 'mundialito'];
+  const orderedLeagues = [
+    ...knownOrder.map(id => leagues.find(l => l.id === id)).filter(Boolean),
+    ...leagues.filter(l => !knownOrder.includes(l.id)).sort((a, b) => Number(a.id) - Number(b.id))
+  ];
   
   return (
     <div className="space-y-12 px-4 sm:px-8">
