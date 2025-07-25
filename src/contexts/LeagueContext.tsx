@@ -701,7 +701,10 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
     deleteCategory,
     getZonesByCategory,
     getZonesByLeague,
-    getCategoriesByZone: () => [],
+    getCategoriesByZone: (zoneId: string) => {
+      // Filtrar categorías que tienen el zoneId especificado
+      return categories.filter(cat => String(cat.zoneId) === String(zoneId));
+    },
     addZone,
     updateZone,
     deleteZone,
