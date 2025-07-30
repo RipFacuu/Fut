@@ -1,8 +1,18 @@
 import React, { useState } from 'react';
 import { Edit, Trash2, ChevronDown, ChevronRight, Calendar } from 'lucide-react';
 import { formatLocalDate } from '../../utils/dateUtils';
+import { Fixture } from '../../contexts/LeagueContext';
 
-const FixtureList = ({
+interface FixtureListProps {
+  fixtures: Fixture[];
+  isLoading: boolean;
+  selectedLeague: string;
+  onEdit: (fixtureId: string) => void;
+  onDelete: (fixtureId: string) => void;
+  getTeamName: (teamId: string) => string;
+}
+
+const FixtureList: React.FC<FixtureListProps> = ({
   fixtures,
   isLoading,
   selectedLeague,

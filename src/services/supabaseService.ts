@@ -489,15 +489,6 @@ export class SupabaseService {
     logo?: string
   ): Promise<Team | null> {
     try {
-      const getNumericLeagueId = (leagueStringId: string): number => {
-        const leagueMap: { [key: string]: number } = {
-          'liga_masculina': 1,
-          'lifufe': 2,
-          'mundialito': 3
-        };
-        return leagueMap[leagueStringId] || parseInt(leagueStringId);
-      };
-      
       const numericLeagueId = getNumericLeagueId(leagueId);
       
       const { data, error }: PostgrestSingleResponse<any[]> = await supabase

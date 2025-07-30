@@ -1,8 +1,21 @@
 import React from 'react';
 import { Plus, Trash2 } from 'lucide-react';
 import { cn } from '../../utils/cn';
+import { Team } from '../../contexts/LeagueContext';
 
-const MatchesSection = ({ fields, append, remove, register, errors, computedData, isFormDisabled }) => (
+interface MatchesSectionProps {
+  fields: any[];
+  append: (field: any) => void;
+  remove: (index: number) => void;
+  register: any;
+  errors: any;
+  computedData: {
+    leagueTeams: Team[];
+  };
+  isFormDisabled: boolean;
+}
+
+const MatchesSection: React.FC<MatchesSectionProps> = ({ fields, append, remove, register, errors, computedData, isFormDisabled }) => (
   <div className="space-y-4">
     <div className="flex items-center justify-between">
       <h3 className="text-lg font-medium">Partidos</h3>

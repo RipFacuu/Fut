@@ -547,15 +547,59 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
     return fixtures.filter(fixture => String(fixture.zoneId) === String(zoneId));
   }, [fixtures]);
 
-  const addFixture = useCallback(() => {
-    // Solo local, para persistir usar SupabaseService
-    // ...
-  }, []);
+  const addFixture = useCallback(async (fixture: Omit<Fixture, 'id'>): Promise<void> => {
+    try {
+      const result = await SupabaseService.createFixture({
+        nombre: fixture.date,
+        fechaPartido: fixture.matchDate,
+        ligaId: fixture.leagueId,
+        categoriaId: fixture.categoryId,
+        zonaId: fixture.zoneId,
+        leyenda: fixture.leyenda,
+        texto_central: fixture.texto_central,
+        matches: fixture.matches.map(match => ({
+          homeTeamId: match.homeTeamId,
+          awayTeamId: match.awayTeamId
+        }))
+      });
+      
+      if (result.success) {
+        refreshFixtures();
+      } else {
+        throw new Error(result.error || 'Error al crear el fixture');
+      }
+    } catch (error) {
+      handleError(error, 'addFixture', 'Error al crear el fixture');
+      throw error;
+    }
+  }, [refreshFixtures]);
 
-  const updateFixture = useCallback(() => {
-    // Solo local, para persistir usar SupabaseService
-    // ...
-  }, []);
+  const updateFixture = useCallback(async (id: string, data: Partial<Fixture>): Promise<void> => {
+    try {
+      const result = await SupabaseService.updateFixtureWithMatches(id, {
+        nombre: data.date || '',
+        fechaPartido: data.matchDate || '',
+        ligaId: data.leagueId || '',
+        categoriaId: data.categoryId || '',
+        zonaId: data.zoneId || '',
+        leyenda: data.leyenda,
+        texto_central: data.texto_central,
+        matches: (data.matches || []).map(match => ({
+          homeTeamId: match.homeTeamId,
+          awayTeamId: match.awayTeamId
+        }))
+      });
+      
+      if (result.success) {
+        refreshFixtures();
+      } else {
+        throw new Error(result.error || 'Error al actualizar el fixture');
+      }
+    } catch (error) {
+      handleError(error, 'updateFixture', 'Error al actualizar el fixture');
+      throw error;
+    }
+  }, [refreshFixtures]);
 
   const deleteFixture = useCallback(async (id: string) => {
     try {
