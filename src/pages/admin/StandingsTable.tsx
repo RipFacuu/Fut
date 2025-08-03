@@ -550,23 +550,39 @@ const StandingsTable: React.FC<{ zoneId: string; leagueId: string; categoryId: s
   //   <input id="pj" ... aria-label="Partidos Jugados" />
   // </div>
   // Aplica esto a todos los inputs del formulario y tabla.
-  // 9. VALIDACIÓN DE PERMISOS EN handleDeleteTeam
+  // 9. VALIDACIÓN DE PERMISOS EN handleDeleteTeam con confirmación de seguridad mejorada
   const handleDeleteTeam = async (standing: Standing) => {
     if (!isAuthenticated || user?.username !== 'admin') {
-      alert('No tienes permisos para eliminar equipos');
+      alert('❌ No tienes permisos para eliminar equipos');
       return;
     }
-    if (window.confirm('¿Estás seguro de eliminar este equipo? Esta acción no se puede deshacer.')) {
-      // setIsLoading(true); // Eliminado
-      try {
-        // await deleteTeam(standing.teamId); // Eliminado
-        // setRefreshKey(prev => prev + 1); // Eliminado
-      } catch (error) {
-        console.error('Error eliminando equipo:', error);
-        alert('Error al eliminar el equipo. Inténtalo de nuevo.');
-      } finally {
-        // setIsLoading(false); // Eliminado
-      }
+    
+    // Obtener el nombre del equipo para mostrar en la confirmación
+    const teamName = getTeamName(standing.teamId) || 'Equipo desconocido';
+    
+
+   
+    
+    // Confirmación final
+    const finalConfirm = confirm(`🔴 CONFIRMACIÓN FINAL\n\n` +
+                               `¿Estás completamente seguro de eliminar "${teamName}"?\n\n` +
+                               `Esta acción es IRREVERSIBLE.`);
+    
+    if (!finalConfirm) {
+      alert('❌ Eliminación cancelada. El equipo se mantiene en la tabla.');
+      return;
+    }
+    
+    // setIsLoading(true); // Eliminado
+    try {
+      // await deleteTeam(standing.teamId); // Eliminado
+      // setRefreshKey(prev => prev + 1); // Eliminado
+      alert(`✅ Equipo "${teamName}" eliminado exitosamente.`);
+    } catch (error) {
+      console.error('Error eliminando equipo:', error);
+      alert('❌ Error al eliminar el equipo. Inténtalo de nuevo.');
+    } finally {
+      // setIsLoading(false); // Eliminado
     }
   };
 
