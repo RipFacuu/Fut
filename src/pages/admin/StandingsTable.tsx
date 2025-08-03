@@ -254,16 +254,22 @@ const StandingsTable: React.FC<{ zoneId: string; leagueId: string; categoryId: s
 
   // 2. Unir standings existentes con equipos que no tengan posición, y ordenar correctamente
   const allRows = useMemo(() => {
-    // Standings existentes, ordenados por puntos, diferencia de gol y nombre
+    // Standings existentes, ordenados por el mismo criterio que el público
+    // TEMPORAL: Ignorar orden manual para forzar orden por puntos
     const standingsRows = standings
       .map(s => ({ ...s, isDraft: false }))
       .sort((a, b) => {
+        // Ordenar por puntos descendente (ignorando orden manual temporalmente)
         const bPuntos = Number(b.puntos) || 0;
         const aPuntos = Number(a.puntos) || 0;
         if (bPuntos !== aPuntos) return bPuntos - aPuntos;
-        const bDiff = (Number(b.goalsFor) || 0) - (Number(b.goalsAgainst) || 0);
-        const aDiff = (Number(a.goalsFor) || 0) - (Number(a.goalsAgainst) || 0);
-        if (bDiff !== aDiff) return bDiff - aDiff;
+        
+        // Si tienen los mismos puntos, ordenar por partidos jugados ascendente
+        const aPj = Number(a.pj) || 0;
+        const bPj = Number(b.pj) || 0;
+        if (aPj !== bPj) return aPj - bPj;
+        
+        // Como último criterio, ordenar alfabéticamente por nombre del equipo
         const teamA = teams.find(t => t.id === a.teamId)?.name || '';
         const teamB = teams.find(t => t.id === b.teamId)?.name || '';
         return teamA.localeCompare(teamB);
