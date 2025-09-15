@@ -1,6 +1,43 @@
 export interface Database {
   public: {
     Tables: {
+      usuarios: {
+        Row: {
+          id: string
+          nombre: string
+          apellido: string
+          fecha_nacimiento: string
+          documento: string
+          escuela: string
+          equipo_id?: string
+          email?: string
+          password?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Insert: {
+          id?: string
+          nombre: string
+          apellido: string
+          fecha_nacimiento: string
+          documento: string
+          escuela: string
+          equipo_id?: string
+          email?: string
+          password?: string
+        }
+        Update: {
+          id?: string
+          nombre?: string
+          apellido?: string
+          fecha_nacimiento?: string
+          documento?: string
+          escuela?: string
+          equipo_id?: string
+          email?: string
+          password?: string
+        }
+      }
       equipos: {
         Row: {
           id: string
@@ -8,7 +45,7 @@ export interface Database {
           zona_id: string
           liga_id: string
           categoria_id: string
-          logo?: string        // ← Agregar esta línea
+          logo?: string
           created_at?: string
         }
         Insert: {
@@ -17,7 +54,7 @@ export interface Database {
           zona_id: string
           liga_id: string
           categoria_id: string
-          logo?: string        // ← Agregar esta línea
+          logo?: string
         }
         Update: {
           id?: string
@@ -25,7 +62,7 @@ export interface Database {
           zona_id?: string
           liga_id?: string
           categoria_id?: string
-          logo?: string        // ← Agregar esta línea
+          logo?: string
         }
       }
       zonas: {
@@ -223,6 +260,83 @@ export interface Database {
           order_index?: number
           created_at?: string
           updated_at?: string
+        }
+      }
+      prode_predictions: {
+        Row: {
+          id: string
+          user_id: string
+          partido_id: string
+          prediction: string
+          points_earned: number
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          partido_id: string
+          prediction: string
+          points_earned?: number
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          partido_id?: string
+          prediction?: string
+          points_earned?: number
+        }
+      }
+      prode_user_scores: {
+        Row: {
+          id: string
+          user_id: string
+          total_points: number
+          total_predictions: number
+          correct_predictions: number
+          accuracy_percentage: number
+          last_updated: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          total_points?: number
+          total_predictions?: number
+          correct_predictions?: number
+          accuracy_percentage?: number
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          total_points?: number
+          total_predictions?: number
+          correct_predictions?: number
+          accuracy_percentage?: number
+        }
+      }
+      prode_config: {
+        Row: {
+          id: string
+          points_per_correct_prediction: number
+          points_per_incorrect_prediction: number
+          prediction_deadline_minutes: number
+          is_active: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          points_per_correct_prediction?: number
+          points_per_incorrect_prediction?: number
+          prediction_deadline_minutes?: number
+          is_active?: boolean
+        }
+        Update: {
+          id?: string
+          points_per_correct_prediction?: number
+          points_per_incorrect_prediction?: number
+          prediction_deadline_minutes?: number
+          is_active?: boolean
         }
       }
       created_at?: string

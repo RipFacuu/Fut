@@ -2,11 +2,14 @@ import React, { useState } from 'react';
 import { Link, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { Trophy, Menu, X, User, LogOut, Sparkles } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { useUserAuth } from '../contexts/UserAuthContext';
 import { cn } from '../utils/cn';
 import { useLeague } from '../contexts/LeagueContext';
+import { UserNav } from './user/UserNav';
 
 const Header: React.FC = () => {
   const { isAuthenticated, logout } = useAuth();
+  const { isAuthenticated: isUserAuthenticated } = useUserAuth();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
@@ -118,6 +121,25 @@ const Header: React.FC = () => {
               )}
             </NavLink>
             
+            <NavLink 
+              to="/prode" 
+              className={({ isActive }) => cn(
+                "px-4 py-2 rounded-xl text-sm font-semibold transition-all duration-300 relative overflow-hidden group",
+                isActive 
+                  ? "bg-white/20 text-white shadow-lg backdrop-blur-sm" 
+                  : "text-white/90 hover:text-white hover:bg-white/10 hover:scale-105"
+              )}
+            >
+              {({ isActive }) => (
+                <>
+                  <span className="relative z-10">🏆 Prode</span>
+                  {isActive && (
+                    <div className="absolute inset-0 bg-gradient-to-r from-white/20 to-transparent"></div>
+                  )}
+                </>
+              )}
+            </NavLink>
+            
             {isAuthenticated ? (
               <div className="flex items-center space-x-2 ml-4">
                 <Link
@@ -136,13 +158,22 @@ const Header: React.FC = () => {
                 </button>
               </div>
             ) : (
-              <Link
-                to="/admin/login"
-                className="flex items-center space-x-2 px-4 py-2 rounded-xl text-sm font-semibold bg-gradient-to-r from-accent-500 to-accent-600 hover:from-accent-600 hover:to-accent-700 text-white transition-all duration-300 hover:scale-105 shadow-lg ml-4"
-              >
-                <User size={18} />
-                <span>Acceder</span>
-              </Link>
+              <div className="flex items-center space-x-2 ml-4">
+                {/* Navegación de usuarios */}
+                <UserNav />
+                
+                {/* Separador visual */}
+                <div className="w-px h-6 bg-white/30"></div>
+                
+                {/* Acceso admin */}
+                <Link
+                  to="/admin/login"
+                  className="flex items-center space-x-2 px-4 py-2 rounded-xl text-sm font-semibold bg-gradient-to-r from-accent-500 to-accent-600 hover:from-accent-600 hover:to-accent-700 text-white transition-all duration-300 hover:scale-105 shadow-lg"
+                >
+                  <User size={18} />
+                  <span>Admin</span>
+                </Link>
+              </div>
             )}
           </nav>
 
@@ -200,6 +231,16 @@ const Header: React.FC = () => {
             >
               Cursos
             </NavLink>
+            <NavLink
+              to="/prode"
+              className={({ isActive }) => cn(
+                "px-4 py-3 rounded-xl text-sm font-semibold transition-all duration-300",
+                isActive ? "bg-white/20 text-white shadow-lg" : "text-white/90 hover:bg-white/10 hover:text-white"
+              )}
+              onClick={toggleMenu}
+            >
+              🏆 Prode
+            </NavLink>
             
             {isAuthenticated ? (
               <div className="flex flex-col space-y-2 pt-2 border-t border-white/20">
@@ -223,14 +264,25 @@ const Header: React.FC = () => {
                 </button>
               </div>
             ) : (
-              <Link
-                to="/admin/login"
-                className="flex items-center space-x-2 px-4 py-3 rounded-xl text-sm font-semibold bg-gradient-to-r from-accent-500 to-accent-600 hover:from-accent-600 hover:to-accent-700 text-white transition-all duration-300"
-                onClick={toggleMenu}
-              >
-                <User size={18} />
-                <span>Acceder</span>
-              </Link>
+              <div className="flex flex-col space-y-2 pt-2 border-t border-white/20">
+                {/* Navegación de usuarios en móvil */}
+                <div className="px-4 py-3">
+                  <UserNav />
+                </div>
+                
+                {/* Separador visual */}
+                <div className="w-full h-px bg-white/20"></div>
+                
+                {/* Acceso admin */}
+                <Link
+                  to="/admin/login"
+                  className="flex items-center space-x-2 px-4 py-3 rounded-xl text-sm font-semibold bg-gradient-to-r from-accent-500 to-accent-600 hover:from-accent-600 hover:to-accent-700 text-white transition-all duration-300"
+                  onClick={toggleMenu}
+                >
+                  <User size={18} />
+                  <span>Admin</span>
+                </Link>
+              </div>
             )}
           </div>
         </div>
