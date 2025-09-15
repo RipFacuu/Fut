@@ -62,27 +62,32 @@ const PublicStandingsTable: React.FC<PublicStandingsTableProps> = ({ leagueId, z
           const teamIdsValid = new Set(teamsForZoneAndCategory.map(t => t.id));
           // Solo standings de equipos válidos
           const filteredStandings = uniqueData.filter(s => teamIdsValid.has(s.teamId));
-          // Ordenar standings por puntos, diferencia de gol y nombre
-          const sortedStandings = filteredStandings.slice().sort((a, b) => {
-            if (typeof a.orden === 'number' && typeof b.orden === 'number' && a.orden !== b.orden) {
-              return a.orden - b.orden;
-            }
-            if (b.puntos !== a.puntos) return b.puntos - a.puntos;
-            const aDiff = a.goalsFor - a.goalsAgainst;
-            const bDiff = b.goalsFor - b.goalsAgainst;
-            if (bDiff !== aDiff) return bDiff - aDiff;
-            const teamA = teams.find(t => t.id === a.teamId)?.name || '';
-            const teamB = teams.find(t => t.id === b.teamId)?.name || '';
-            return teamA.localeCompare(teamB);
-          });
           // Eliminar duplicados por teamId, priorizando equipo_nombre no vacío
           const uniqueStandingsMap = new Map();
-          for (const s of sortedStandings) {
+          for (const s of filteredStandings) {
             if (!uniqueStandingsMap.has(s.teamId) || (s.equipo_nombre && s.equipo_nombre.trim() !== '')) {
               uniqueStandingsMap.set(s.teamId, s);
             }
           }
           const uniqueStandings = Array.from(uniqueStandingsMap.values());
+
+          console.log('Raw data from database:', uniqueData);
+          console.log('Transformed standings:', uniqueData.map(pos => ({
+            id: `${pos.equipo_id}-${pos.zona_id}-${pos.categoria_id}`,
+            teamId: pos.equipo_id,
+            leagueId,
+            categoryId: String(pos.categoria_id),
+            zoneId: pos.zona_id,
+            puntos: Number(pos.puntos) || 0,
+            pj: Number(pos.pj) || 0,
+            orden: typeof pos.orden === 'number' ? pos.orden : 0,
+            equipo_nombre: pos.equipo_nombre || '',
+            won: 0,
+            drawn: 0,
+            lost: 0,
+            goalsFor: 0,
+            goalsAgainst: 0
+          })));
 
           setStandings(uniqueData.map(pos => ({
             id: `${pos.equipo_id}-${pos.zona_id}-${pos.categoria_id}`,
@@ -90,8 +95,8 @@ const PublicStandingsTable: React.FC<PublicStandingsTableProps> = ({ leagueId, z
             leagueId,
             categoryId: String(pos.categoria_id),
             zoneId: pos.zona_id,
-            puntos: pos.puntos || 0,
-            pj: pos.pj || 0,
+            puntos: Number(pos.puntos) || 0,
+            pj: Number(pos.pj) || 0,
             orden: typeof pos.orden === 'number' ? pos.orden : 0,
             equipo_nombre: pos.equipo_nombre || '',
             won: 0,
@@ -106,32 +111,30 @@ const PublicStandingsTable: React.FC<PublicStandingsTableProps> = ({ leagueId, z
     });
   }, [zoneId, categoryId, leagueId]);
 
-  // Ordenar standings por el mismo criterio que el admin: si hay algún 'orden' > 0, usarlo; si no, usar el orden tradicional
-  const hasManualOrder = standings.some(s => typeof s.orden === 'number' && s.orden > 0);
+  // Ordenar standings por el mismo criterio que el admin y la base de datos
+  // TEMPORAL: Ignorar orden manual para forzar orden por puntos
   const sortedStandings = standings.slice().sort((a, b) => {
-    if (hasManualOrder) {
-      // Ordenar por 'orden' ascendente (1,2,3...)
-      return (a.orden ?? 9999) - (b.orden ?? 9999);
-    }
-    // 1. Puntos (desc)
-    if (b.puntos !== a.puntos) return b.puntos - a.puntos;
-    // 2. Diferencia de gol (desc)
-    const aDiff = a.goalsFor - a.goalsAgainst;
-    const bDiff = b.goalsFor - b.goalsAgainst;
-    if (bDiff !== aDiff) return bDiff - aDiff;
-    // 3. Goles a favor (desc)
-    if (b.goalsFor !== a.goalsFor) return b.goalsFor - a.goalsFor;
-    // 4. Menos partidos jugados (asc)
-    if (a.pj !== b.pj) return a.pj - b.pj;
-    // 5. Nombre de equipo (asc, opcional)
-    const teamA = (a.equipo_nombre && a.equipo_nombre.trim() !== '' ? a.equipo_nombre : teams.find(t => t.id === a.teamId)?.name || '').toLowerCase();
-    const teamB = (b.equipo_nombre && b.equipo_nombre.trim() !== '' ? b.equipo_nombre : teams.find(t => t.id === b.teamId)?.name || '').toLowerCase();
-    return teamA.localeCompare(teamB);
+    // Ordenar por puntos descendente (ignorando orden manual temporalmente)
+    const bPuntos = Number(b.puntos) || 0;
+    const aPuntos = Number(a.puntos) || 0;
+    if (bPuntos !== aPuntos) return bPuntos - aPuntos;
+    
+    // Si tienen los mismos puntos, ordenar por partidos jugados ascendente
+    const aPj = Number(a.pj) || 0;
+    const bPj = Number(b.pj) || 0;
+    if (aPj !== bPj) return aPj - bPj;
+    
+    // Como último criterio, ordenar alfabéticamente por nombre del equipo
+    const nombreA = (a.equipo_nombre && a.equipo_nombre.trim() !== '' ? a.equipo_nombre : teams.find(t => t.id === a.teamId)?.name || '').toLowerCase();
+    const nombreB = (b.equipo_nombre && b.equipo_nombre.trim() !== '' ? b.equipo_nombre : teams.find(t => t.id === b.teamId)?.name || '').toLowerCase();
+    return nombreA.localeCompare(nombreB);
   });
 
   // Log para depuración
   console.log('Standings antes de filtrar:', standings);
   console.log('Standings ordenados:', sortedStandings);
+  console.log('Tipos de datos - puntos:', standings.map(s => ({ teamId: s.teamId, puntos: s.puntos, tipo: typeof s.puntos })));
+  console.log('Manual orden values:', standings.map(s => ({ teamId: s.teamId, orden: s.orden, puntos: s.puntos })));
 
   // Filtrar duplicados por teamId, priorizando la fila con equipo_nombre no vacío
   const uniqueStandingsMap = new Map();

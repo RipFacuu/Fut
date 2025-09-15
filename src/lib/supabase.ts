@@ -636,12 +636,47 @@ export async function obtenerPosicionesPorZonaYCategoria(zonaId: string, categor
     .from('posiciones_editable')
     .select('equipo_id, equipo_nombre, zona_id, pj, puntos, categoria_id, orden, id')
     .eq('zona_id', zonaId)
-    .eq('categoria_id', categoriaId)
-    .order('orden', { ascending: true })
-    .order('puntos', { ascending: false })
-    .order('pj', { ascending: true });
+    .eq('categoria_id', categoriaId);
+  
   if (error) throw error;
-  return data || [];
+  
+  // Debug: Log the raw data
+  console.log('Raw data from database:', data);
+  console.log('Data types:', data?.map(item => ({
+    equipo_id: item.equipo_id,
+    puntos: item.puntos,
+    tipo_puntos: typeof item.puntos,
+    pj: item.pj,
+    tipo_pj: typeof item.pj
+  })));
+  
+  // Ordenar los datos en JavaScript para mayor control
+  // TEMPORAL: Ignorar orden manual para forzar orden por puntos
+  const sortedData = (data || []).sort((a, b) => {
+    // Ordenar por puntos descendente (ignorando orden manual temporalmente)
+    const bPuntos = Number(b.puntos) || 0;
+    const aPuntos = Number(a.puntos) || 0;
+    if (bPuntos !== aPuntos) {
+      return bPuntos - aPuntos;
+    }
+    
+    // Si tienen los mismos puntos, ordenar por partidos jugados ascendente
+    const aPj = Number(a.pj) || 0;
+    const bPj = Number(b.pj) || 0;
+    if (aPj !== bPj) {
+      return aPj - bPj;
+    }
+    
+    // Como último criterio, ordenar alfabéticamente por nombre del equipo
+    const nombreA = (a.equipo_nombre || '').toLowerCase();
+    const nombreB = (b.equipo_nombre || '').toLowerCase();
+    return nombreA.localeCompare(nombreB);
+  });
+  
+  // Debug: Log the sorted data
+  console.log('Sorted data from database:', sortedData);
+  
+  return sortedData;
 }
 
 // Crear nueva posición

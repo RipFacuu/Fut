@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useLeague, Team, League } from '../../contexts/LeagueContext';
-import { useForm } from 'react-hook-form';
+import { useForm, useFieldArray } from 'react-hook-form';
 import { Plus, Users, AlertTriangle } from 'lucide-react';
 import FixtureList from './FixtureList';
+import FixtureForm from './FixtureForm';
 
 interface FixtureFormData {
   date: string;
@@ -105,12 +106,16 @@ const FixturesPage: React.FC = () => {
     getZonesByCategory,
     refreshFixtures,
     getZonesByLeague,
-    getCategoriesByZone
+    getCategoriesByZone,
+    addFixture,
+    updateFixture,
+    deleteFixture
   } = useLeague();
 
   const [formState, setFormState] = useState<FormState>(INITIAL_FORM_STATE);
   const [filters, setFilters] = useState<Filters>(INITIAL_FILTERS);
   const [error, setError] = useState<string | null>(null);
+  const [showForm, setShowForm] = useState(false);
 
   const form = useForm<FixtureFormData>({
     defaultValues: {
@@ -123,7 +128,11 @@ const FixturesPage: React.FC = () => {
     }
   });
 
-  const { watch } = form;
+  const { watch, reset, handleSubmit, register, formState: { errors }, setValue, control } = form;
+  const { fields, append, remove } = useFieldArray({
+    control,
+    name: 'matches'
+  });
 
   const teamsByZone = useMemo(() => {
     const cache = new Map<string, Team[]>();
@@ -151,7 +160,10 @@ const FixturesPage: React.FC = () => {
     const categoryZones = getZonesByCategory(filters.selectedCategory);
     const zoneTeams = teamsByZone.get(filters.selectedZone) || [];
     const formZoneTeams = teamsByZone.get(watch('zoneId') || '') || [];
-    const leagueTeams = teams.filter(team => team.leagueId === (watch('leagueId') || ''));
+    const selectedLeagueId = watch('leagueId') || '';
+    const leagueTeams = selectedLeagueId 
+      ? teams.filter(team => team.leagueId === selectedLeagueId)
+      : teams; // Mostrar todos los equipos si no hay liga seleccionada
 
     const availableZones = isLigaMasculina 
       ? getZonesByLeague(filters.selectedLeague)
@@ -218,6 +230,93 @@ const FixturesPage: React.FC = () => {
     setFilters(prev => ({ ...prev, [type]: value }));
   }, []);
 
+  const handleAddFixture = useCallback(() => {
+    setFormState(prev => ({ ...prev, isAdding: true, editingId: null }));
+    setShowForm(true);
+    reset({
+      leagueId: filters.selectedLeague || '',
+      categoryId: '',
+      zoneId: '',
+      date: '',
+      matchDate: '',
+      matches: [{ homeTeamId: '', awayTeamId: '', played: false }]
+    });
+  }, [filters.selectedLeague, reset]);
+
+  const handleEditFixture = useCallback((fixtureId: string) => {
+    const fixture = fixtures.find(f => f.id === fixtureId);
+    if (!fixture) return;
+
+    setFormState(prev => ({ ...prev, isAdding: false, editingId: fixtureId }));
+    setShowForm(true);
+    
+    reset({
+      leagueId: fixture.leagueId,
+      categoryId: fixture.categoryId,
+      zoneId: fixture.zoneId,
+      date: fixture.date,
+      matchDate: fixture.matchDate,
+      leyenda: fixture.leyenda || '',
+      texto_central: fixture.texto_central || '',
+      matches: fixture.matches.length > 0 ? fixture.matches.map(match => ({
+        homeTeamId: match.homeTeamId,
+        awayTeamId: match.awayTeamId,
+        played: match.played || false,
+        homeScore: match.homeScore,
+        awayScore: match.awayScore
+      })) : [{ homeTeamId: '', awayTeamId: '', played: false }]
+    });
+  }, [fixtures, reset]);
+
+  const handleDeleteFixture = useCallback(async (fixtureId: string) => {
+    if (!confirm('¿Estás seguro de que quieres eliminar este fixture?')) return;
+    
+    try {
+      setFormState(prev => ({ ...prev, isLoading: true }));
+      await deleteFixture(fixtureId);
+      setError(null);
+    } catch (err) {
+      setError('Error al eliminar el fixture.');
+    } finally {
+      setFormState(prev => ({ ...prev, isLoading: false }));
+    }
+  }, [deleteFixture]);
+
+  const handleCancelForm = useCallback(() => {
+    setShowForm(false);
+    setFormState(prev => ({ ...prev, isAdding: false, editingId: null }));
+    reset();
+  }, [reset]);
+
+  const handleSubmitForm = useCallback(async (data: FixtureFormData) => {
+    try {
+      setFormState(prev => ({ ...prev, isSubmitting: true }));
+      
+      if (formState.isAdding) {
+        // Crear nuevo fixture
+        await addFixture({
+          ...data,
+          id: '', // Se generará automáticamente
+          matches: data.matches.filter(match => match.homeTeamId && match.awayTeamId)
+        });
+      } else if (formState.editingId) {
+        // Actualizar fixture existente
+        await updateFixture(formState.editingId, {
+          ...data,
+          matches: data.matches.filter(match => match.homeTeamId && match.awayTeamId)
+        });
+      }
+      
+      setShowForm(false);
+      setFormState(prev => ({ ...prev, isAdding: false, editingId: null, isSubmitting: false }));
+      reset();
+      setError(null);
+    } catch (err) {
+      setError('Error al guardar el fixture.');
+      setFormState(prev => ({ ...prev, isSubmitting: false }));
+    }
+  }, [formState.isAdding, formState.editingId, addFixture, updateFixture, reset]);
+
   useEffect(() => {
     const loadFixtures = async () => {
       if (leagues.length === 0) return;
@@ -243,26 +342,53 @@ const FixturesPage: React.FC = () => {
         isDisabled={formState.isLoading}
       />
       <ErrorBanner error={error} />
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Fixtures</h1>
-        <button
-          className="btn btn-primary flex items-center space-x-2"
-          disabled={formState.isLoading || formState.isAdding || !!formState.editingId || !filters.selectedLeague}
-        >
-          <Plus size={18} />
-          <span>Agregar Fixture</span>
-        </button>
-      </div>
-      <div style={{ maxHeight: '70vh', overflowY: 'auto' }}>
-        <FixtureList
-          fixtures={filteredFixtures}
-          isLoading={formState.isLoading}
-          selectedLeague={filters.selectedLeague}
-          onEdit={() => {}}
-          onDelete={() => {}}
-          getTeamName={getTeamName}
+      
+      {showForm ? (
+        <FixtureForm
+          formState={formState}
+          setFormState={setFormState}
+          filters={filters}
+          setFilters={setFilters}
+          leagues={leagues}
+          teams={teams}
+          computedData={computedData}
+          reset={reset}
+          handleSubmit={handleSubmit}
+          onSubmit={handleSubmitForm}
+          register={register}
+          errors={errors}
+          fields={fields}
+          append={append}
+          remove={remove}
+          isFormDisabled={formState.isSubmitting}
+          handleCancelClick={handleCancelForm}
         />
-      </div>
+      ) : (
+        <>
+          <div className="flex items-center justify-between">
+            <h1 className="text-2xl font-bold">Fixtures</h1>
+            <button
+              className="btn btn-primary flex items-center space-x-2"
+              disabled={formState.isLoading || formState.isAdding || !!formState.editingId || !filters.selectedLeague}
+              onClick={handleAddFixture}
+            >
+              <Plus size={18} />
+              <span>Agregar Fixture</span>
+            </button>
+          </div>
+          <div style={{ maxHeight: '70vh', overflowY: 'auto' }}>
+            <FixtureList
+              fixtures={filteredFixtures}
+              isLoading={formState.isLoading}
+              selectedLeague={filters.selectedLeague}
+              onEdit={handleEditFixture}
+              onDelete={handleDeleteFixture}
+              getTeamName={getTeamName}
+            />
+          </div>
+        </>
+      )}
+      
       {invalidFixtures.length > 0 && (
         <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded-md">
           <div className="flex items-start">

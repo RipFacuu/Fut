@@ -2,9 +2,46 @@ import React, { useRef, useState } from 'react';
 import { Plus, Save, X } from 'lucide-react';
 import { cn } from '../../utils/cn';
 import MatchesSection from './MatchesSection';
-import mammoth from 'mammoth';
+import { League, Team } from '../../contexts/LeagueContext';
 
-const FixtureForm = ({
+interface FixtureFormProps {
+  formState: {
+    isAdding: boolean;
+    editingId: string | null;
+    isLoading: boolean;
+    isSubmitting: boolean;
+  };
+  setFormState: (state: any) => void;
+  filters: {
+    selectedLeague: string;
+    selectedCategory: string;
+    selectedZone: string;
+  };
+  setFilters: (filters: any) => void;
+  leagues: League[];
+  teams: Team[];
+  computedData: {
+    leagueCategories: unknown[];
+    categoryZones: unknown[];
+    zoneTeams: Team[];
+    formZoneTeams: Team[];
+    leagueTeams: Team[];
+    availableZones: unknown[];
+    availableCategories: unknown[];
+  };
+  reset: () => void;
+  handleSubmit: (onSubmit: any) => (e: any) => void;
+  onSubmit: (data: any) => void;
+  register: any;
+  errors: any;
+  fields: any[];
+  append: (field: any) => void;
+  remove: (index: number) => void;
+  isFormDisabled: boolean;
+  handleCancelClick: () => void;
+}
+
+const FixtureForm: React.FC<FixtureFormProps> = ({
   formState,
   setFormState,
   filters,

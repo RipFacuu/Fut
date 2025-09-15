@@ -757,14 +757,28 @@ const StandingsPage: React.FC = () => {
     setIsAddingTeam(false);
   };
   
-  // Handler para eliminar posición/standing
+  // Handler para eliminar posición/standing con confirmación de seguridad
   const handleDeletePosition = async (standing: Standing) => {
     console.log('Intentando eliminar standing:', standing);
+    
+    // Obtener el nombre del equipo para mostrar en la confirmación
+    const teamName = getTeamName(standing.teamId) || 'Equipo desconocido';
+    
+    // Confirmación simple sin input de texto
+    const confirmDelete = confirm(`¿Estás seguro de que quieres eliminar el equipo "${teamName}" de la tabla de posiciones?`);
+    
+    if (!confirmDelete) {
+      console.log('Eliminación cancelada por el usuario');
+      return;
+    }
+    
     // Si el ID es temporal, solo eliminar del estado local
     if (typeof standing.id === 'string' && standing.id.startsWith('temp-')) {
       setLocalStandings(prev => prev.filter(p => p.id !== standing.id));
+      alert(`✅ Equipo "${teamName}" eliminado de la tabla (datos temporales)`);
       return;
     }
+    
     // Si el ID es numérico o string convertible a número, intenta eliminar en Supabase
     try {
       const result = await eliminarPosicion(standing.id);
@@ -776,13 +790,16 @@ const StandingsPage: React.FC = () => {
           return newSet;
         });
         setError(null);
-        // Refresca standings si tienes función para ello
         if (typeof loadStandings === 'function') await loadStandings();
+        alert(`✅ Equipo "${teamName}" eliminado exitosamente de la tabla de posiciones.`);
       } else {
         setError('No se pudo eliminar la posición en la base de datos.');
+        alert('❌ Error: No se pudo eliminar el equipo de la base de datos.');
       }
     } catch (error) {
-      setError(`Error al eliminar la posición: ${error instanceof Error ? error.message : 'Error desconocido'}`);
+      const errorMessage = `Error al eliminar la posición: ${error instanceof Error ? error.message : 'Error desconocido'}`;
+      setError(errorMessage);
+      alert(`❌ Error al eliminar el equipo: ${errorMessage}`);
     }
   };
   

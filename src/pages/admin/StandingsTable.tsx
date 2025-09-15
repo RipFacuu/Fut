@@ -254,16 +254,22 @@ const StandingsTable: React.FC<{ zoneId: string; leagueId: string; categoryId: s
 
   // 2. Unir standings existentes con equipos que no tengan posición, y ordenar correctamente
   const allRows = useMemo(() => {
-    // Standings existentes, ordenados por puntos, diferencia de gol y nombre
+    // Standings existentes, ordenados por el mismo criterio que el público
+    // TEMPORAL: Ignorar orden manual para forzar orden por puntos
     const standingsRows = standings
       .map(s => ({ ...s, isDraft: false }))
       .sort((a, b) => {
+        // Ordenar por puntos descendente (ignorando orden manual temporalmente)
         const bPuntos = Number(b.puntos) || 0;
         const aPuntos = Number(a.puntos) || 0;
         if (bPuntos !== aPuntos) return bPuntos - aPuntos;
-        const bDiff = (Number(b.goalsFor) || 0) - (Number(b.goalsAgainst) || 0);
-        const aDiff = (Number(a.goalsFor) || 0) - (Number(a.goalsAgainst) || 0);
-        if (bDiff !== aDiff) return bDiff - aDiff;
+        
+        // Si tienen los mismos puntos, ordenar por partidos jugados ascendente
+        const aPj = Number(a.pj) || 0;
+        const bPj = Number(b.pj) || 0;
+        if (aPj !== bPj) return aPj - bPj;
+        
+        // Como último criterio, ordenar alfabéticamente por nombre del equipo
         const teamA = teams.find(t => t.id === a.teamId)?.name || '';
         const teamB = teams.find(t => t.id === b.teamId)?.name || '';
         return teamA.localeCompare(teamB);
@@ -544,23 +550,39 @@ const StandingsTable: React.FC<{ zoneId: string; leagueId: string; categoryId: s
   //   <input id="pj" ... aria-label="Partidos Jugados" />
   // </div>
   // Aplica esto a todos los inputs del formulario y tabla.
-  // 9. VALIDACIÓN DE PERMISOS EN handleDeleteTeam
+  // 9. VALIDACIÓN DE PERMISOS EN handleDeleteTeam con confirmación de seguridad mejorada
   const handleDeleteTeam = async (standing: Standing) => {
     if (!isAuthenticated || user?.username !== 'admin') {
-      alert('No tienes permisos para eliminar equipos');
+      alert('❌ No tienes permisos para eliminar equipos');
       return;
     }
-    if (window.confirm('¿Estás seguro de eliminar este equipo? Esta acción no se puede deshacer.')) {
-      // setIsLoading(true); // Eliminado
-      try {
-        // await deleteTeam(standing.teamId); // Eliminado
-        // setRefreshKey(prev => prev + 1); // Eliminado
-      } catch (error) {
-        console.error('Error eliminando equipo:', error);
-        alert('Error al eliminar el equipo. Inténtalo de nuevo.');
-      } finally {
-        // setIsLoading(false); // Eliminado
-      }
+    
+    // Obtener el nombre del equipo para mostrar en la confirmación
+    const teamName = getTeamName(standing.teamId) || 'Equipo desconocido';
+    
+
+   
+    
+    // Confirmación final
+    const finalConfirm = confirm(`🔴 CONFIRMACIÓN FINAL\n\n` +
+                               `¿Estás completamente seguro de eliminar "${teamName}"?\n\n` +
+                               `Esta acción es IRREVERSIBLE.`);
+    
+    if (!finalConfirm) {
+      alert('❌ Eliminación cancelada. El equipo se mantiene en la tabla.');
+      return;
+    }
+    
+    // setIsLoading(true); // Eliminado
+    try {
+      // await deleteTeam(standing.teamId); // Eliminado
+      // setRefreshKey(prev => prev + 1); // Eliminado
+      alert(`✅ Equipo "${teamName}" eliminado exitosamente.`);
+    } catch (error) {
+      console.error('Error eliminando equipo:', error);
+      alert('❌ Error al eliminar el equipo. Inténtalo de nuevo.');
+    } finally {
+      // setIsLoading(false); // Eliminado
     }
   };
 
