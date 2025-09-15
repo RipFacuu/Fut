@@ -233,7 +233,7 @@ const PublicStandingsTable: React.FC<PublicStandingsTableProps> = ({ leagueId, z
                     {index < 3 && <span>{medalIcons[index]}</span>}
                   </div>
                   <div>
-                    <div className="text-lg font-bold text-gray-900">{standing.equipo_nombre && standing.equipo_nombre.trim() !== '' ? standing.equipo_nombre : standing.teamId}</div>
+                    <div className="text-lg font-bold text-gray-900">{team?.name || (standing.equipo_nombre && standing.equipo_nombre.trim() !== '' ? standing.equipo_nombre : standing.teamId)}</div>
                     <div className="flex space-x-2 mt-1">
                       <span className="bg-gray-200 text-gray-700 px-2 py-0.5 rounded text-xs font-semibold">PJ: {standing.pj}</span>
                       <span className="bg-blue-200 text-blue-800 px-2 py-0.5 rounded text-xs font-semibold">PTS: {standing.puntos}</span>
