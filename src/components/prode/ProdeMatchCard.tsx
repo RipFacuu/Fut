@@ -18,6 +18,9 @@ export const ProdeMatchCard: React.FC<ProdeMatchCardProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [betAmount, setBetAmount] = useState<string>('');
+  const [scoreHome, setScoreHome] = useState<string>('');
+  const [scoreAway, setScoreAway] = useState<string>('');
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -91,13 +94,14 @@ export const ProdeMatchCard: React.FC<ProdeMatchCardProps> = ({
     try {
       let result;
       
+      const amt = betAmount ? Number(betAmount) : undefined;
+      const sh = scoreHome ? Number(scoreHome) : undefined;
+      const sa = scoreAway ? Number(scoreAway) : undefined;
       if (match.user_prediction) {
-        // Actualizar predicción existente
-        result = await ProdeService.updatePrediction(user.id, match.id, prediction);
+        result = await ProdeService.updatePrediction(user.id, match.id, prediction, amt, sh, sa);
         setSuccess('¡Predicción actualizada!');
       } else {
-        // Crear nueva predicción
-        result = await ProdeService.createPrediction(user.id, match.id, prediction);
+        result = await ProdeService.createPrediction(user.id, match.id, prediction, amt, sh, sa);
         setSuccess('¡Predicción guardada!');
       }
 
@@ -222,7 +226,33 @@ export const ProdeMatchCard: React.FC<ProdeMatchCardProps> = ({
           <div className="text-sm font-medium text-gray-700 mb-2">
             Tu predicción:
           </div>
-          
+          <div className="grid grid-cols-3 gap-2 mb-3">
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              value={betAmount}
+              onChange={(e) => setBetAmount(e.target.value)}
+              placeholder="Monto"
+              className="form-input text-sm"
+            />
+            <input
+              type="number"
+              min="0"
+              value={scoreHome}
+              onChange={(e) => setScoreHome(e.target.value)}
+              placeholder="Goles Local"
+              className="form-input text-sm"
+            />
+            <input
+              type="number"
+              min="0"
+              value={scoreAway}
+              onChange={(e) => setScoreAway(e.target.value)}
+              placeholder="Goles Visitante"
+              className="form-input text-sm"
+            />
+          </div>
           <div className="grid grid-cols-3 gap-2">
             <button
               onClick={() => handlePrediction('local')}

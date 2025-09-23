@@ -659,59 +659,31 @@ export class ProdeService {
   static async createPrediction(
     userId: string,
     matchId: string,
-    prediction: PredictionType
+    prediction: PredictionType,
+    betAmount?: number,
+    predictedScoreHome?: number,
+    predictedScoreAway?: number
   ): Promise<ProdePrediction | null> {
     try {
-      // Verificar que el partido se puede predecir
-      const { data: match } = await supabase
-        .from('partidos')
-        .select('fecha')
-        .eq('id', matchId)
-        .single();
-
-      if (!match) {
-        throw new Error('Partido no encontrado');
-      }
-
-      const config = await this.getConfig();
-      const deadlineMinutes = config?.prediction_deadline_minutes || 15;
-      const matchDate = new Date(match.fecha);
-      const deadline = new Date(matchDate.getTime() - deadlineMinutes * 60 * 1000);
-
-      if (new Date() >= deadline) {
-        throw new Error('Ya no se puede predecir este partido');
-      }
-
-      // Verificar si ya existe una predicción
-      const { data: existingPrediction } = await supabase
-        .from('prode_predictions')
-        .select('id')
-        .eq('user_id', userId)
-        .eq('partido_id', matchId)
-        .single();
-
-      if (existingPrediction) {
-        throw new Error('Ya has hecho una predicción para este partido');
-      }
-
-      // Crear la predicción
-      const { data, error } = await supabase
-        .from('prode_predictions')
-        .insert([{
+      // Llamar API serverless para validar cutoff y upsert con monto y score
+      const resp = await fetch('/api/predictions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
           user_id: userId,
-          partido_id: matchId,
-          prediction: prediction,
-          points_earned: 0
-        }])
-        .select()
-        .single();
-
-      if (error) {
-        console.error('Error creando predicción:', error);
-        throw error;
+          match_id: matchId,
+          predicted_outcome: prediction === 'local' ? 'home' : prediction === 'visitante' ? 'away' : 'draw',
+          predicted_score_home: predictedScoreHome ?? null,
+          predicted_score_away: predictedScoreAway ?? null,
+          bet_amount: betAmount ?? 0
+        })
+      });
+      if (!resp.ok) {
+        const err = await resp.json().catch(() => ({}));
+        throw new Error(err.error || 'Error creando predicción');
       }
-
-      return data;
+      const data = await resp.json();
+      return data as any;
     } catch (error) {
       console.error('Error en createPrediction:', error);
       throw error;
@@ -722,44 +694,31 @@ export class ProdeService {
   static async updatePrediction(
     userId: string,
     matchId: string,
-    prediction: PredictionType
+    prediction: PredictionType,
+    betAmount?: number,
+    predictedScoreHome?: number,
+    predictedScoreAway?: number
   ): Promise<ProdePrediction | null> {
     try {
-      // Verificar que el partido se puede predecir
-      const { data: match } = await supabase
-        .from('partidos')
-        .select('fecha')
-        .eq('id', matchId)
-        .single();
-
-      if (!match) {
-        throw new Error('Partido no encontrado');
+      // Usar mismo endpoint (upsert) con monto y score
+      const resp = await fetch('/api/predictions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user_id: userId,
+          match_id: matchId,
+          predicted_outcome: prediction === 'local' ? 'home' : prediction === 'visitante' ? 'away' : 'draw',
+          predicted_score_home: predictedScoreHome ?? null,
+          predicted_score_away: predictedScoreAway ?? null,
+          bet_amount: betAmount ?? 0
+        })
+      });
+      if (!resp.ok) {
+        const err = await resp.json().catch(() => ({}));
+        throw new Error(err.error || 'Error actualizando predicción');
       }
-
-      const config = await this.getConfig();
-      const deadlineMinutes = config?.prediction_deadline_minutes || 15;
-      const matchDate = new Date(match.fecha);
-      const deadline = new Date(matchDate.getTime() - deadlineMinutes * 60 * 1000);
-
-      if (new Date() >= deadline) {
-        throw new Error('Ya no se puede predecir este partido');
-      }
-
-      // Actualizar la predicción
-      const { data, error } = await supabase
-        .from('prode_predictions')
-        .update({ prediction: prediction })
-        .eq('user_id', userId)
-        .eq('partido_id', matchId)
-        .select()
-        .single();
-
-      if (error) {
-        console.error('Error actualizando predicción:', error);
-        throw error;
-      }
-
-      return data;
+      const data = await resp.json();
+      return data as any;
     } catch (error) {
       console.error('Error en updatePrediction:', error);
       throw error;

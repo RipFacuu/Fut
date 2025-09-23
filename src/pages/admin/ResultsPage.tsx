@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useLeague, Match, Fixture, Team } from '../../contexts/LeagueContext';
-import { Edit, Save, X } from 'lucide-react';
+import { Edit, Save, X, CheckCircle } from 'lucide-react';
 import { cn } from '../../utils/cn';
 
 const ResultsPage: React.FC = () => {
@@ -112,6 +112,24 @@ const ResultsPage: React.FC = () => {
     } catch (error) {
       console.error('Error guardando resultado:', error);
       alert('Error al guardar el resultado. Por favor intenta de nuevo.');
+    }
+  };
+
+  const handleSettle = async (matchId: string) => {
+    try {
+      const resp = await fetch('/api/admin_settle', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ match_id: matchId })
+      });
+      if (!resp.ok) {
+        const err = await resp.json().catch(() => ({}));
+        alert(`Error al liquidar: ${err.error || 'desconocido'}`);
+        return;
+      }
+      alert('Predicciones liquidadas correctamente');
+    } catch (e: any) {
+      alert(`Error al liquidar: ${e.message || 'desconocido'}`);
     }
   };
   
@@ -383,7 +401,7 @@ const ResultsPage: React.FC = () => {
                             <p className="font-semibold text-lg text-gray-800">{awayTeam}</p>
                           </div>
                           
-                          <div className="ml-6">
+                          <div className="ml-6 flex gap-2">
                             <button
                               className="p-3 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors shadow-sm border border-indigo-200 hover:border-indigo-300"
                               onClick={() => handleEditClick(match)}
@@ -391,6 +409,14 @@ const ResultsPage: React.FC = () => {
                             >
                               <Edit size={18} />
                             </button>
+                            {match.played && (
+                              <button
+                                className="p-3 text-green-600 hover:bg-green-50 rounded-lg transition-colors shadow-sm border border-green-200 hover:border-green-300"
+                                onClick={() => handleSettle(match.id)}
+                              >
+                                <CheckCircle size={18} />
+                              </button>
+                            )}
                           </div>
                         </div>
                       )}

@@ -42,6 +42,31 @@ create table if not exists public.wallet_transactions (
 );
 create index if not exists wallet_tx_user_idx on public.wallet_transactions(user_id);
 
+-- RPC: increment wallet balance atomically
+do $$ begin
+  if not exists (
+    select 1 from pg_proc where proname = 'increment_wallet_balance'
+  ) then
+    create or replace function public.increment_wallet_balance(user_uuid uuid, delta_amount numeric)
+    returns void
+    language plpgsql
+    security definer
+    as $$
+    begin
+      insert into public.wallets(user_id, balance)
+      values (user_uuid, 0)
+      on conflict (user_id) do nothing;
+      update public.wallets
+      set balance = balance + delta_amount,
+          updated_at = now()
+      where user_id = user_uuid;
+    end;
+    $$;
+    revoke all on function public.increment_wallet_balance(uuid, numeric) from anon, authenticated;
+    grant execute on function public.increment_wallet_balance(uuid, numeric) to service_role;
+  end if;
+end $$;
+
 -- Predictions / bets
 create table if not exists public.predictions (
   id uuid primary key default gen_random_uuid(),
