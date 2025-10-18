@@ -1,10 +1,124 @@
 import { createClient } from '@supabase/supabase-js'
 import { Database } from '../types/database'
 
+// Interfaces para mejor type safety
+interface PositionUpdate {
+  equipo_id: string | number;
+  zona_id: string | number;
+  categoria_id: string | number;
+  orden: number;
+  puntos?: number;
+  pj?: number;
+  equipo_nombre?: string;
+}
+
+interface StandingData {
+  equipo_id: string;
+  liga_id: string;
+  categoria_id: string;
+  zona_id: string;
+  points?: number;
+  played?: number;
+  won?: number;
+  drawn?: number;
+  lost?: number;
+  goals_for?: number;
+  goals_against?: number;
+}
+
 const supabaseUrl = 'https://mdulwygjcqvcyjyxtpum.supabase.co'
 const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1kdWx3eWdqY3F2Y3lqeXh0cHVtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDg0OTg3MTksImV4cCI6MjA2NDA3NDcxOX0.Dn6xzntOZKS0OBIbNjci0hnwv6Iu7ZPaFSzzyxqpBp0'
 
 export const supabase = createClient<Database>(supabaseUrl, supabaseKey)
+
+/**
+ * Actualiza el orden de posiciones en la tabla posiciones_editable
+ * @param updates Array de actualizaciones con información de equipo, zona, categoría y orden
+ * @returns Array con los registros actualizados
+ */
+export async function updateEditablePositionsOrder(updates: PositionUpdate[]): Promise<any[]> {
+  console.log('Actualizando orden de posiciones:', updates);
+  
+  // Validación de entrada
+  if (!updates || !Array.isArray(updates) || updates.length === 0) {
+    throw new Error('No hay datos válidos para actualizar');
+  }
+
+  try {
+    const results = [];
+    
+    for (const update of updates) {
+      // Validar campos requeridos
+      if (!update.equipo_id || !update.zona_id || !update.categoria_id) {
+        console.warn('Datos incompletos, omitiendo registro:', update);
+        continue;
+      }
+      
+      // Conversión consistente de tipos
+      const equipoId = String(update.equipo_id);
+      const zonaId = String(update.zona_id);
+      const categoriaId = String(update.categoria_id);
+      const orden = Number(update.orden);
+      
+      // Verificar existencia
+      const { data: existingData, error: checkError } = await supabase
+        .from('posiciones_editable')
+        .select('*')
+        .eq('equipo_id', equipoId)
+        .eq('zona_id', zonaId)
+        .eq('categoria_id', categoriaId)
+        .maybeSingle();
+      
+      if (checkError) {
+        console.error('Error verificando posición existente:', checkError);
+        throw checkError;
+      }
+      
+      let operationResult;
+      
+      if (existingData) {
+        // Actualizar existente
+        const { data, error } = await supabase
+          .from('posiciones_editable')
+          .update({ orden })
+          .eq('equipo_id', equipoId)
+          .eq('zona_id', zonaId)
+          .eq('categoria_id', categoriaId)
+          .select();
+        
+        if (error) throw error;
+        operationResult = data;
+      } else {
+        // Crear nuevo
+        const { data, error } = await supabase
+          .from('posiciones_editable')
+          .insert([{ 
+            equipo_id: equipoId, 
+            zona_id: zonaId, 
+            categoria_id: categoriaId, 
+            orden: orden, 
+            puntos: update.puntos || 0, 
+            pj: update.pj || 0, 
+            equipo_nombre: update.equipo_nombre || '' 
+          }])
+          .select();
+        
+        if (error) throw error;
+        operationResult = data;
+      }
+      
+      if (operationResult) {
+        results.push(...operationResult);
+      }
+    }
+
+    console.log('Actualización completada:', results.length, 'registros');
+    return results;
+  } catch (error) {
+    console.error('Error en updateEditablePositionsOrder:', error);
+    throw error;
+  }
+}
 
 // Función helper para mapear IDs de liga (movida fuera de la función)
 export function getNumericLeagueId(leagueStringId: string): number {
@@ -40,7 +154,14 @@ export async function obtenerZonasPorLigaYCategoria(ligaId: string, categoriaId:
 }
 
 // Funciones para Equipos
-export async function agregarEquipo(nombre: string, zonaId: string, logo?: string) {
+/**
+ * Agrega un nuevo equipo a la base de datos
+ * @param nombre Nombre del equipo
+ * @param zonaId ID de la zona
+ * @param logo URL del logo (opcional)
+ * @returns Datos del equipo creado
+ */
+export async function agregarEquipo(nombre: string, zonaId: string, logo?: string): Promise<any> {
   const { data, error } = await supabase
     .from('equipos')
     .insert([{ 
@@ -52,7 +173,7 @@ export async function agregarEquipo(nombre: string, zonaId: string, logo?: strin
 
   if (error) {
     console.error('Error agregando equipo:', error);
-    return null;
+    throw error;
   }
 
   return data;
@@ -87,7 +208,15 @@ export async function obtenerTodosLosEquipos() {
 }
 
 // Funciones para Partidos
-export async function crearPartido(equipoLocalId: string, equipoVisitanteId: string, zonaId: string, fecha: string) {
+/**
+ * Crea un nuevo partido en la base de datos
+ * @param equipoLocalId ID del equipo local
+ * @param equipoVisitanteId ID del equipo visitante
+ * @param zonaId ID de la zona
+ * @param fecha Fecha del partido
+ * @returns Datos del partido creado
+ */
+export async function crearPartido(equipoLocalId: string, equipoVisitanteId: string, zonaId: string, fecha: string): Promise<any> {
   const { data, error } = await supabase
     .from('partidos')
     .insert([{ 
@@ -100,7 +229,7 @@ export async function crearPartido(equipoLocalId: string, equipoVisitanteId: str
 
   if (error) {
     console.error('Error creando partido:', error);
-    return null;
+    throw error;
   }
 
   return data;
@@ -127,7 +256,14 @@ export async function obtenerPartidosConEquiposYResultados() {
   return data;
 }
 
-export async function actualizarResultadoPartido(partidoId: string, resultadoLocal: number, resultadoVisitante: number) {
+/**
+ * Actualiza el resultado de un partido
+ * @param partidoId ID del partido
+ * @param resultadoLocal Resultado del equipo local
+ * @param resultadoVisitante Resultado del equipo visitante
+ * @returns Datos del partido actualizado
+ */
+export async function actualizarResultadoPartido(partidoId: string, resultadoLocal: number, resultadoVisitante: number): Promise<any> {
   const { data, error } = await supabase
     .from('partidos')
     .update({ 
@@ -139,24 +275,28 @@ export async function actualizarResultadoPartido(partidoId: string, resultadoLoc
 
   if (error) {
     console.error('Error actualizando resultado:', error);
-    return null;
+    throw error;
   }
 
   return data;
 }
 
 // Funciones para Ligas
-export async function obtenerLigas() {
+/**
+ * Obtiene todas las ligas disponibles
+ * @returns Array con todas las ligas
+ */
+export async function obtenerLigas(): Promise<any[]> {
   const { data, error } = await supabase
     .from('ligas')
     .select('*');
 
   if (error) {
     console.error('Error obteniendo ligas:', error);
-    return [];
+    throw error;
   }
 
-  return data;
+  return data || [];
 }
 
 // Funciones para Categorías
@@ -261,8 +401,16 @@ export async function getNumericIds(equipoUuid: string | null, zonaUuid: string,
   }
 }
 
-// Nueva función para agregar equipo con todos los campos
-export async function agregarEquipoCompleto(nombre: string, zonaId: string, ligaId: string, categoriaId: string, logo?: string) {
+/**
+ * Agrega un equipo con todos los campos
+ * @param nombre Nombre del equipo
+ * @param zonaId ID de la zona
+ * @param ligaId ID de la liga
+ * @param categoriaId ID de la categoría
+ * @param logo URL del logo (opcional)
+ * @returns Datos del equipo creado
+ */
+export async function agregarEquipoCompleto(nombre: string, zonaId: string, ligaId: string, categoriaId: string, logo?: string): Promise<any> {
   try {
     // Convertir UUIDs a IDs numéricos
     const numericIds = await getNumericIds(null, zonaId, ligaId, categoriaId);
@@ -283,42 +431,31 @@ export async function agregarEquipoCompleto(nombre: string, zonaId: string, liga
 
     if (error) {
       console.error('Error agregando equipo completo:', error);
-      return null;
+      throw error;
     }
 
     return data;
   } catch (error) {
     console.error('Error en agregarEquipoCompleto:', error);
-    return null;
+    throw error;
   }
 }
 
-// Agregar esta función después de obtenerZonasPorLigaYCategoria
-export async function obtenerTodasLasZonas() {
+/**
+ * Obtiene todas las zonas disponibles
+ * @returns Array con todas las zonas
+ */
+export async function obtenerTodasLasZonas(): Promise<any[]> {
   const { data, error } = await supabase
     .from('zonas')
     .select('*');
 
   if (error) {
     console.error('Error obteniendo todas las zonas:', error);
-    return [];
+    throw error;
   }
 
-  return data;
-}
-
-// Add these functions after obtenerTodasLasZonas
-export async function obtenerZonas() {
-  const { data, error } = await supabase
-    .from('zonas')
-    .select('*');
-
-  if (error) {
-    console.error('Error obteniendo zonas:', error);
-    return [];
-  }
-
-  return data;
+  return data || [];
 }
 
 export async function obtenerZonasPorCategoria(categoriaId: string) {
@@ -366,7 +503,18 @@ export async function eliminarCategoria(id: string) {
 }
 
 // Funciones para Fixtures
-export async function crearFixture(nombre: string, fechaPartido: string, ligaId: number, categoriaId: number, zonaId: number | null, leyenda?: string | null, texto_central?: string | null) {
+/**
+ * Crea un nuevo fixture en la base de datos
+ * @param nombre Nombre del fixture
+ * @param fechaPartido Fecha del partido
+ * @param ligaId ID de la liga
+ * @param categoriaId ID de la categoría
+ * @param zonaId ID de la zona (opcional)
+ * @param leyenda Leyenda del fixture (opcional)
+ * @param texto_central Texto central del fixture (opcional)
+ * @returns Datos del fixture creado
+ */
+export async function crearFixture(nombre: string, fechaPartido: string, ligaId: number, categoriaId: number, zonaId: number | null, leyenda?: string | null, texto_central?: string | null): Promise<any> {
   const { data, error } = await supabase
     .from('fixtures')
     .insert([{ 
@@ -381,12 +529,21 @@ export async function crearFixture(nombre: string, fechaPartido: string, ligaId:
     .select();
   if (error) {
     console.error('Error creando fixture:', error);
-    return null;
+    throw error;
   }
   return data;
 }
 
-export async function crearPartidoConFixture(equipoLocalId: number, equipoVisitanteId: number, zonaId: number | null, fecha: string, fixtureId: number) {
+/**
+ * Crea un nuevo partido asociado a un fixture
+ * @param equipoLocalId ID del equipo local
+ * @param equipoVisitanteId ID del equipo visitante
+ * @param zonaId ID de la zona (opcional)
+ * @param fecha Fecha del partido
+ * @param fixtureId ID del fixture
+ * @returns Datos del partido creado
+ */
+export async function crearPartidoConFixture(equipoLocalId: number, equipoVisitanteId: number, zonaId: number | null, fecha: string, fixtureId: number): Promise<any> {
   const { data, error } = await supabase
     .from('partidos')
     .insert([{ 
@@ -400,7 +557,7 @@ export async function crearPartidoConFixture(equipoLocalId: number, equipoVisita
 
   if (error) {
     console.error('Error creando partido con fixture:', error);
-    return null;
+    throw error;
   }
 
   return data;
@@ -749,6 +906,8 @@ export async function eliminarPosicionPorEquipo(equipo_id: string) {
   }
   return true;
 }
+
+
 
 // Funciones para Cursos
 export async function crearCurso(curso: {

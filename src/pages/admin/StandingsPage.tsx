@@ -2,8 +2,8 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useLeague, Team } from '../../contexts/LeagueContext';
 import { Download, Edit, Save, X, Plus } from 'lucide-react';
 import { cn } from '../../utils/cn';
-import { obtenerPosicionesPorZonaYCategoria, crearPosicion, actualizarPosicion, eliminarPosicion, obtenerEquipoPorId } from '../../lib/supabase';
-import { standingsLegendService, updateEditablePositionsOrder } from '../../services/standingsLegendService';
+import { obtenerPosicionesPorZonaYCategoria, crearPosicion, actualizarPosicion, eliminarPosicion, obtenerEquipoPorId, updateEditablePositionsOrder } from '../../lib/supabase';
+import { standingsLegendService } from '../../services/standingsLegendService';
 import { useAuth } from '../../contexts/AuthContext';
 import StandingsTable from './StandingsTable';
 
@@ -400,6 +400,12 @@ const StandingsPage: React.FC = () => {
       return arr.map((s, idx) => ({ ...s, orden: idx + 1 }));
     });
     setOrderDirty(true);
+    setOrderSaved(false); // Resetear el estado de guardado cuando se cambia el orden
+    
+    // Log para depuración
+    console.log('Orden actualizado:', localStandings.map((s, idx) => 
+      `${s.equipo_nombre || getTeamName(s.teamId)}: ${idx + 1}`
+    ));
   };
 
   // 4. El render usa standings
@@ -409,26 +415,58 @@ const StandingsPage: React.FC = () => {
   const handleSaveOrder = async () => {
     setSavingOrder(true);
     setOrderSaved(false);
-    const payload = localStandings.map((s, idx) => ({
-      equipo_id: Number(s.teamId),
-      zona_id: Number(s.zoneId),
-      categoria_id: Number(s.categoryId),
-      orden: idx + 1
-    }));
-    if (payload.length === 0) {
+    
+    // Validar que tengamos datos válidos
+    if (localStandings.length === 0) {
       alert('No hay datos válidos para guardar el orden.');
       setSavingOrder(false);
       return;
     }
+    
     try {
+      // Crear payload con el nuevo orden - asegurando que todos los IDs sean strings
+      const payload = localStandings.map((s, idx) => {
+        // Validar que los IDs existan y sean strings
+        const teamId = String(s.teamId);
+        const zoneId = String(s.zoneId);
+        const categoryId = String(s.categoryId);
+
+        if (!teamId || !zoneId || !categoryId) {
+          console.error('Datos incompletos:', s);
+          throw new Error('Datos incompletos para actualizar el orden');
+        }
+        
+        // Asegurar que los valores numéricos sean números válidos
+        const puntos = typeof s.puntos === 'number' ? s.puntos : Number(s.puntos) || 0;
+        const pj = typeof s.pj === 'number' ? s.pj : Number(s.pj) || 0;
+        
+        return {
+          equipo_id: teamId,
+          zona_id: zoneId,
+          categoria_id: categoryId,
+          orden: idx + 1,
+          puntos: puntos,
+          pj: pj,
+          equipo_nombre: s.equipo_nombre?.trim() || ''
+        };
+      });
+      
+      console.log('Guardando nuevo orden:', payload);
+      
+      // Guardar el nuevo orden
       await updateEditablePositionsOrder(payload);
+      
+      // Actualizar estado
       setOrderDirty(false);
       setOrderSaved(true);
-      // Recargar standings desde la base
+      
+      // Recargar standings desde la base para confirmar cambios
       await loadStandings();
+      
+      console.log('Orden guardado exitosamente');
     } catch (e) {
-      alert('Error al guardar el orden');
       console.error('Error al guardar el orden en Supabase:', e);
+      alert('Error al guardar el orden. Por favor, intenta nuevamente.');
     } finally {
       setSavingOrder(false);
     }
@@ -1303,17 +1341,43 @@ const StandingsPage: React.FC = () => {
                   )}
                 </div>
 
-                {/* Botón Guardar Orden */}
-                {orderDirty && localStandings.length > 1 && (
-                  <div className="flex justify-end mb-2">
+                {/* Botón Guardar Orden - Mejorado */}
+                {localStandings.length > 1 && (
+                  <div className="flex justify-end mb-4 mt-2">
                     <button
                       onClick={handleSaveOrder}
-                      className="px-4 py-2 bg-violet-600 text-white rounded shadow hover:bg-violet-700 disabled:opacity-50"
-                      disabled={savingOrder}
+                      className={`px-4 py-2 rounded shadow flex items-center ${
+                        orderDirty 
+                          ? 'bg-violet-600 text-white hover:bg-violet-700' 
+                          : 'bg-gray-200 text-gray-600'
+                      } disabled:opacity-50 transition-colors duration-200`}
+                      disabled={savingOrder || !orderDirty}
                     >
-                      {savingOrder ? 'Guardando...' : 'Guardar Orden'}
+                      {savingOrder ? (
+                        <>
+                          <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                          </svg>
+                          Guardando...
+                        </>
+                      ) : (
+                        <>
+                          <svg className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
+                          </svg>
+                          Guardar Orden
+                        </>
+                      )}
                     </button>
-                    {orderSaved && <span className="ml-3 text-green-600 font-medium">¡Orden guardado!</span>}
+                    {orderSaved && (
+                      <div className="ml-3 flex items-center text-green-600 font-medium">
+                        <svg className="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                        ¡Orden guardado!
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

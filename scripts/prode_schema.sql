@@ -51,7 +51,7 @@ do $$ begin
     returns void
     language plpgsql
     security definer
-    as $$
+    as $fn$
     begin
       insert into public.wallets(user_id, balance)
       values (user_uuid, 0)
@@ -61,7 +61,7 @@ do $$ begin
           updated_at = now()
       where user_id = user_uuid;
     end;
-    $$;
+    $fn$;
     revoke all on function public.increment_wallet_balance(uuid, numeric) from anon, authenticated;
     grant execute on function public.increment_wallet_balance(uuid, numeric) to service_role;
   end if;

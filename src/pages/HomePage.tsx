@@ -76,7 +76,11 @@ const HomePage: React.FC = () => {
                       {/* Para ligas nuevas, mostrar un ícono de copa */}
                       {league.id !== 'liga_masculina' && league.id !== 'lifufe' && league.id !== 'mundialito' && (
                         <div className="w-24 h-24 bg-gradient-to-br from-gray-100 to-gray-200 rounded-full flex items-center justify-center relative">
-                          <Trophy className="text-gray-400" size={48} />
+                          {league.name === "COPA D.I.E.F" ? (
+                            <img src="/images/image.png" alt="COPA D.I.E.F" className="w-24 h-24 object-cover rounded-full scale-110 group-hover:scale-125 transition-transform duration-300" />
+                          ) : (
+                            <Trophy className="text-gray-400" size={48} />
+                          )}
                         </div>
                       )}
                     </div>
