@@ -30,17 +30,3 @@ export async function updateStandingsOrder(standingsOrder: { id: string | number
   });
   return Promise.all(updates);
 }
-
-export async function updateEditablePositionsOrder(positionsOrder: { equipo_id: number, zona_id: number, categoria_id: number, orden: number }[]) {
-  const updates = positionsOrder.map(async ({ equipo_id, zona_id, categoria_id, orden }) => {
-    const { data, error } = await supabase
-      .from('posiciones_editable')
-      .update({ orden })
-      .eq('equipo_id', equipo_id)
-      .eq('zona_id', zona_id)
-      .eq('categoria_id', categoria_id);
-    console.log('Update result:', { equipo_id, zona_id, categoria_id, orden, data, error });
-    return { data, error };
-  });
-  return Promise.all(updates);
-} 

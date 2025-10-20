@@ -4,7 +4,8 @@ import { Trash2, Save, Plus, X, Download, Upload, RefreshCw } from 'lucide-react
 import { cn } from '../../utils/cn';
 import { useForm } from 'react-hook-form';
 import { useAuth } from '../../contexts/AuthContext';
-import { standingsLegendService, updateEditablePositionsOrder } from '../../services/standingsLegendService';
+import { standingsLegendService } from '../../services/standingsLegendService';
+import { updateEditablePositionsOrder } from '../../lib/supabase';
 import { obtenerPosicionesPorZonaYCategoria } from '../../lib/supabase';
 
 // 1. INTERFACES CORREGIDAS
@@ -201,7 +202,7 @@ const StandingsTable: React.FC<{ zoneId: string; leagueId: string; categoryId: s
             zoneId: String(pos.zona_id),
             puntos: Number(pos.puntos) || 0,
             pj: Number(pos.pj) || 0,
-            orden: typeof pos.orden === 'number' ? pos.orden : 0,
+            orden: typeof pos.orden === 'number' ? pos.orden : null,
             equipo_nombre: pos.equipo_nombre || '',
             won: 0,
             drawn: 0,
@@ -209,7 +210,15 @@ const StandingsTable: React.FC<{ zoneId: string; leagueId: string; categoryId: s
             goalsFor: 0,
             goalsAgainst: 0
           }))
-          .sort((a, b) => (a.orden || 0) - (b.orden || 0));
+          .sort((a, b) => {
+            // Si ambos tienen orden, usar ese orden
+            if (a.orden && b.orden) return a.orden - b.orden;
+            // Si solo uno tiene orden, el que tiene orden va primero
+            if (a.orden && !b.orden) return -1;
+            if (!a.orden && b.orden) return 1;
+            // Si ninguno tiene orden, mantener el orden original
+            return 0;
+          });
         setStandings(orderedStandings.map(s => ({ ...s, id: String(s.id) })));
         setHasManualOrder(orderedStandings.some(s => s.orden && s.orden > 0));
         setOrderDirty(false);
@@ -227,16 +236,19 @@ const StandingsTable: React.FC<{ zoneId: string; leagueId: string; categoryId: s
     setSavingOrder(true);
     try {
       const payload = standings.map((standing, idx) => ({
-        equipo_id: Number(standing.teamId),
-        zona_id: Number(standing.zoneId),
-        categoria_id: Number(standing.categoryId),
-        orden: idx + 1
+        equipo_id: String(standing.teamId || standing.equipo_id),
+        zona_id: String(standing.zoneId || standing.zona_id),
+        categoria_id: String(standing.categoryId || standing.categoria_id),
+        orden: idx + 1,
+        puntos: Number(standing.puntos) || 0,
+        pj: Number(standing.pj) || 0,
+        equipo_nombre: standing.equipo_nombre || ''
       }));
       await updateEditablePositionsOrder(payload);
       setOrderDirty(false);
       setHasManualOrder(true);
       // Recargar standings desde la base
-      // (opcional) await loadStandingsData();
+      await loadStandingsData();
     } catch (error) {
       console.error('Error al guardar el orden:', error);
       alert('Error al guardar el orden');
@@ -919,9 +931,23 @@ const StandingsTable: React.FC<{ zoneId: string; leagueId: string; categoryId: s
   // Lógica igual a la tabla pública:
   // Cambia el filtrado de standings para que solo filtre por leagueId
   const filteredStandings = standings.filter(s => String(s.leagueId) === String(leagueId));
-  // Ordenar standings igual que la vista pública
+  // Ordenar standings respetando el orden manual si existe
   const sortedStandings = useMemo(() => {
     return standings.slice().sort((a: any, b: any) => {
+      // Primero, verificar si existe orden manual (campo 'orden' no nulo)
+      const ordenA = Number(a.orden);
+      const ordenB = Number(b.orden);
+      
+      // Si ambos tienen orden manual, usar ese orden
+      if (ordenA && ordenB && !isNaN(ordenA) && !isNaN(ordenB)) {
+        return ordenA - ordenB;
+      }
+      
+      // Si solo uno tiene orden manual, el que tiene orden va primero
+      if (ordenA && !isNaN(ordenA)) return -1;
+      if (ordenB && !isNaN(ordenB)) return 1;
+      
+      // Si ninguno tiene orden manual, usar orden por puntos
       if (b.puntos !== a.puntos) return b.puntos - a.puntos;
       const aDiff = (a.goalsFor || 0) - (a.goalsAgainst || 0);
       const bDiff = (b.goalsFor || 0) - (b.goalsAgainst || 0);
@@ -959,11 +985,19 @@ const StandingsTable: React.FC<{ zoneId: string; leagueId: string; categoryId: s
   // 2. Redefine moveStanding para usar displayStandings
   const moveStanding = (index: number, direction: 'up' | 'down') => {
     setStandings(prev => {
-      const arr = displayStandings.slice();
+      // Usar el estado actual de standings
+      const arr = [...prev];
       const newIndex = direction === 'up' ? index - 1 : index + 1;
       if (newIndex < 0 || newIndex >= arr.length) return prev;
+      
+      // Intercambiar posiciones
       [arr[index], arr[newIndex]] = [arr[newIndex], arr[index]];
-      return arr.map((s, idx) => ({ ...s, orden: idx + 1 }));
+      
+      // Actualizar el orden en cada elemento
+      const updatedArr = arr.map((s, idx) => ({ ...s, orden: idx + 1 }));
+      
+      // Actualizar el estado con los nuevos standings
+      return updatedArr;
     });
     setOrderDirty(true);
   };

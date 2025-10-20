@@ -297,7 +297,7 @@ const StandingsPage: React.FC = () => {
         zoneId: String(pos.zona_id),
         puntos: Number(pos.puntos) || 0,
         pj: Number(pos.pj) || 0,
-        orden: typeof pos.orden === 'number' ? pos.orden : 0,
+        orden: typeof pos.orden === 'number' ? pos.orden : null,
         equipo_nombre: pos.equipo_nombre || ''
       }));
       setLocalStandings(standingsData);
@@ -331,8 +331,22 @@ const StandingsPage: React.FC = () => {
     const validStandings = localStandings.filter(standing => 
       teams.some(team => String(team.id) === String(standing.teamId))
     );
-    // Ordenar igual que la tabla pública
+    // Ordenar respetando el orden manual si existe
     return validStandings.sort((a, b) => {
+      // Primero, verificar si existe orden manual (campo 'orden' no nulo)
+      const ordenA = Number(a.orden);
+      const ordenB = Number(b.orden);
+      
+      // Si ambos tienen orden manual, usar ese orden
+      if (ordenA && ordenB && !isNaN(ordenA) && !isNaN(ordenB)) {
+        return ordenA - ordenB;
+      }
+      
+      // Si solo uno tiene orden manual, el que tiene orden va primero
+      if (ordenA && !isNaN(ordenA)) return -1;
+      if (ordenB && !isNaN(ordenB)) return 1;
+      
+      // Si ninguno tiene orden manual, usar orden por puntos
       if (b.puntos !== a.puntos) return b.puntos - a.puntos;
       const aDiff = (a.goalsFor || 0) - (a.goalsAgainst || 0);
       const bDiff = (b.goalsFor || 0) - (b.goalsAgainst || 0);

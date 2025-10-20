@@ -807,10 +807,22 @@ export async function obtenerPosicionesPorZonaYCategoria(zonaId: string, categor
     tipo_pj: typeof item.pj
   })));
   
-  // Ordenar los datos en JavaScript para mayor control
-  // TEMPORAL: Ignorar orden manual para forzar orden por puntos
+  // Ordenar los datos respetando el orden manual si existe
   const sortedData = (data || []).sort((a, b) => {
-    // Ordenar por puntos descendente (ignorando orden manual temporalmente)
+    // Primero, verificar si existe orden manual (campo 'orden' no nulo)
+    const ordenA = Number(a.orden);
+    const ordenB = Number(b.orden);
+    
+    // Si ambos tienen orden manual, usar ese orden
+    if (ordenA && ordenB && !isNaN(ordenA) && !isNaN(ordenB)) {
+      return ordenA - ordenB;
+    }
+    
+    // Si solo uno tiene orden manual, el que tiene orden va primero
+    if (ordenA && !isNaN(ordenA)) return -1;
+    if (ordenB && !isNaN(ordenB)) return 1;
+    
+    // Si ninguno tiene orden manual, usar orden por puntos
     const bPuntos = Number(b.puntos) || 0;
     const aPuntos = Number(a.puntos) || 0;
     if (bPuntos !== aPuntos) {
