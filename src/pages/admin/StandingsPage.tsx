@@ -279,16 +279,21 @@ const StandingsPage: React.FC = () => {
   
   // Extrae loadStandings fuera del useEffect
   const loadStandings = useCallback(async () => {
+    console.log('🔄 loadStandings called with:', { selectedZone, selectedCategory, selectedLeague });
+    
     if (!selectedZone || !selectedCategory) {
+      console.log('❌ No zone or category selected, clearing standings');
       setLocalStandings([]);
       return;
     }
+    
     setLoading(true);
     setError(null);
     try {
+      console.log('📡 Fetching positions for zone:', selectedZone, 'category:', selectedCategory);
       // Trae standings solo de la zona y categoría seleccionada
       const posiciones = await obtenerPosicionesPorZonaYCategoria(selectedZone, selectedCategory);
-      console.log('Respuesta de obtenerPosicionesPorZonaYCategoria:', posiciones);
+      console.log('✅ Response from obtenerPosicionesPorZonaYCategoria:', posiciones);
       const standingsData = posiciones.map(pos => ({
         id: String(pos.id), // Usar el id único de la base
         teamId: String(pos.equipo_id), // Asegurar que es string
@@ -300,6 +305,7 @@ const StandingsPage: React.FC = () => {
         orden: typeof pos.orden === 'number' ? pos.orden : null,
         equipo_nombre: pos.equipo_nombre || ''
       }));
+      console.log('StandingsData antes de setLocalStandings:', standingsData);
       setLocalStandings(standingsData);
       
       // Log de depuración para verificar relación equipos-standings
@@ -312,17 +318,57 @@ const StandingsPage: React.FC = () => {
         todosEquipos: teams.map(t => ({id: t.id, name: t.name}))
       });
     } catch (error) {
-      setError('Error al cargar las posiciones.');
+      console.error('❌ Error loading standings:', error);
+      setError(`Error al cargar las posiciones: ${error instanceof Error ? error.message : 'Error desconocido'}`);
       setLocalStandings([]);
     } finally {
       setLoading(false);
     }
   }, [selectedZone, selectedCategory, selectedLeague, teams]);
 
+  // Función para diagnosticar problemas de datos
+  const diagnoseDataIssue = useCallback(async () => {
+    if (!selectedZone || !selectedCategory) return;
+    
+    console.log('🔍 Diagnosing data issue for:', { selectedZone, selectedCategory, selectedLeague });
+    
+    try {
+      // Verificar si hay datos en la base
+      const posiciones = await obtenerPosicionesPorZonaYCategoria(selectedZone, selectedCategory);
+      console.log('📊 Raw data from database:', posiciones);
+      
+      // Verificar equipos disponibles
+      const availableTeams = teams.filter(team => 
+        String(team.leagueId) === String(selectedLeague)
+      );
+      console.log('👥 Available teams for league:', availableTeams);
+      
+      // Verificar si hay equipos en la zona específica
+      const teamsInZone = teams.filter(team => 
+        String(team.zoneId) === String(selectedZone) && 
+        String(team.categoryId) === String(selectedCategory)
+      );
+      console.log('🏟️ Teams in specific zone/category:', teamsInZone);
+      
+    } catch (error) {
+      console.error('❌ Error during diagnosis:', error);
+    }
+  }, [selectedZone, selectedCategory, selectedLeague, teams]);
+
   // useEffect para cargar standings al cambiar zona/categoría
   useEffect(() => {
+    console.log('🔄 useEffect triggered for loadStandings:', { selectedZone, selectedCategory, selectedLeague });
     loadStandings();
-  }, [selectedZone, selectedCategory, selectedLeague]);
+    
+    // Ejecutar diagnóstico si no hay datos
+    if (selectedZone && selectedCategory) {
+      setTimeout(() => {
+        if (localStandings.length === 0) {
+          diagnoseDataIssue();
+        }
+      }, 1000);
+    }
+  }, [selectedZone, selectedCategory, selectedLeague, diagnoseDataIssue, localStandings.length]);
 
   // Elimina completeStandings y zoneTeams del render y lógica de standings
   // Simplifica sortedStandings para que use solo localStandings y teams, igual que la tabla pública
@@ -331,32 +377,43 @@ const StandingsPage: React.FC = () => {
     const validStandings = localStandings.filter(standing => 
       teams.some(team => String(team.id) === String(standing.teamId))
     );
-    // Ordenar respetando el orden manual si existe
-    return validStandings.sort((a, b) => {
-      // Primero, verificar si existe orden manual (campo 'orden' no nulo)
-      const ordenA = Number(a.orden);
-      const ordenB = Number(b.orden);
-      
-      // Si ambos tienen orden manual, usar ese orden
-      if (ordenA && ordenB && !isNaN(ordenA) && !isNaN(ordenB)) {
+    
+    // Verificar si hay orden manual establecido (todos los equipos tienen orden > 0)
+    const hasManualOrder = validStandings.length > 0 && 
+      validStandings.every(standing => standing.orden && standing.orden > 0);
+    
+    if (hasManualOrder) {
+      // Si hay orden manual, respetarlo
+      return validStandings.sort((a, b) => {
+        const ordenA = Number(a.orden) || 9999;
+        const ordenB = Number(b.orden) || 9999;
         return ordenA - ordenB;
-      }
-      
-      // Si solo uno tiene orden manual, el que tiene orden va primero
-      if (ordenA && !isNaN(ordenA)) return -1;
-      if (ordenB && !isNaN(ordenB)) return 1;
-      
-      // Si ninguno tiene orden manual, usar orden por puntos
-      if (b.puntos !== a.puntos) return b.puntos - a.puntos;
-      const aDiff = (a.goalsFor || 0) - (a.goalsAgainst || 0);
-      const bDiff = (b.goalsFor || 0) - (b.goalsAgainst || 0);
-      if (bDiff !== aDiff) return bDiff - aDiff;
-      if ((b.goalsFor || 0) !== (a.goalsFor || 0)) return (b.goalsFor || 0) - (a.goalsFor || 0);
-      if ((a.pj || 0) !== (b.pj || 0)) return (a.pj || 0) - (b.pj || 0);
-      const teamA = teams.find(t => t.id === a.teamId)?.name || '';
-      const teamB = teams.find(t => t.id === b.teamId)?.name || '';
-      return teamA.localeCompare(teamB);
-    });
+      });
+    } else {
+      // Si no hay orden manual, ordenar por puntos descendente
+      return validStandings.sort((a, b) => {
+        // PRIORIDAD 1: Ordenar por puntos descendente
+        const bPuntos = Number(b.puntos) || 0;
+        const aPuntos = Number(a.puntos) || 0;
+        if (bPuntos !== aPuntos) return bPuntos - aPuntos;
+        
+        // PRIORIDAD 2: Si tienen los mismos puntos, ordenar por diferencia de goles descendente
+        const aDiff = (a.goalsFor || 0) - (a.goalsAgainst || 0);
+        const bDiff = (b.goalsFor || 0) - (b.goalsAgainst || 0);
+        if (bDiff !== aDiff) return bDiff - aDiff;
+        
+        // PRIORIDAD 3: Si tienen la misma diferencia, ordenar por goles a favor descendente
+        if ((b.goalsFor || 0) !== (a.goalsFor || 0)) return (b.goalsFor || 0) - (a.goalsFor || 0);
+        
+        // PRIORIDAD 4: Si tienen los mismos goles, ordenar por partidos jugados ascendente
+        if ((a.pj || 0) !== (b.pj || 0)) return (a.pj || 0) - (b.pj || 0);
+        
+        // PRIORIDAD 5: Como último criterio, ordenar alfabéticamente por nombre del equipo
+        const teamA = teams.find(t => t.id === a.teamId)?.name || '';
+        const teamB = teams.find(t => t.id === b.teamId)?.name || '';
+        return teamA.localeCompare(teamB);
+      });
+    }
   }, [localStandings, teams]);
 
   // Logs de depuración para comparar con la tabla pública
@@ -364,6 +421,12 @@ const StandingsPage: React.FC = () => {
     console.log('Raw standings data (admin):', localStandings);
     console.log('All teams (admin):', teams);
     console.log('Sorted standings (admin):', sortedStandings);
+    console.log('Orden en sortedStandings:', sortedStandings.map(s => ({
+      equipo_nombre: s.equipo_nombre,
+      puntos: s.puntos,
+      orden: s.orden,
+      orden_final: sortedStandings.indexOf(s) + 1
+    })));
   }, [localStandings, teams, sortedStandings]);
   
   // Handlers de cambio de filtros
@@ -406,19 +469,29 @@ const StandingsPage: React.FC = () => {
   // 3. Las flechas modifican localStandings directamente
   const moveStanding = (index: number, direction: 'up' | 'down') => {
     setLocalStandings(prev => {
-      const arr = [...prev];
+      // Usar sortedStandings para obtener el orden actual correcto
+      const sortedArr = [...sortedStandings];
       const newIndex = direction === 'up' ? index - 1 : index + 1;
-      if (newIndex < 0 || newIndex >= arr.length) return arr;
-      [arr[index], arr[newIndex]] = [arr[newIndex], arr[index]];
-      // Actualizar campo 'orden'
-      return arr.map((s, idx) => ({ ...s, orden: idx + 1 }));
+      if (newIndex < 0 || newIndex >= sortedArr.length) return prev;
+      
+      // Intercambiar posiciones en el array ordenado
+      [sortedArr[index], sortedArr[newIndex]] = [sortedArr[newIndex], sortedArr[index]];
+      
+      // Actualizar el campo 'orden' para mantener el orden manual
+      const updatedArr = sortedArr.map((s, idx) => ({ ...s, orden: idx + 1 }));
+      
+      // Actualizar localStandings con los nuevos valores de orden
+      return prev.map(standing => {
+        const updatedStanding = updatedArr.find(s => s.id === standing.id);
+        return updatedStanding ? { ...standing, orden: updatedStanding.orden } : standing;
+      });
     });
     setOrderDirty(true);
     setOrderSaved(false); // Resetear el estado de guardado cuando se cambia el orden
     
     // Log para depuración
-    console.log('Orden actualizado:', localStandings.map((s, idx) => 
-      `${s.equipo_nombre || getTeamName(s.teamId)}: ${idx + 1}`
+    console.log('Orden manual actualizado:', sortedStandings.map((s, idx) => 
+      `${s.equipo_nombre || getTeamName(s.teamId)}: ${idx + 1} (puntos: ${s.puntos})`
     ));
   };
 
@@ -438,8 +511,11 @@ const StandingsPage: React.FC = () => {
     }
     
     try {
+      // Usar sortedStandings para obtener el orden correcto
+      const orderedStandings = [...sortedStandings];
+      
       // Crear payload con el nuevo orden - asegurando que todos los IDs sean strings
-      const payload = localStandings.map((s, idx) => {
+      const payload = orderedStandings.map((s, idx) => {
         // Validar que los IDs existan y sean strings
         const teamId = String(s.teamId);
         const zoneId = String(s.zoneId);
@@ -475,7 +551,9 @@ const StandingsPage: React.FC = () => {
       setOrderSaved(true);
       
       // Recargar standings desde la base para confirmar cambios
+      console.log('Recargando standings después de guardar...');
       await loadStandings();
+      console.log('Standings recargados:', localStandings);
       
       console.log('Orden guardado exitosamente');
     } catch (e) {
@@ -1068,6 +1146,21 @@ const StandingsPage: React.FC = () => {
               </div>
             </div>
 
+            {/* Indicador de modo de ordenamiento */}
+            {localStandings.length > 0 && (
+              <div className="px-6 pb-2">
+                <div className="flex items-center gap-2">
+                  <div className={`w-3 h-3 rounded-full ${sortedStandings.every(s => s.orden && s.orden > 0) ? 'bg-orange-500' : 'bg-green-500'}`}></div>
+                  <span className="text-sm font-medium text-gray-700">
+                    {sortedStandings.every(s => s.orden && s.orden > 0) 
+                      ? '🔧 Modo Orden Manual' 
+                      : '📊 Modo Orden Automático por Puntos'
+                    }
+                  </span>
+                </div>
+              </div>
+            )}
+
             {/* Campo de leyenda editable */}
             <div className="flex flex-col sm:flex-row sm:items-center gap-2 px-6 pb-2">
               <label className="block text-sm font-medium text-gray-700 mb-1 sm:mb-0 sm:mr-2 whitespace-nowrap">
@@ -1215,8 +1308,73 @@ const StandingsPage: React.FC = () => {
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-100">
-                      {localStandings.map((standing: Standing, index: number) => (
-                        <tr 
+                      {loading ? (
+                        <tr>
+                          <td colSpan={5} className="px-6 py-12 text-center">
+                            <div className="flex flex-col items-center space-y-4">
+                              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-violet-600"></div>
+                              <p className="text-gray-500">Cargando posiciones...</p>
+                            </div>
+                          </td>
+                        </tr>
+                      ) : error ? (
+                        <tr>
+                          <td colSpan={5} className="px-6 py-12 text-center">
+                            <div className="flex flex-col items-center space-y-4">
+                              <div className="text-red-500 text-4xl">⚠️</div>
+                              <p className="text-red-600 font-medium">Error al cargar datos</p>
+                              <p className="text-gray-500 text-sm">{error}</p>
+                              <div className="flex space-x-2">
+                                <button 
+                                  onClick={loadStandings}
+                                  className="px-4 py-2 bg-violet-600 text-white rounded-md hover:bg-violet-700 transition-colors"
+                                >
+                                  Reintentar
+                                </button>
+                                <button 
+                                  onClick={diagnoseDataIssue}
+                                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+                                >
+                                  🔍 Diagnosticar
+                                </button>
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                      ) : localStandings.length === 0 ? (
+                        <tr>
+                          <td colSpan={5} className="px-6 py-12 text-center">
+                            <div className="flex flex-col items-center space-y-4">
+                              <div className="text-gray-400 text-4xl">📊</div>
+                              <p className="text-gray-600 font-medium">No hay equipos en esta zona/categoría</p>
+                              <p className="text-gray-500 text-sm">Selecciona una zona y categoría diferentes o agrega equipos</p>
+                              <div className="bg-gray-100 p-3 rounded-md text-xs text-gray-600">
+                                <p><strong>Debug info:</strong></p>
+                                <p>Liga: {selectedLeague || 'No seleccionada'}</p>
+                                <p>Zona: {selectedZone || 'No seleccionada'}</p>
+                                <p>Categoría: {selectedCategory || 'No seleccionada'}</p>
+                                <p>Equipos disponibles: {teams.length}</p>
+                              </div>
+                              <div className="flex space-x-2">
+                                <button 
+                                  onClick={() => setIsAddingTeam(true)}
+                                  className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"
+                                >
+                                  + Agregar Equipo
+                                </button>
+                                <button 
+                                  onClick={diagnoseDataIssue}
+                                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+                                >
+                                  🔍 Diagnosticar
+                                </button>
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                      ) : (
+                        localStandings.map((standing: Standing, index: number) => (
+                          <tr 
                           key={standing.id} 
                           className={cn(
                             "hover:bg-gradient-to-r hover:from-violet-50 hover:to-purple-50 transition-all duration-200",
@@ -1291,14 +1449,68 @@ const StandingsPage: React.FC = () => {
                               </button>
                             </div>
                           </td>
-                        </tr>
-                      ))}
+                          </tr>
+                        ))
+                      )}
                     </tbody>
                   </table>
                 </div>
                 {/* Vista tipo lista para mobile */}
                 <div className="md:hidden space-y-3 p-0">
-                  {localStandings.map((standing: Standing, idx: number) => (
+                  {loading ? (
+                    <div className="flex flex-col items-center space-y-4 py-12">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-violet-600"></div>
+                      <p className="text-gray-500">Cargando posiciones...</p>
+                    </div>
+                  ) : error ? (
+                    <div className="flex flex-col items-center space-y-4 py-12">
+                      <div className="text-red-500 text-4xl">⚠️</div>
+                      <p className="text-red-600 font-medium">Error al cargar datos</p>
+                      <p className="text-gray-500 text-sm">{error}</p>
+                      <div className="flex space-x-2">
+                        <button 
+                          onClick={loadStandings}
+                          className="px-4 py-2 bg-violet-600 text-white rounded-md hover:bg-violet-700 transition-colors"
+                        >
+                          Reintentar
+                        </button>
+                        <button 
+                          onClick={diagnoseDataIssue}
+                          className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+                        >
+                          🔍 Diagnosticar
+                        </button>
+                      </div>
+                    </div>
+                  ) : localStandings.length === 0 ? (
+                    <div className="flex flex-col items-center space-y-4 py-12">
+                      <div className="text-gray-400 text-4xl">📊</div>
+                      <p className="text-gray-600 font-medium">No hay equipos en esta zona/categoría</p>
+                      <p className="text-gray-500 text-sm">Selecciona una zona y categoría diferentes o agrega equipos</p>
+                      <div className="bg-gray-100 p-3 rounded-md text-xs text-gray-600">
+                        <p><strong>Debug info:</strong></p>
+                        <p>Liga: {selectedLeague || 'No seleccionada'}</p>
+                        <p>Zona: {selectedZone || 'No seleccionada'}</p>
+                        <p>Categoría: {selectedCategory || 'No seleccionada'}</p>
+                        <p>Equipos disponibles: {teams.length}</p>
+                      </div>
+                      <div className="flex space-x-2">
+                        <button 
+                          onClick={() => setIsAddingTeam(true)}
+                          className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"
+                        >
+                          + Agregar Equipo
+                        </button>
+                        <button 
+                          onClick={diagnoseDataIssue}
+                          className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+                        >
+                          🔍 Diagnosticar
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    localStandings.map((standing: Standing, idx: number) => (
                     <div
                       key={standing.id}
                       className={
@@ -1347,7 +1559,8 @@ const StandingsPage: React.FC = () => {
                         </div>
                       </div>
                     </div>
-                  ))}
+                  ))
+                  )}
                   {localStandings.length === 0 && (
                     <div className="text-center py-8 text-gray-500 bg-gray-50 rounded-md">
                       No hay equipos en esta zona. Agrega el primer equipo para comenzar.
@@ -1355,9 +1568,28 @@ const StandingsPage: React.FC = () => {
                   )}
                 </div>
 
-                {/* Botón Guardar Orden - Mejorado */}
+                {/* Botones de Orden - Mejorados */}
                 {localStandings.length > 1 && (
-                  <div className="flex justify-end mb-4 mt-2">
+                  <div className="flex justify-end gap-3 mb-4 mt-2">
+                    {/* Botón para resetear orden manual */}
+                    <button
+                      onClick={async () => {
+                        if (confirm('¿Estás seguro de que quieres resetear el orden manual y volver al ordenamiento automático por puntos?')) {
+                          setLocalStandings(prev => prev.map(standing => ({ ...standing, orden: 0 })));
+                          setOrderDirty(true);
+                          setOrderSaved(false);
+                        }
+                      }}
+                      className="px-4 py-2 rounded shadow flex items-center bg-orange-500 text-white hover:bg-orange-600 transition-colors duration-200"
+                      title="Resetear orden manual y volver al ordenamiento por puntos"
+                    >
+                      <svg className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                      </svg>
+                      Orden por Puntos
+                    </button>
+                    
+                    {/* Botón Guardar Orden */}
                     <button
                       onClick={handleSaveOrder}
                       className={`px-4 py-2 rounded shadow flex items-center ${
@@ -1384,6 +1616,7 @@ const StandingsPage: React.FC = () => {
                         </>
                       )}
                     </button>
+                    
                     {orderSaved && (
                       <div className="ml-3 flex items-center text-green-600 font-medium">
                         <svg className="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">

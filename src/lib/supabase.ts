@@ -78,6 +78,7 @@ export async function updateEditablePositionsOrder(updates: PositionUpdate[]): P
       
       if (existingData) {
         // Actualizar existente
+        console.log(`Actualizando orden para equipo ${equipoId}: orden ${orden}`);
         const { data, error } = await supabase
           .from('posiciones_editable')
           .update({ orden })
@@ -801,26 +802,29 @@ export async function obtenerPosicionesPorZonaYCategoria(zonaId: string, categor
   console.log('Raw data from database:', data);
   console.log('Data types:', data?.map(item => ({
     equipo_id: item.equipo_id,
+    equipo_nombre: item.equipo_nombre,
     puntos: item.puntos,
     tipo_puntos: typeof item.puntos,
     pj: item.pj,
-    tipo_pj: typeof item.pj
+    tipo_pj: typeof item.pj,
+    orden: item.orden,
+    tipo_orden: typeof item.orden
   })));
   
   // Ordenar los datos respetando el orden manual si existe
   const sortedData = (data || []).sort((a, b) => {
     // Primero, verificar si existe orden manual (campo 'orden' no nulo)
-    const ordenA = Number(a.orden);
-    const ordenB = Number(b.orden);
+    const ordenA = a.orden !== null && a.orden !== undefined ? Number(a.orden) : null;
+    const ordenB = b.orden !== null && b.orden !== undefined ? Number(b.orden) : null;
     
-    // Si ambos tienen orden manual, usar ese orden
-    if (ordenA && ordenB && !isNaN(ordenA) && !isNaN(ordenB)) {
+    // Si ambos tienen orden manual válido, usar ese orden
+    if (ordenA !== null && ordenB !== null && !isNaN(ordenA) && !isNaN(ordenB)) {
       return ordenA - ordenB;
     }
     
     // Si solo uno tiene orden manual, el que tiene orden va primero
-    if (ordenA && !isNaN(ordenA)) return -1;
-    if (ordenB && !isNaN(ordenB)) return 1;
+    if (ordenA !== null && !isNaN(ordenA)) return -1;
+    if (ordenB !== null && !isNaN(ordenB)) return 1;
     
     // Si ninguno tiene orden manual, usar orden por puntos
     const bPuntos = Number(b.puntos) || 0;
@@ -844,6 +848,12 @@ export async function obtenerPosicionesPorZonaYCategoria(zonaId: string, categor
   
   // Debug: Log the sorted data
   console.log('Sorted data from database:', sortedData);
+  console.log('Orden final:', sortedData.map(item => ({
+    equipo_nombre: item.equipo_nombre,
+    puntos: item.puntos,
+    orden: item.orden,
+    orden_final: sortedData.indexOf(item) + 1
+  })));
   
   return sortedData;
 }
