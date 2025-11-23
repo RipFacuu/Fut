@@ -80,7 +80,8 @@ const PublicStandingsTable: React.FC<PublicStandingsTableProps> = ({ leagueId, z
             zoneId: pos.zona_id,
             puntos: Number(pos.puntos) || 0,
             pj: Number(pos.pj) || 0,
-            orden: typeof pos.orden === 'number' ? pos.orden : 0,
+            // Cargar orden: si es número > 0, usarlo; si es 0 o null, establecer null
+            orden: (typeof pos.orden === 'number' && pos.orden > 0) ? pos.orden : null,
             equipo_nombre: pos.equipo_nombre || '',
             won: 0,
             drawn: 0,
@@ -97,7 +98,8 @@ const PublicStandingsTable: React.FC<PublicStandingsTableProps> = ({ leagueId, z
             zoneId: pos.zona_id,
             puntos: Number(pos.puntos) || 0,
             pj: Number(pos.pj) || 0,
-            orden: typeof pos.orden === 'number' ? pos.orden : 0,
+            // Cargar orden: si es número > 0, usarlo; si es 0 o null, establecer null
+            orden: (typeof pos.orden === 'number' && pos.orden > 0) ? pos.orden : null,
             equipo_nombre: pos.equipo_nombre || '',
             won: 0,
             drawn: 0,
@@ -112,14 +114,35 @@ const PublicStandingsTable: React.FC<PublicStandingsTableProps> = ({ leagueId, z
   }, [zoneId, categoryId, leagueId]);
 
   // Ordenar standings por el mismo criterio que el admin y la base de datos
-  // TEMPORAL: Ignorar orden manual para forzar orden por puntos
+  // Respetar el orden manual si existe, igual que en el admin
   const sortedStandings = standings.slice().sort((a, b) => {
-    // Ordenar por puntos descendente (ignorando orden manual temporalmente)
+    // Primero, verificar si existe orden manual (campo 'orden' no nulo y > 0)
+    const ordenA = (typeof a.orden === 'number' && a.orden > 0) ? a.orden : 0;
+    const ordenB = (typeof b.orden === 'number' && b.orden > 0) ? b.orden : 0;
+    
+    // Si ambos tienen orden manual válido (> 0), usar ese orden
+    if (ordenA > 0 && ordenB > 0) {
+      return ordenA - ordenB;
+    }
+    
+    // Si solo uno tiene orden manual, el que tiene orden va primero
+    if (ordenA > 0 && ordenB === 0) return -1;
+    if (ordenA === 0 && ordenB > 0) return 1;
+    
+    // Si ninguno tiene orden manual (o ambos tienen 0), usar orden por puntos
     const bPuntos = Number(b.puntos) || 0;
     const aPuntos = Number(a.puntos) || 0;
     if (bPuntos !== aPuntos) return bPuntos - aPuntos;
     
-    // Si tienen los mismos puntos, ordenar por partidos jugados ascendente
+    // Si tienen los mismos puntos, ordenar por diferencia de goles descendente
+    const aDiff = (a.goalsFor || 0) - (a.goalsAgainst || 0);
+    const bDiff = (b.goalsFor || 0) - (b.goalsAgainst || 0);
+    if (bDiff !== aDiff) return bDiff - aDiff;
+    
+    // Si tienen la misma diferencia, ordenar por goles a favor descendente
+    if ((b.goalsFor || 0) !== (a.goalsFor || 0)) return (b.goalsFor || 0) - (a.goalsFor || 0);
+    
+    // Si tienen los mismos goles, ordenar por partidos jugados ascendente
     const aPj = Number(a.pj) || 0;
     const bPj = Number(b.pj) || 0;
     if (aPj !== bPj) return aPj - bPj;

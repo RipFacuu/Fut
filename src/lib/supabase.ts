@@ -813,24 +813,36 @@ export async function obtenerPosicionesPorZonaYCategoria(zonaId: string, categor
   
   // Ordenar los datos respetando el orden manual si existe
   const sortedData = (data || []).sort((a, b) => {
-    // Primero, verificar si existe orden manual (campo 'orden' no nulo)
-    const ordenA = a.orden !== null && a.orden !== undefined ? Number(a.orden) : null;
-    const ordenB = b.orden !== null && b.orden !== undefined ? Number(b.orden) : null;
+    // Primero, verificar si existe orden manual (campo 'orden' no nulo y > 0)
+    const ordenA = a.orden !== null && a.orden !== undefined && Number(a.orden) > 0 ? Number(a.orden) : 0;
+    const ordenB = b.orden !== null && b.orden !== undefined && Number(b.orden) > 0 ? Number(b.orden) : 0;
     
-    // Si ambos tienen orden manual válido, usar ese orden
-    if (ordenA !== null && ordenB !== null && !isNaN(ordenA) && !isNaN(ordenB)) {
+    // Si ambos tienen orden manual válido (> 0), usar ese orden
+    if (ordenA > 0 && ordenB > 0) {
       return ordenA - ordenB;
     }
     
     // Si solo uno tiene orden manual, el que tiene orden va primero
-    if (ordenA !== null && !isNaN(ordenA)) return -1;
-    if (ordenB !== null && !isNaN(ordenB)) return 1;
+    if (ordenA > 0 && ordenB === 0) return -1;
+    if (ordenA === 0 && ordenB > 0) return 1;
     
-    // Si ninguno tiene orden manual, usar orden por puntos
+    // Si ninguno tiene orden manual (o ambos tienen 0), usar orden por puntos
     const bPuntos = Number(b.puntos) || 0;
     const aPuntos = Number(a.puntos) || 0;
     if (bPuntos !== aPuntos) {
       return bPuntos - aPuntos;
+    }
+    
+    // Si tienen los mismos puntos, ordenar por diferencia de goles descendente
+    const aDiff = (Number(a.goles_a_favor) || 0) - (Number(a.goles_en_contra) || 0);
+    const bDiff = (Number(b.goles_a_favor) || 0) - (Number(b.goles_en_contra) || 0);
+    if (bDiff !== aDiff) {
+      return bDiff - aDiff;
+    }
+    
+    // Si tienen la misma diferencia, ordenar por goles a favor descendente
+    if ((Number(b.goles_a_favor) || 0) !== (Number(a.goles_a_favor) || 0)) {
+      return (Number(b.goles_a_favor) || 0) - (Number(a.goles_a_favor) || 0);
     }
     
     // Si tienen los mismos puntos, ordenar por partidos jugados ascendente

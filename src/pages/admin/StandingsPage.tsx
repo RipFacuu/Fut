@@ -302,7 +302,8 @@ const StandingsPage: React.FC = () => {
         zoneId: String(pos.zona_id),
         puntos: Number(pos.puntos) || 0,
         pj: Number(pos.pj) || 0,
-        orden: typeof pos.orden === 'number' ? pos.orden : null,
+        // Cargar orden: si es número > 0, usarlo; si es 0 o null, establecer null
+        orden: (typeof pos.orden === 'number' && pos.orden > 0) ? pos.orden : null,
         equipo_nombre: pos.equipo_nombre || ''
       }));
       console.log('StandingsData antes de setLocalStandings:', standingsData);
@@ -378,16 +379,47 @@ const StandingsPage: React.FC = () => {
       teams.some(team => String(team.id) === String(standing.teamId))
     );
     
-    // Verificar si hay orden manual establecido (todos los equipos tienen orden > 0)
-    const hasManualOrder = validStandings.length > 0 && 
-      validStandings.every(standing => standing.orden && standing.orden > 0);
+    // Verificar si hay orden manual establecido
+    // Si al menos algunos equipos tienen orden > 0, considerar que hay orden manual
+    // Esto permite orden manual incluso cuando hay empates (solo algunos equipos necesitan orden)
+    const standingsWithOrder = validStandings.filter(s => s.orden && s.orden > 0);
+    const hasManualOrder = standingsWithOrder.length > 0;
     
     if (hasManualOrder) {
-      // Si hay orden manual, respetarlo
+      // Si hay orden manual, ordenar primero por orden manual, luego por puntos para los que no tienen orden
       return validStandings.sort((a, b) => {
-        const ordenA = Number(a.orden) || 9999;
-        const ordenB = Number(b.orden) || 9999;
-        return ordenA - ordenB;
+        const ordenA = Number(a.orden) || 0;
+        const ordenB = Number(b.orden) || 0;
+        
+        // Si ambos tienen orden manual, usar ese orden
+        if (ordenA > 0 && ordenB > 0) {
+          return ordenA - ordenB;
+        }
+        
+        // Si solo uno tiene orden, el que tiene orden va primero
+        if (ordenA > 0 && ordenB === 0) return -1;
+        if (ordenA === 0 && ordenB > 0) return 1;
+        
+        // Si ninguno tiene orden (o ambos tienen 0), ordenar por puntos
+        const bPuntos = Number(b.puntos) || 0;
+        const aPuntos = Number(a.puntos) || 0;
+        if (bPuntos !== aPuntos) return bPuntos - aPuntos;
+        
+        // Si tienen los mismos puntos, ordenar por diferencia de goles descendente
+        const aDiff = (a.goalsFor || 0) - (a.goalsAgainst || 0);
+        const bDiff = (b.goalsFor || 0) - (b.goalsAgainst || 0);
+        if (bDiff !== aDiff) return bDiff - aDiff;
+        
+        // Si tienen la misma diferencia, ordenar por goles a favor descendente
+        if ((b.goalsFor || 0) !== (a.goalsFor || 0)) return (b.goalsFor || 0) - (a.goalsFor || 0);
+        
+        // Si tienen los mismos goles, ordenar por partidos jugados ascendente
+        if ((a.pj || 0) !== (b.pj || 0)) return (a.pj || 0) - (b.pj || 0);
+        
+        // Como último criterio, ordenar alfabéticamente por nombre del equipo
+        const teamA = teams.find(t => t.id === a.teamId)?.name || '';
+        const teamB = teams.find(t => t.id === b.teamId)?.name || '';
+        return teamA.localeCompare(teamB);
       });
     } else {
       // Si no hay orden manual, ordenar por puntos descendente
@@ -469,8 +501,52 @@ const StandingsPage: React.FC = () => {
   // 3. Las flechas modifican localStandings directamente
   const moveStanding = (index: number, direction: 'up' | 'down') => {
     setLocalStandings(prev => {
-      // Usar sortedStandings para obtener el orden actual correcto
-      const sortedArr = [...sortedStandings];
+      // Filtrar standings válidos y calcular el orden actual basándose en prev (no en sortedStandings que puede estar obsoleto)
+      const validStandings = prev.filter(standing => 
+        teams.some(team => String(team.id) === String(standing.teamId))
+      );
+      
+      // Calcular el orden actual basándose en prev, no en sortedStandings
+      const standingsWithOrder = validStandings.filter(s => s.orden && s.orden > 0);
+      const hasManualOrder = standingsWithOrder.length > 0;
+      
+      // Ordenar según la misma lógica que sortedStandings pero usando prev
+      let sortedArr: Standing[];
+      if (hasManualOrder) {
+        sortedArr = [...validStandings].sort((a, b) => {
+          const ordenA = Number(a.orden) || 0;
+          const ordenB = Number(b.orden) || 0;
+          if (ordenA > 0 && ordenB > 0) return ordenA - ordenB;
+          if (ordenA > 0 && ordenB === 0) return -1;
+          if (ordenA === 0 && ordenB > 0) return 1;
+          const bPuntos = Number(b.puntos) || 0;
+          const aPuntos = Number(a.puntos) || 0;
+          if (bPuntos !== aPuntos) return bPuntos - aPuntos;
+          const aDiff = (a.goalsFor || 0) - (a.goalsAgainst || 0);
+          const bDiff = (b.goalsFor || 0) - (b.goalsAgainst || 0);
+          if (bDiff !== aDiff) return bDiff - aDiff;
+          if ((b.goalsFor || 0) !== (a.goalsFor || 0)) return (b.goalsFor || 0) - (a.goalsFor || 0);
+          if ((a.pj || 0) !== (b.pj || 0)) return (a.pj || 0) - (b.pj || 0);
+          const teamA = teams.find(t => t.id === a.teamId)?.name || '';
+          const teamB = teams.find(t => t.id === b.teamId)?.name || '';
+          return teamA.localeCompare(teamB);
+        });
+      } else {
+        sortedArr = [...validStandings].sort((a, b) => {
+          const bPuntos = Number(b.puntos) || 0;
+          const aPuntos = Number(a.puntos) || 0;
+          if (bPuntos !== aPuntos) return bPuntos - aPuntos;
+          const aDiff = (a.goalsFor || 0) - (a.goalsAgainst || 0);
+          const bDiff = (b.goalsFor || 0) - (b.goalsAgainst || 0);
+          if (bDiff !== aDiff) return bDiff - aDiff;
+          if ((b.goalsFor || 0) !== (a.goalsFor || 0)) return (b.goalsFor || 0) - (a.goalsFor || 0);
+          if ((a.pj || 0) !== (b.pj || 0)) return (a.pj || 0) - (b.pj || 0);
+          const teamA = teams.find(t => t.id === a.teamId)?.name || '';
+          const teamB = teams.find(t => t.id === b.teamId)?.name || '';
+          return teamA.localeCompare(teamB);
+        });
+      }
+      
       const newIndex = direction === 'up' ? index - 1 : index + 1;
       if (newIndex < 0 || newIndex >= sortedArr.length) return prev;
       
@@ -478,6 +554,7 @@ const StandingsPage: React.FC = () => {
       [sortedArr[index], sortedArr[newIndex]] = [sortedArr[newIndex], sortedArr[index]];
       
       // Actualizar el campo 'orden' para mantener el orden manual
+      // IMPORTANTE: Asignar orden a TODOS los equipos, no solo a los que se movieron
       const updatedArr = sortedArr.map((s, idx) => ({ ...s, orden: idx + 1 }));
       
       // Actualizar localStandings con los nuevos valores de orden
@@ -488,11 +565,6 @@ const StandingsPage: React.FC = () => {
     });
     setOrderDirty(true);
     setOrderSaved(false); // Resetear el estado de guardado cuando se cambia el orden
-    
-    // Log para depuración
-    console.log('Orden manual actualizado:', sortedStandings.map((s, idx) => 
-      `${s.equipo_nombre || getTeamName(s.teamId)}: ${idx + 1} (puntos: ${s.puntos})`
-    ));
   };
 
   // 4. El render usa standings
@@ -511,10 +583,54 @@ const StandingsPage: React.FC = () => {
     }
     
     try {
-      // Usar sortedStandings para obtener el orden correcto
-      const orderedStandings = [...sortedStandings];
+      // Calcular el orden actual basándose en localStandings actual (no sortedStandings que puede estar desactualizado)
+      // Filtrar standings válidos
+      const validStandings = localStandings.filter(standing => 
+        teams.some(team => String(team.id) === String(standing.teamId))
+      );
+      
+      // Calcular orden actual usando la misma lógica que sortedStandings
+      const standingsWithOrder = validStandings.filter(s => s.orden && s.orden > 0);
+      const hasManualOrder = standingsWithOrder.length > 0;
+      
+      let orderedStandings: Standing[];
+      if (hasManualOrder) {
+        orderedStandings = [...validStandings].sort((a, b) => {
+          const ordenA = Number(a.orden) || 0;
+          const ordenB = Number(b.orden) || 0;
+          if (ordenA > 0 && ordenB > 0) return ordenA - ordenB;
+          if (ordenA > 0 && ordenB === 0) return -1;
+          if (ordenA === 0 && ordenB > 0) return 1;
+          const bPuntos = Number(b.puntos) || 0;
+          const aPuntos = Number(a.puntos) || 0;
+          if (bPuntos !== aPuntos) return bPuntos - aPuntos;
+          const aDiff = (a.goalsFor || 0) - (a.goalsAgainst || 0);
+          const bDiff = (b.goalsFor || 0) - (b.goalsAgainst || 0);
+          if (bDiff !== aDiff) return bDiff - aDiff;
+          if ((b.goalsFor || 0) !== (a.goalsFor || 0)) return (b.goalsFor || 0) - (a.goalsFor || 0);
+          if ((a.pj || 0) !== (b.pj || 0)) return (a.pj || 0) - (b.pj || 0);
+          const teamA = teams.find(t => t.id === a.teamId)?.name || '';
+          const teamB = teams.find(t => t.id === b.teamId)?.name || '';
+          return teamA.localeCompare(teamB);
+        });
+      } else {
+        orderedStandings = [...validStandings].sort((a, b) => {
+          const bPuntos = Number(b.puntos) || 0;
+          const aPuntos = Number(a.puntos) || 0;
+          if (bPuntos !== aPuntos) return bPuntos - aPuntos;
+          const aDiff = (a.goalsFor || 0) - (a.goalsAgainst || 0);
+          const bDiff = (b.goalsFor || 0) - (b.goalsAgainst || 0);
+          if (bDiff !== aDiff) return bDiff - aDiff;
+          if ((b.goalsFor || 0) !== (a.goalsFor || 0)) return (b.goalsFor || 0) - (a.goalsFor || 0);
+          if ((a.pj || 0) !== (b.pj || 0)) return (a.pj || 0) - (b.pj || 0);
+          const teamA = teams.find(t => t.id === a.teamId)?.name || '';
+          const teamB = teams.find(t => t.id === b.teamId)?.name || '';
+          return teamA.localeCompare(teamB);
+        });
+      }
       
       // Crear payload con el nuevo orden - asegurando que todos los IDs sean strings
+      // IMPORTANTE: Guardar el orden para TODOS los equipos, no solo los que están en la tabla
       const payload = orderedStandings.map((s, idx) => {
         // Validar que los IDs existan y sean strings
         const teamId = String(s.teamId);
@@ -534,14 +650,18 @@ const StandingsPage: React.FC = () => {
           equipo_id: teamId,
           zona_id: zoneId,
           categoria_id: categoryId,
-          orden: idx + 1,
+          orden: idx + 1, // Asignar orden secuencial a todos
           puntos: puntos,
           pj: pj,
           equipo_nombre: s.equipo_nombre?.trim() || ''
         };
       });
       
-      console.log('Guardando nuevo orden:', payload);
+      console.log('Guardando nuevo orden:', payload.map(p => ({
+        equipo: p.equipo_nombre,
+        orden: p.orden,
+        puntos: p.puntos
+      })));
       
       // Guardar el nuevo orden
       await updateEditablePositionsOrder(payload);
@@ -553,7 +673,7 @@ const StandingsPage: React.FC = () => {
       // Recargar standings desde la base para confirmar cambios
       console.log('Recargando standings después de guardar...');
       await loadStandings();
-      console.log('Standings recargados:', localStandings);
+      console.log('Standings recargados');
       
       console.log('Orden guardado exitosamente');
     } catch (e) {
@@ -1150,9 +1270,9 @@ const StandingsPage: React.FC = () => {
             {localStandings.length > 0 && (
               <div className="px-6 pb-2">
                 <div className="flex items-center gap-2">
-                  <div className={`w-3 h-3 rounded-full ${sortedStandings.every(s => s.orden && s.orden > 0) ? 'bg-orange-500' : 'bg-green-500'}`}></div>
+                  <div className={`w-3 h-3 rounded-full ${sortedStandings.some(s => s.orden && s.orden > 0) ? 'bg-orange-500' : 'bg-green-500'}`}></div>
                   <span className="text-sm font-medium text-gray-700">
-                    {sortedStandings.every(s => s.orden && s.orden > 0) 
+                    {sortedStandings.some(s => s.orden && s.orden > 0) 
                       ? '🔧 Modo Orden Manual' 
                       : '📊 Modo Orden Automático por Puntos'
                     }
@@ -1373,7 +1493,7 @@ const StandingsPage: React.FC = () => {
                           </td>
                         </tr>
                       ) : (
-                        localStandings.map((standing: Standing, index: number) => (
+                        sortedStandings.map((standing: Standing, index: number) => (
                           <tr 
                           key={standing.id} 
                           className={cn(
@@ -1425,7 +1545,7 @@ const StandingsPage: React.FC = () => {
                             <div className="flex justify-center space-x-2">
                               {/* Flechas de orden */}
                               <button onClick={() => moveStanding(index, 'up')} disabled={index === 0} title="Subir" className="text-gray-500 hover:text-violet-600 disabled:opacity-30"><span>▲</span></button>
-                              <button onClick={() => moveStanding(index, 'down')} disabled={index === localStandings.length - 1} title="Bajar" className="text-gray-500 hover:text-violet-600 disabled:opacity-30"><span>▼</span></button>
+                              <button onClick={() => moveStanding(index, 'down')} disabled={index === sortedStandings.length - 1} title="Bajar" className="text-gray-500 hover:text-violet-600 disabled:opacity-30"><span>▼</span></button>
                               <button
                                 onClick={() => handleSaveRow(standing)}
                                 disabled={loading || !modifiedRows.has(String(standing.id))}
@@ -1510,7 +1630,7 @@ const StandingsPage: React.FC = () => {
                       </div>
                     </div>
                   ) : (
-                    localStandings.map((standing: Standing, idx: number) => (
+                    sortedStandings.map((standing: Standing, idx: number) => (
                     <div
                       key={standing.id}
                       className={
@@ -1532,7 +1652,7 @@ const StandingsPage: React.FC = () => {
                         <div className="flex flex-row gap-3">
                           {/* Flechas de orden */}
                           <button onClick={() => moveStanding(idx, 'up')} disabled={idx === 0} title="Subir" className="text-gray-500 hover:text-violet-600 disabled:opacity-30"><span>▲</span></button>
-                          <button onClick={() => moveStanding(idx, 'down')} disabled={idx === localStandings.length - 1} title="Bajar" className="text-gray-500 hover:text-violet-600 disabled:opacity-30"><span>▼</span></button>
+                          <button onClick={() => moveStanding(idx, 'down')} disabled={idx === sortedStandings.length - 1} title="Bajar" className="text-gray-500 hover:text-violet-600 disabled:opacity-30"><span>▼</span></button>
                           <button
                             onClick={() => handleSaveRow(standing)}
                             className="text-indigo-600 hover:text-indigo-900"
@@ -1575,9 +1695,35 @@ const StandingsPage: React.FC = () => {
                     <button
                       onClick={async () => {
                         if (confirm('¿Estás seguro de que quieres resetear el orden manual y volver al ordenamiento automático por puntos?')) {
-                          setLocalStandings(prev => prev.map(standing => ({ ...standing, orden: 0 })));
-                          setOrderDirty(true);
-                          setOrderSaved(false);
+                          try {
+                            // Obtener el estado actual antes de actualizar
+                            const currentStandings = localStandings;
+                            
+                            // Crear payload con orden 0 para todos los equipos
+                            const payload = currentStandings.map(s => ({
+                              equipo_id: String(s.teamId),
+                              zona_id: String(s.zoneId),
+                              categoria_id: String(s.categoryId),
+                              orden: 0, // 0 indica que no hay orden manual
+                              puntos: Number(s.puntos) || 0,
+                              pj: Number(s.pj) || 0,
+                              equipo_nombre: s.equipo_nombre?.trim() || ''
+                            }));
+                            
+                            // Guardar el reseteo en la base de datos primero
+                            await updateEditablePositionsOrder(payload);
+                            
+                            // Luego actualizar el estado local y recargar
+                            setLocalStandings(prev => prev.map(standing => ({ ...standing, orden: null })));
+                            setOrderDirty(false);
+                            setOrderSaved(false);
+                            
+                            // Recargar desde la base de datos para asegurar consistencia
+                            await loadStandings();
+                          } catch (error) {
+                            console.error('Error al resetear orden:', error);
+                            alert('Error al resetear el orden. Por favor, intenta nuevamente.');
+                          }
                         }
                       }}
                       className="px-4 py-2 rounded shadow flex items-center bg-orange-500 text-white hover:bg-orange-600 transition-colors duration-200"
