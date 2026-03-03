@@ -81,7 +81,7 @@ const HomePage: React.FC = () => {
                         <div className="w-24 h-24 bg-gradient-to-br from-gray-100 to-gray-200 rounded-full flex items-center justify-center relative">
                           {league.name.includes('Copa Lobitos') ? (
                             <img
-                              src="/images/lobitos.png"
+                              src="/images/Lobitos.png"
                               alt="Copa Lobitos"
                               className="w-24 h-24 object-cover rounded-full scale-110 group-hover:scale-125 transition-transform duration-300"
                             />
