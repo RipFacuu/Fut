@@ -76,11 +76,21 @@ const HomePage: React.FC = () => {
                           <img src="/mundialito.jpeg" alt="Mundialito" className="w-24 h-24 object-cover rounded-full scale-110 group-hover:scale-125 transition-transform duration-300" />
                         </div>
                       )}
-                      {/* Para ligas nuevas, mostrar un ícono de copa */}
+                      {/* Para ligas nuevas, mostrar logo específico si existe, si no ícono de copa */}
                       {league.id !== 'liga_masculina' && league.id !== 'lifufe' && league.id !== 'mundialito' && (
                         <div className="w-24 h-24 bg-gradient-to-br from-gray-100 to-gray-200 rounded-full flex items-center justify-center relative">
-                          {league.name.includes("D.I.E.F") || league.name.includes("DIEF") ? (
-                            <img src="/dief_logo.png" alt="COPA D.I.E.F" className="w-24 h-24 object-cover rounded-full scale-110 group-hover:scale-125 transition-transform duration-300" />
+                          {league.name.includes('Copa Lobitos') ? (
+                            <img
+                              src="/images/lobitos.png"
+                              alt="Copa Lobitos"
+                              className="w-24 h-24 object-cover rounded-full scale-110 group-hover:scale-125 transition-transform duration-300"
+                            />
+                          ) : league.name.includes('D.I.E.F') || league.name.includes('DIEF') ? (
+                            <img
+                              src="/dief_logo.png"
+                              alt="COPA D.I.E.F"
+                              className="w-24 h-24 object-cover rounded-full scale-110 group-hover:scale-125 transition-transform duration-300"
+                            />
                           ) : (
                             <Trophy className="text-gray-400" size={48} />
                           )}
