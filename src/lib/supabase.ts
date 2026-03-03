@@ -121,21 +121,11 @@ export async function updateEditablePositionsOrder(updates: PositionUpdate[]): P
   }
 }
 
+import { getLeagueNumericId, getLeagueStringId } from '../utils/leagueUtils';
+
 // Función helper para mapear IDs de liga (movida fuera de la función)
 export function getNumericLeagueId(leagueStringId: string): number {
-  const leagueMap: { [key: string]: number } = {
-    'liga_masculina': 1,
-    'lifufe': 2,
-    'mundialito': 3
-  };
-  
-  // Si ya es un número, devolverlo como está
-  if (!isNaN(Number(leagueStringId))) {
-    return Number(leagueStringId);
-  }
-  
-  // Si es un string, mapear al número correspondiente
-  return leagueMap[leagueStringId] || 1; // Default a Liga Masculina si no se encuentra
+  return getLeagueNumericId(leagueStringId);
 }
 
 // Funciones para Zonas

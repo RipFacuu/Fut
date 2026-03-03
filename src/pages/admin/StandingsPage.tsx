@@ -211,9 +211,8 @@ const StandingsPage: React.FC = () => {
   const isLigaMasculina = selectedLeague === 'liga_masculina';
   const isLifufe = selectedLeague === 'lifufe';
   const isMundialito = selectedLeague === 'mundialito';
-  // IDs de ligas que deben ser "categoría primero"
-  const categoriaPrimeroIds = ['lifufe', 'mundialito', '5']; // '5' es el id de Tu Torneo
-  const isCategoriaPrimero = categoriaPrimeroIds.includes(selectedLeague);
+  // IDs de ligas que deben ser "categoría primero" (todas las que no son liga_masculina)
+  const isCategoriaPrimero = !isLigaMasculina;
   
   // Get categories for selected league and zone (como en CategoriesPage)
   const filteredZones = useMemo(() => {
@@ -302,8 +301,8 @@ const StandingsPage: React.FC = () => {
         zoneId: String(pos.zona_id),
         puntos: Number(pos.puntos) || 0,
         pj: Number(pos.pj) || 0,
-        // Cargar orden: si es número > 0, usarlo; si es 0 o null, establecer null
-        orden: (typeof pos.orden === 'number' && pos.orden > 0) ? pos.orden : null,
+        // Cargar orden: si es número > 0, usarlo; si es 0 o null, establecer undefined
+        orden: (typeof pos.orden === 'number' && pos.orden > 0) ? pos.orden : undefined,
         equipo_nombre: pos.equipo_nombre || ''
       }));
       console.log('StandingsData antes de setLocalStandings:', standingsData);
@@ -1714,7 +1713,7 @@ const StandingsPage: React.FC = () => {
                             await updateEditablePositionsOrder(payload);
                             
                             // Luego actualizar el estado local y recargar
-                            setLocalStandings(prev => prev.map(standing => ({ ...standing, orden: null })));
+                            setLocalStandings(prev => prev.map(standing => ({ ...standing, orden: undefined })));
                             setOrderDirty(false);
                             setOrderSaved(false);
                             

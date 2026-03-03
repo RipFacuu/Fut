@@ -48,25 +48,18 @@ export async function getNumericIds(
   };
 }
 
+import { getLeagueStringId, getLeagueNumericId, getLeagueDefaultLogo } from '../utils/leagueUtils';
+
 // Mapeo de liga
 export const mapSupabaseToLeague = (supabaseLeague: any): League => {
   if (!supabaseLeague) throw new Error('League data is required');
 
-  const idMap: { [key: number]: string } = {
-    1: 'liga_masculina',
-    2: 'lifufe',
-    3: 'mundialito'
-  };
-
-  const leagueId =
-    typeof supabaseLeague.id === 'string'
-      ? supabaseLeague.id
-      : idMap[supabaseLeague.id] || String(supabaseLeague.id);
+  const leagueId = getLeagueStringId(supabaseLeague.id);
 
   return {
     id: leagueId,
     name: supabaseLeague.nombre || '',
-    logo: supabaseLeague.logo || ''
+    logo: supabaseLeague.logo || getLeagueDefaultLogo(leagueId, supabaseLeague.nombre) || ''
   };
 };
 
@@ -74,21 +67,10 @@ export const mapSupabaseToLeague = (supabaseLeague: any): League => {
 export const mapSupabaseToZone = (supabaseZone: any): Zone => {
   if (!supabaseZone) throw new Error('Zone data is required');
 
-  const idMap: { [key: number]: string } = {
-    1: 'liga_masculina',
-    2: 'lifufe',
-    3: 'mundialito'
-  };
-
-  const numericId =
-    typeof supabaseZone.liga_id === 'string'
-      ? parseInt(supabaseZone.liga_id)
-      : supabaseZone.liga_id;
-
   return {
     id: supabaseZone.id || '',
     name: supabaseZone.nombre || '',
-    leagueId: idMap[numericId] || String(numericId),
+    leagueId: getLeagueStringId(supabaseZone.liga_id),
     categoryId: String(supabaseZone.categoria_id || ''),
     legend: supabaseZone.legend || undefined
   };
@@ -98,20 +80,12 @@ export const mapSupabaseToZone = (supabaseZone: any): Zone => {
 export const mapSupabaseToCategory = (supabaseCategory: any): Category => {
   if (!supabaseCategory) throw new Error('Category data is required');
 
-  const idMap: { [key: number]: string } = {
-    1: 'liga_masculina',
-    2: 'lifufe', 
-    3: 'mundialito'
-  };
-
-  const numericId = typeof supabaseCategory.liga_id === 'string' 
-    ? parseInt(supabaseCategory.liga_id) 
-    : supabaseCategory.liga_id;
+  const leagueId = getLeagueStringId(supabaseCategory.liga_id);
 
   const category: Category & { zoneId?: string } = {
     id: String(supabaseCategory.id || ''),
     name: supabaseCategory.nombre || '',
-    leagueId: idMap[numericId] || String(numericId),
+    leagueId: leagueId,
     isEditable: supabaseCategory.is_editable !== false
   };
 
@@ -189,21 +163,9 @@ export const mapSupabaseToTeam = (supabaseTeam: any): Team => {
     throw new Error('Team must have id and name');
   }
   
-  // Mapear IDs numéricos de liga a strings
-  const getStringLeagueId = (numericId: number | string): string => {
-    const idMap: { [key: number]: string } = {
-      1: 'liga_masculina',
-      2: 'lifufe', 
-      3: 'mundialito'
-    };
-    
-    const numId = typeof numericId === 'string' ? parseInt(numericId) : numericId;
-    return idMap[numId] || String(numericId);
-  };
-  
   // Agregar validación y logging
   console.log('Liga ID recibida:', supabaseTeam.liga_id);
-  const mappedLeagueId = supabaseTeam.liga_id ? getStringLeagueId(supabaseTeam.liga_id) : '';
+  const mappedLeagueId = getLeagueStringId(supabaseTeam.liga_id);
   console.log('Liga ID mapeada:', mappedLeagueId);
   
   return {
@@ -219,21 +181,9 @@ export const mapSupabaseToTeam = (supabaseTeam: any): Team => {
 export const mapSupabaseToFixture = (supabaseFixture: any): Fixture & { invalidLeagueId?: boolean } => {
   console.log('Mapping fixture from Supabase:', supabaseFixture);
   
-  // Función para mapear IDs numéricos de liga a strings
-  const getStringLeagueId = (numericId: number | string | null | undefined): string => {
-    const idMap: { [key: number]: string } = {
-      1: 'liga_masculina',
-      2: 'lifufe',
-      3: 'mundialito'
-    };
-    if (numericId === null || numericId === undefined || isNaN(Number(numericId))) return '__INVALID__';
-    const numId = typeof numericId === 'string' ? parseInt(numericId) : numericId;
-    return idMap[numId] || '__INVALID__';
-  };
-  
   // Asegurarse de que todos los IDs sean strings y manejar valores nulos
   const fixtureId = supabaseFixture.id ? supabaseFixture.id.toString() : '';
-  const leagueId = getStringLeagueId(supabaseFixture.liga_id);
+  const leagueId = getLeagueStringId(supabaseFixture.liga_id);
   const categoryId = supabaseFixture.categoria_id ? supabaseFixture.categoria_id.toString() : '';
   const zoneId = supabaseFixture.zona_id ? supabaseFixture.zona_id.toString() : '';
   const invalidLeagueId = leagueId === '__INVALID__';
@@ -270,22 +220,10 @@ export const mapSupabaseToStanding = (supabaseStanding: any): Standing => {
     throw new Error('Standing data is required');
   }
 
-  // Función para mapear IDs numéricos de liga a strings
-  const getStringLeagueId = (numericId: number | string): string => {
-    const idMap: { [key: number]: string } = {
-      1: 'liga_masculina',
-      2: 'lifufe',
-      3: 'mundialito'
-    };
-    
-    const numId = typeof numericId === 'string' ? parseInt(numericId) : numericId;
-    return idMap[numId] || String(numericId);
-  };
-
   return {
     id: supabaseStanding.id || '',
     teamId: String(supabaseStanding.equipo_id || supabaseStanding.teamId || ''),
-    leagueId: getStringLeagueId(supabaseStanding.liga_id || supabaseStanding.leagueId || ''),
+    leagueId: getLeagueStringId(supabaseStanding.liga_id || supabaseStanding.leagueId || ''),
     categoryId: String(supabaseStanding.categoria_id || supabaseStanding.categoryId || ''),
     zoneId: String(supabaseStanding.zona_id || supabaseStanding.zoneId || ''),
     puntos: Number(supabaseStanding.points || supabaseStanding.puntos || 0),
@@ -341,13 +279,9 @@ export class SupabaseService {
   }
 
   // Categorías
-  static async getCategoriesByLeague(leagueId: string): Promise<Category[]> {
+  static async getCategoriesByLeague(leagueId: string, zoneId?: string): Promise<Category[]> {
     try {
-      // ✅ SOLUCIÓN: Convertir string ID a numérico para todas las ligas
-      const numericLeagueId = getNumericLeagueId(leagueId);
-      console.log(`🔍 Querying categories for leagueId: ${leagueId} -> ${numericLeagueId}`);
-      
-      const data = await obtenerCategoriasPorLiga(numericLeagueId.toString());
+      const data = await obtenerCategoriasPorLigaConEstructura(leagueId, zoneId);
       return data.map(mapSupabaseToCategory);
     } catch (error) {
       console.error('Error getting categories by league:', error);
@@ -890,9 +824,9 @@ static async updateTeam(
     }
   }
 
-  static async getZonesByLeague(leagueId: string): Promise<Zone[]> {
+  static async getZonesByLeague(leagueId: string, categoryId?: string): Promise<Zone[]> {
     try {
-      const data = await obtenerZonasPorLiga(leagueId);
+      const data = await obtenerZonasPorLigaConEstructura(leagueId, categoryId);
       return data.map(mapSupabaseToZone);
     } catch (error) {
       console.error('Error getting zones by league:', error);

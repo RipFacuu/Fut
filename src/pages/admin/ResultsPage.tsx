@@ -176,8 +176,10 @@ const ResultsPage: React.FC = () => {
     filteredFixtures: filteredFixtures.length
   });
   
-  // Filtros para Liga Participando (liga_masculina): primero zona, luego categoría
+  // Detectar tipo de liga
   const isLigaMasculina = selectedLeague === 'liga_masculina';
+  // IDs de ligas que deben ser "categoría primero" (todas las que no son liga_masculina)
+  const isCategoriaPrimero = !isLigaMasculina;
   const availableZones = isLigaMasculina ? getZonesByLeague(selectedLeague) : getZonesByCategory(selectedCategory);
   const availableCategories = isLigaMasculina && selectedZone ? getCategoriesByZone(selectedZone) : getCategoriesByLeague(selectedLeague);
   
@@ -203,35 +205,37 @@ const ResultsPage: React.FC = () => {
             ))}
           </select>
         </div>
-        {isLigaMasculina ? (
+        {isCategoriaPrimero ? (
           <>
-            <div>
-              <label htmlFor="zoneFilter" className="form-label">Zona</label>
-              <select
-                id="zoneFilter"
-                className="form-input"
-                value={selectedZone}
-                onChange={handleZoneChange}
-                disabled={!selectedLeague}
-              >
-                <option value="">Seleccionar zona</option>
-                {availableZones.map(zone => (
-                  <option key={zone.id} value={zone.id}>{zone.name}</option>
-                ))}
-              </select>
-            </div>
             <div>
               <label htmlFor="categoryFilter" className="form-label">Categoría</label>
               <select
                 id="categoryFilter"
-                className="form-input"
                 value={selectedCategory}
-                onChange={handleCategoryChange}
-                disabled={!selectedZone}
+                onChange={(e) => {
+                  setSelectedCategory(e.target.value);
+                  setSelectedZone('');
+                }}
+                className="form-input"
               >
-                <option value="">Seleccionar categoría</option>
-                {availableCategories.map(category => (
-                  <option key={category.id} value={category.id}>{category.name}</option>
+                <option value="">Todas las categorías</option>
+                {availableCategories.map(cat => (
+                  <option key={cat.id} value={cat.id}>{cat.name}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label htmlFor="zoneFilter" className="form-label">Zona</label>
+              <select
+                id="zoneFilter"
+                value={selectedZone}
+                onChange={(e) => setSelectedZone(e.target.value)}
+                className="form-input"
+                disabled={!selectedCategory}
+              >
+                <option value="">Todas las zonas</option>
+                {availableZones.map(zone => (
+                  <option key={zone.id} value={zone.id}>{zone.name}</option>
                 ))}
               </select>
             </div>
@@ -239,32 +243,34 @@ const ResultsPage: React.FC = () => {
         ) : (
           <>
             <div>
-              <label htmlFor="categoryFilter" className="form-label">Categoría</label>
+              <label htmlFor="zoneFilter" className="form-label">Zona</label>
               <select
-                id="categoryFilter"
+                id="zoneFilter"
+                value={selectedZone}
+                onChange={(e) => {
+                  setSelectedZone(e.target.value);
+                  setSelectedCategory('');
+                }}
                 className="form-input"
-                value={selectedCategory}
-                onChange={handleCategoryChange}
-                disabled={!selectedLeague}
               >
-                <option value="">Seleccionar categoría</option>
-                {availableCategories.map(category => (
-                  <option key={category.id} value={category.id}>{category.name}</option>
+                <option value="">Todas las zonas</option>
+                {availableZones.map(zone => (
+                  <option key={zone.id} value={zone.id}>{zone.name}</option>
                 ))}
               </select>
             </div>
             <div>
-              <label htmlFor="zoneFilter" className="form-label">Zona</label>
+              <label htmlFor="categoryFilter" className="form-label">Categoría</label>
               <select
-                id="zoneFilter"
+                id="categoryFilter"
+                value={selectedCategory}
+                onChange={(e) => setSelectedCategory(e.target.value)}
                 className="form-input"
-                value={selectedZone}
-                onChange={handleZoneChange}
-                disabled={!selectedCategory}
+                disabled={!selectedZone}
               >
-                <option value="">Seleccionar zona</option>
-                {availableZones.map(zone => (
-                  <option key={zone.id} value={zone.id}>{zone.name}</option>
+                <option value="">Todas las categorías</option>
+                {availableCategories.map(cat => (
+                  <option key={cat.id} value={cat.id}>{cat.name}</option>
                 ))}
               </select>
             </div>

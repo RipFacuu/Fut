@@ -1,32 +1,35 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { useLeague } from '../contexts/LeagueContext';
-import { Trophy, Users, ClipboardList, Star, Zap, Target, Award } from 'lucide-react';
+import { Trophy, Users, ClipboardList, Star, Zap, Target, Award, ArrowRight } from 'lucide-react';
 import FlyerCarousel from '../components/FlyerCarousel';
+
+import { getLeagueDefaultLogo } from '../utils/leagueUtils';
 
 const HomePage: React.FC = () => {
   const { leagues } = useLeague();
   
   // Debug: Log todas las ligas disponibles
-  console.log('Ligas disponibles:', leagues.map(league => ({ id: league.id, name: league.name })));
+  console.log('Ligas disponibles:', leagues.map(league => ({ id: league.id, name: league.name, logo: league.logo })));
   
   // Ordenar: primero las conocidas, luego el resto por id ascendente
   const knownOrder = ['liga_masculina', 'lifufe', 'mundialito'];
   const orderedLeagues = [
     ...knownOrder.map(id => leagues.find(l => l.id === id)).filter(Boolean),
-    ...leagues.filter(l => !knownOrder.includes(l.id)).sort((a, b) => Number(a.id) - Number(b.id))
+    ...leagues.filter(l => !knownOrder.includes(l.id)).sort((a, b) => {
+      const idA = isNaN(Number(a.id)) ? 999 : Number(a.id);
+      const idB = isNaN(Number(b.id)) ? 999 : Number(b.id);
+      return idA - idB;
+    })
   ];
+
+  // Función para obtener la imagen de la liga
+  const getLeagueLogo = (league: any) => {
+    return league.logo || getLeagueDefaultLogo(league.id, league.name);
+  };
   
   return (
     <div className="space-y-12 px-4 sm:px-8">
-      {/* Hero principal oculto */}
-      <section className="hidden">
-        {/* ...hero... */}
-      </section>
-
-      {/* Hero Section ancho igual a Nuestras Ligas */}
-      {/* Sección eliminada por pedido del usuario */}
-
       {/* Carrusel de Flyers */}
       <section className="animate-fade-in max-w-5xl mx-auto px-4 sm:px-8">
         <FlyerCarousel />
@@ -46,6 +49,8 @@ const HomePage: React.FC = () => {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           {orderedLeagues.map((league, index) => {
             if (!league) return null;
+            const logoSrc = getLeagueLogo(league);
+            
             return (
               <Link 
                 key={league.id} 
@@ -60,42 +65,18 @@ const HomePage: React.FC = () => {
                   <div className="relative flex justify-center mb-6">
                     <div className="relative">
                       <div className="absolute inset-0 bg-gradient-to-r from-primary-400 to-accent-400 rounded-full blur-lg opacity-50 group-hover:opacity-75 transition-opacity duration-300"></div>
-                      {/* Mostrar imagen solo para ligas conocidas, si no mostrar ícono por defecto */}
-                      {league.id === 'liga_masculina' && (
-                        <div className="w-24 h-24 bg-gradient-to-br from-primary-100 to-primary-200 rounded-full flex items-center justify-center relative">
-                          <img src="/liga_participando.jpeg" alt="Liga Masculina" className="w-24 h-24 object-cover rounded-full scale-110 group-hover:scale-125 transition-transform duration-300" />
-                        </div>
-                      )}
-                      {league.id === 'lifufe' && (
-                        <div className="w-24 h-24 bg-gradient-to-br from-accent-100 to-accent-200 rounded-full flex items-center justify-center relative">
-                          <img src="/lifufe.jpeg" alt="LIFUFE" className="w-24 h-24 object-cover rounded-full scale-110 group-hover:scale-125 transition-transform duration-300" />
-                        </div>
-                      )}
-                      {league.id === 'mundialito' && (
-                        <div className="w-24 h-24 bg-gradient-to-br from-yellow-100 to-yellow-200 rounded-full flex items-center justify-center relative">
-                          <img src="/mundialito.jpeg" alt="Mundialito" className="w-24 h-24 object-cover rounded-full scale-110 group-hover:scale-125 transition-transform duration-300" />
-                        </div>
-                      )}
-                      {/* Para ligas nuevas, mostrar logo específico si existe, si no ícono de copa */}
-                      {league.id !== 'liga_masculina' && league.id !== 'lifufe' && league.id !== 'mundialito' && (
-                        <div className="w-24 h-24 bg-gradient-to-br from-gray-100 to-gray-200 rounded-full flex items-center justify-center relative">
-                          {league.name.includes('Copa Lobitos') ? (
-                            <img
-                              src="/images/lobitos.jpeg"
-                              alt="Copa Lobitos"
-                              className="w-24 h-24 object-cover rounded-full scale-110 group-hover:scale-125 transition-transform duration-300"
-                            />
-                          ) : league.name.includes('D.I.E.F') || league.name.includes('DIEF') ? (
-                            <img
-                              src="/dief_logo.png"
-                              alt="COPA D.I.E.F"
-                              className="w-24 h-24 object-cover rounded-full scale-110 group-hover:scale-125 transition-transform duration-300"
-                            />
-                          ) : (
-                            <Trophy className="text-gray-400" size={48} />
-                          )}
-                        </div>
-                      )}
+                      
+                      <div className="w-24 h-24 bg-gradient-to-br from-gray-100 to-gray-200 rounded-full flex items-center justify-center relative overflow-hidden">
+                        {logoSrc ? (
+                          <img 
+                            src={logoSrc} 
+                            alt={league.name} 
+                            className="w-full h-full object-cover scale-110 group-hover:scale-125 transition-transform duration-300" 
+                          />
+                        ) : (
+                          <Trophy className="text-gray-400" size={48} />
+                        )}
+                      </div>
                     </div>
                   </div>
                   
@@ -179,12 +160,5 @@ const HomePage: React.FC = () => {
     </div>
   );
 };
-
-// Componente ArrowRight para el botón
-const ArrowRight = ({ className }: { className?: string }) => (
-  <svg className={className} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <path d="M5 12h14M12 5l7 7-7 7"/>
-  </svg>
-);
 
 export default HomePage;
