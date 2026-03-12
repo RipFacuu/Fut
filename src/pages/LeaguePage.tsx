@@ -173,12 +173,15 @@ const LeaguePage: React.FC = () => {
       <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-8">
         <h2 className="text-2xl font-bold mb-4">¿Qué deseas ver de la liga?</h2>
         <div className="flex flex-col md:flex-row gap-6">
-          <button
-            className="px-8 py-6 rounded-xl bg-gradient-to-r from-blue-500 to-indigo-600 text-white text-xl font-semibold shadow-lg hover:scale-105 transition-all"
-            onClick={() => setViewMode('fixture')}
-          >
-            Ver Fixture de la Liga
-          </button>
+          {/* En Copa Lobitos ocultamos el botón de Fixture y dejamos solo Tabla de Posiciones */}
+          {!(league.name && league.name.toLowerCase().includes('lobitos')) && (
+            <button
+              className="px-8 py-6 rounded-xl bg-gradient-to-r from-blue-500 to-indigo-600 text-white text-xl font-semibold shadow-lg hover:scale-105 transition-all"
+              onClick={() => setViewMode('fixture')}
+            >
+              Ver Fixture de la Liga
+            </button>
+          )}
           <button
             className="px-8 py-6 rounded-xl bg-gradient-to-r from-green-500 to-emerald-600 text-white text-xl font-semibold shadow-lg hover:scale-105 transition-all"
             onClick={() => setViewMode('standings')}
