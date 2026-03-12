@@ -193,6 +193,13 @@ const StandingsPage: React.FC = () => {
   
   const { isAuthenticated, user } = useAuth();
   const [selectedLeague, setSelectedLeague] = useState<string>(leagues[0]?.id || '');
+  
+  // Sincronizar selectedLeague cuando se cargan las ligas por primera vez
+  useEffect(() => {
+    if (!selectedLeague && leagues.length > 0) {
+      setSelectedLeague(leagues[0].id);
+    }
+  }, [leagues, selectedLeague]);
   const [selectedCategory, setSelectedCategory] = useState<string>('');
   const [selectedZone, setSelectedZone] = useState<string>('');
   const [modifiedRows, setModifiedRows] = useState<Set<string>>(new Set());
@@ -209,10 +216,12 @@ const StandingsPage: React.FC = () => {
   
   // Detectar tipo de liga
   const isLigaMasculina = selectedLeague === 'liga_masculina';
-  const isLifufe = selectedLeague === 'lifufe';
-  const isMundialito = selectedLeague === 'mundialito';
   // IDs de ligas que deben ser "categoría primero" (todas las que no son liga_masculina)
-  const isCategoriaPrimero = !isLigaMasculina;
+  // Asegurarse de que si no hay liga seleccionada, también se considere categoría primero por defecto
+  const isCategoriaPrimero = !selectedLeague || !isLigaMasculina;
+  
+  // LOG PARA DEBUG
+  console.log('StandingsPage: State check', { selectedLeague, isLigaMasculina, isCategoriaPrimero });
   
   // Get categories for selected league and zone (como en CategoriesPage)
   const filteredZones = useMemo(() => {
@@ -1126,19 +1135,25 @@ const StandingsPage: React.FC = () => {
       : [{ id: '', name: 'No hay zonas' }]
   ), [availableZones]);
 
-  const categoryOptions = useMemo(() => (
-    filteredCategories.length > 0
+  const categoryOptions = useMemo(() => {
+    console.log('StandingsPage: Recalculando categoryOptions, filteredCategories:', filteredCategories);
+    return filteredCategories.length > 0
       ? [{ id: '', name: 'Seleccionar categoría' }, ...filteredCategories]
-      : [{ id: '', name: 'No hay categorías' }]
-  ), [filteredCategories]);
+      : [{ id: '', name: 'No hay categorías' }];
+  }, [filteredCategories]);
 
   // Validación para habilitar guardado
   const canSave = !!selectedZone && !!selectedCategory && modifiedRows.size > 0 && !loading;
 
-  console.log('selectedZone:', selectedZone);
-  console.log('zoneTeams:', zoneTeams);
-  console.log('teams:', teams);
-  console.log('Equipos disponibles para seleccionar:', availableTeams);
+  console.log('Filtros StandingsPage:', { 
+    selectedLeague, 
+    selectedCategory, 
+    selectedZone, 
+    isLigaMasculina, 
+    isCategoriaPrimero,
+    availableCategoriesCount: filteredCategories.length,
+    availableZonesCount: availableZones.length
+  });
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-100">

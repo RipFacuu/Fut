@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import { useLeague, Fixture } from '../contexts/LeagueContext';
+import { resolveLeagueIdFromSlug } from '../utils/leagueSlug';
 import CategoryPanel from '../components/league/CategoryPanel';
 import FixtureList from '../components/league/FixtureList';
 import StandingsTable from '../components/league/StandingsTable';
@@ -14,7 +15,9 @@ import { formatShortDate } from '../utils/dateUtils';
 type Tab = 'fixtures' | 'results' | 'standings' | 'teams';
 
 const LeaguePage: React.FC = () => {
-  const { leagueId } = useParams<{ leagueId: string }>();
+  const { leagueId: routeLeagueId } = useParams<{ leagueId: string }>();
+  // Resolver el ID real de liga a partir del slug o ID de la URL
+  const leagueId = resolveLeagueIdFromSlug(routeLeagueId || '');
   // Extraer todos los valores de useLeague() al inicio
   const {
     getLeague,

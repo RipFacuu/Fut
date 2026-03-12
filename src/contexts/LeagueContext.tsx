@@ -276,10 +276,16 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
   const { data: categories, refresh: refreshCategories } = useDataLoader<Category>(
     async () => {
       if (!leagues.length) return [];
+      console.log('LeagueContext: Cargando categorías para ligas:', leagues.map(l => l.id));
       let allCategories: Category[] = [];
       for (const league of leagues) {
-        const leagueCategories = await SupabaseService.getCategoriesByLeague(league.id);
-        allCategories = allCategories.concat(leagueCategories);
+        try {
+          const leagueCategories = await SupabaseService.getCategoriesByLeague(league.id);
+          console.log(`LeagueContext: Cargadas ${leagueCategories.length} categorías para liga ${league.id}`);
+          allCategories = allCategories.concat(leagueCategories);
+        } catch (err) {
+          console.error(`LeagueContext: Error cargando categorías para liga ${league.id}:`, err);
+        }
       }
       return allCategories;
     },

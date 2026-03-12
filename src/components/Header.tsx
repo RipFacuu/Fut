@@ -6,6 +6,7 @@ import { useUserAuth } from '../contexts/UserAuthContext';
 import { cn } from '../utils/cn';
 import { useLeague } from '../contexts/LeagueContext';
 import { UserNav } from './user/UserNav';
+import { getLeaguePathId } from '../utils/leagueSlug';
 
 const Header: React.FC = () => {
   const { isAuthenticated, logout } = useAuth();
@@ -84,7 +85,7 @@ const Header: React.FC = () => {
             {orderedLeagues.map((league) => (
               <NavLink
                 key={league.id}
-                to={`/league/${league.id}`}
+                to={`/league/${getLeaguePathId(league)}`}
                 className={({ isActive }) => cn(
                   "px-4 py-2 rounded-xl text-sm font-semibold transition-all duration-300 relative overflow-hidden group",
                   isActive 
@@ -211,7 +212,7 @@ const Header: React.FC = () => {
             {orderedLeagues.map((league) => (
               <NavLink
                 key={league.id}
-                to={`/league/${league.id}`}
+                to={`/league/${getLeaguePathId(league)}`}
                 className={({ isActive }) => cn(
                   "px-4 py-3 rounded-xl text-sm font-semibold transition-all duration-300",
                   isActive ? "bg-white/20 text-white shadow-lg" : "text-white/90 hover:bg-white/10 hover:text-white"

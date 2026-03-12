@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useLeague, Category } from '../../contexts/LeagueContext';
 import { useForm } from 'react-hook-form';
 import { Plus, Edit, Trash2, Save, X } from 'lucide-react';
@@ -24,6 +24,13 @@ const CategoriesPage: React.FC = () => {
   const [isAdding, setIsAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [selectedLeague, setSelectedLeague] = useState<string>(leagues[0]?.id || '');
+  
+  // Sincronizar selectedLeague cuando se cargan las ligas por primera vez
+  useEffect(() => {
+    if (!selectedLeague && leagues.length > 0) {
+      setSelectedLeague(leagues[0].id);
+    }
+  }, [leagues, selectedLeague]);
   const [selectedZone, setSelectedZone] = useState<string>(''); // Nuevo estado para filtrar por zona
   
   const { register, handleSubmit, reset, watch, setValue, formState: { errors } } = useForm<CategoryFormData>({

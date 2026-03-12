@@ -5,6 +5,7 @@ import { Trophy, Users, ClipboardList, Star, Zap, Target, Award, ArrowRight } fr
 import FlyerCarousel from '../components/FlyerCarousel';
 
 import { getLeagueDefaultLogo } from '../utils/leagueUtils';
+import { getLeaguePathId } from '../utils/leagueSlug';
 
 const HomePage: React.FC = () => {
   const { leagues } = useLeague();
@@ -54,7 +55,7 @@ const HomePage: React.FC = () => {
             return (
               <Link 
                 key={league.id} 
-                to={`/league/${league.id}`}
+                to={`/league/${getLeaguePathId(league)}`}
                 className="league-panel group animate-slide-up"
                 style={{ animationDelay: `${index * 0.1}s` }}
               >

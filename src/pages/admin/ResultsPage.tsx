@@ -15,7 +15,14 @@ const ResultsPage: React.FC = () => {
     getCategoriesByZone
   } = useLeague();
   
-  const [selectedLeague, setSelectedLeague] = useState<string>('');
+  const [selectedLeague, setSelectedLeague] = useState<string>(leagues[0]?.id || '');
+  
+  // Sincronizar selectedLeague cuando se cargan las ligas por primera vez
+  useEffect(() => {
+    if (!selectedLeague && leagues.length > 0) {
+      setSelectedLeague(leagues[0].id);
+    }
+  }, [leagues, selectedLeague]);
   const [selectedCategory, setSelectedCategory] = useState<string>('');
   const [selectedZone, setSelectedZone] = useState<string>('');
   const [editingMatch, setEditingMatch] = useState<string | null>(null);
@@ -36,19 +43,6 @@ const ResultsPage: React.FC = () => {
     if (selectedZone) match = match && fixture.zoneId === selectedZone;
     return match;
   });
-  
-  // Inicializar liga automáticamente cuando las ligas estén disponibles
-  useEffect(() => {
-    if (leagues.length > 0 && !selectedLeague) {
-      const leagueWithFixtures = leagues.find(league => 
-        fixtures.some(fixture => fixture.leagueId === league.id)
-      );
-      const targetLeague = leagueWithFixtures || leagues[0];
-      if (targetLeague) {
-        setSelectedLeague(targetLeague.id);
-      }
-    }
-  }, [leagues, fixtures, selectedLeague]);
   
   // Inicializar categoría automáticamente cuando las categorías estén disponibles
   useEffect(() => {
