@@ -297,7 +297,7 @@ export async function obtenerCategoriasPorLiga(ligaId: string) {
   const { data, error } = await supabase
     .from('categorias')
     .select('*')
-    .or(`liga_id.eq.${numericLeagueId},liga_id.eq.${ligaId}`);
+    .eq('liga_id', numericLeagueId);
 
   if (error) {
     console.error('Error obteniendo categorías:', error);
@@ -998,7 +998,7 @@ export async function obtenerZonasPorLiga(leagueId: string) {
   const { data, error } = await supabase
     .from('zonas')
     .select('*')
-    .or(`liga_id.eq.${numericLeagueId},liga_id.eq.${leagueId}`);
+    .eq('liga_id', numericLeagueId);
     
   if (error) {
     console.error('Error obteniendo zonas por liga:', error);
@@ -1012,11 +1012,10 @@ export async function obtenerZonasPorLiga(leagueId: string) {
 export async function obtenerCategoriasPorLigaConEstructura(leagueId: string, zoneId?: string) {
   const numericLeagueId = getNumericLeagueId(leagueId);
   
-  // Intentar primero con ID numérico y luego con string si falla o es necesario
   let query = supabase
     .from('categorias')
     .select('*')
-    .or(`liga_id.eq.${numericLeagueId},liga_id.eq.${leagueId}`);
+    .eq('liga_id', numericLeagueId);
   
   if (zoneId) {
     query = query.eq('zona_id', parseInt(zoneId));
@@ -1039,7 +1038,7 @@ export async function obtenerZonasPorLigaConEstructura(leagueId: string, categor
   let query = supabase
     .from('zonas')
     .select('*')
-    .or(`liga_id.eq.${numericLeagueId},liga_id.eq.${leagueId}`);
+    .eq('liga_id', numericLeagueId);
   
   if (categoryId) {
     query = query.eq('categoria_id', parseInt(categoryId));

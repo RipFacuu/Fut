@@ -123,7 +123,7 @@ const CategoriesPage: React.FC = () => {
           name: data.name,
           leagueId: data.leagueId,
           isEditable: data.isEditable,
-          ...(data.zoneId && { zoneId: String(Number(data.zoneId)) })
+          ...(data.zoneId && { zoneId: data.zoneId })
         };
         await addCategory(categoryData);
       } else if (editingId) {
@@ -131,7 +131,7 @@ const CategoriesPage: React.FC = () => {
           name: data.name,
           leagueId: data.leagueId,
           isEditable: data.isEditable,
-          ...(data.zoneId && { zoneId: String(Number(data.zoneId)) })
+          ...(data.zoneId && { zoneId: data.zoneId })
         };
         await updateCategory(editingId, updateData);
       }
