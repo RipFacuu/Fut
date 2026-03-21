@@ -559,19 +559,10 @@ export async function crearPartidoConFixture(equipoLocalId: number, equipoVisita
 export async function obtenerFixtures() {
   console.log('Fetching fixtures from database...');
   
+  // Consulta simplificada para evitar errores si faltan columnas
   const { data, error } = await supabase
     .from('fixtures')
-    .select(`
-      id,
-      nombre,
-      fecha_partido,
-      liga_id,
-      categoria_id,
-      zona_id,
-      created_at,
-      leyenda,
-      texto_central
-    `)
+    .select('*')
     .order('created_at', { ascending: false });
 
   if (error) {
@@ -584,24 +575,38 @@ export async function obtenerFixtures() {
 }
 
 export async function obtenerPartidosPorFixture(fixtureId: string) {
-  const { data, error } = await supabase
-    .from('partidos')
-    .select(`
-      id,
-      fecha,
-      resultado_local,
-      resultado_visitante,
-      equipo_local: equipos!partidos_equipo_local_id_fkey (id, nombre),
-      equipo_visitante: equipos!partidos_equipo_visitante_id_fkey (id, nombre)
-    `)
-    .eq('fixture_id', fixtureId);
+  // Intentar obtener con joins, pero si falla, obtener solo los IDs
+  try {
+    const { data, error } = await supabase
+      .from('partidos')
+      .select(`
+        id,
+        fecha,
+        resultado_local,
+        resultado_visitante,
+        equipo_local_id,
+        equipo_visitante_id,
+        equipo_local: equipos!partidos_equipo_local_id_fkey (id, nombre),
+        equipo_visitante: equipos!partidos_equipo_visitante_id_fkey (id, nombre)
+      `)
+      .eq('fixture_id', fixtureId);
 
-  if (error) {
-    console.error('Error obteniendo partidos por fixture:', error);
+    if (error) {
+      console.warn('Error con join en partidos, intentando consulta simple:', error);
+      const { data: simpleData, error: simpleError } = await supabase
+        .from('partidos')
+        .select('*')
+        .eq('fixture_id', fixtureId);
+      
+      if (simpleError) throw simpleError;
+      return simpleData;
+    }
+
+    return data;
+  } catch (err) {
+    console.error('Error obteniendo partidos por fixture:', err);
     return [];
   }
-
-  return data;
 }
 
 // Función para eliminar fixture
@@ -784,7 +789,7 @@ export async function obtenerPosicionesPorZona(zonaId: string) {
 export async function obtenerPosicionesPorZonaYCategoria(zonaId: string, categoriaId: string) {
   const { data, error } = await supabase
     .from('posiciones_editable')
-    .select('equipo_id, equipo_nombre, zona_id, pj, puntos, categoria_id, orden, id')
+    .select('equipo_id, equipo_nombre, zona_id, pj, puntos, categoria_id, orden, id, goles_a_favor, goles_en_contra')
     .eq('zona_id', zonaId)
     .eq('categoria_id', categoriaId);
   

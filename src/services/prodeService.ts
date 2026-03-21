@@ -110,40 +110,18 @@ export class ProdeService {
     }
   }
 
-  // Obtener partidos disponibles para predicciones
+  // Obtener partidos disponibles para el Prode
   static async getAvailableMatches(userId?: string, filters?: {
     zonaId?: string;
     fixtureId?: string;
     torneo?: string;
   }): Promise<MatchWithPrediction[]> {
     try {
-      // MODO OFFLINE: Usar solo datos locales para pruebas
-      console.log('🎯 MODO OFFLINE: Usando datos locales para pruebas');
-      const allMatches = this.getLocalMatches(userId);
-      
-      // Aplicar filtros si están especificados
-      if (filters) {
-        return this.applyFilters(allMatches, filters);
-      }
-      
-      return allMatches;
-
-      // NOTA: Para usar datos reales, descomenta el código de abajo
-      /*
       // Primero intentar obtener fixtures reales de la base de datos
       try {
         const { data: fixtures, error } = await supabase
           .from('fixtures')
-          .select(`
-            id,
-            nombre,
-            fecha_partido,
-            liga_id,
-            categoria_id,
-            zona_id,
-            leyenda,
-            texto_central
-          `)
+          .select('*')
           .order('fecha_partido', { ascending: true });
 
         if (error) {
@@ -167,6 +145,8 @@ export class ProdeService {
               fecha,
               resultado_local,
               resultado_visitante,
+              equipo_local_id,
+              equipo_visitante_id,
               equipo_local: equipos!partidos_equipo_local_id_fkey (id, nombre),
               equipo_visitante: equipos!partidos_equipo_visitante_id_fkey (id, nombre),
               zona: zonas!partidos_zona_id_fkey (id, nombre)
@@ -174,65 +154,40 @@ export class ProdeService {
             .eq('fixture_id', fixture.id);
 
           if (partidosError) {
-            console.log(`⚠️ Error obteniendo partidos para fixture ${fixture.id}:`, partidosError);
+            console.log(`⚠️ Error obteniendo partidos para fixture ${fixture.id}, intentando consulta simple:`, partidosError);
+            const { data: simplePartidos, error: simpleError } = await supabase
+              .from('partidos')
+              .select('*')
+              .eq('fixture_id', fixture.id);
+            
+            if (simpleError) {
+              console.log(`⚠️ Error en consulta simple para fixture ${fixture.id}:`, simpleError);
+              continue;
+            }
+            
+            // Procesar datos simples
+            for (const partido of (simplePartidos || [])) {
+              allMatches.push(await this.processMatchData(partido, fixture, userId));
+            }
             continue;
           }
 
           if (partidos && partidos.length > 0) {
             // Procesar cada partido
             for (const partido of partidos) {
-              const matchDate = new Date(partido.fecha);
-              const now = new Date();
-              const config = await this.getConfig();
-              const deadlineMinutes = config?.prediction_deadline_minutes || 15;
-              const deadline = new Date(matchDate.getTime() - deadlineMinutes * 60 * 1000);
-              const canPredict = now < deadline;
-
-              // Obtener predicción del usuario si existe
-              let userPrediction: string | undefined;
-              if (userId) {
-                try {
-                  const { data: prediction } = await supabase
-                    .from('prode_predictions')
-                    .select('prediction')
-                    .eq('user_id', userId)
-                    .eq('partido_id', partido.id)
-                    .single();
-                  
-                  if (prediction) {
-                    userPrediction = prediction.prediction;
-                  }
-                } catch {
-                  // No hay predicción o error, continuar
-                }
-              }
-
-              const matchWithPrediction: MatchWithPrediction = {
-                id: partido.id,
-                fecha: partido.fecha,
-                resultado_local: partido.resultado_local,
-                resultado_visitante: partido.resultado_visitante,
-                equipo_local: partido.equipo_local,
-                equipo_visitante: partido.equipo_visitante,
-                zona: partido.zona,
-                user_prediction: userPrediction,
-                can_predict: canPredict,
-                prediction_deadline: deadline.toISOString(),
-                fixture_info: {
-                  nombre: fixture.nombre,
-                  fecha_partido: fixture.fecha_partido,
-                  leyenda: fixture.leyenda,
-                  texto_central: fixture.texto_central
-                }
-              };
-
-              allMatches.push(matchWithPrediction);
+              allMatches.push(await this.processMatchData(partido, fixture, userId));
             }
           }
         }
 
         if (allMatches.length > 0) {
           console.log(`🎯 Usando ${allMatches.length} partidos reales de ${fixtures.length} fixtures`);
+          
+          // Aplicar filtros si están especificados
+          if (filters) {
+            return this.applyFilters(allMatches, filters);
+          }
+          
           return allMatches;
         }
 
@@ -243,12 +198,64 @@ export class ProdeService {
         console.log('⚠️ Error accediendo a la BD, usando datos locales:', error);
         return this.getLocalMatches(userId);
       }
-      */
 
     } catch (error) {
       console.error('Error en getAvailableMatches:', error);
       return this.getLocalMatches(userId);
     }
+  }
+
+  // Helper para procesar datos de partido
+  private static async processMatchData(partido: any, fixture: any, userId?: string): Promise<MatchWithPrediction> {
+    const matchDate = new Date(partido.fecha);
+    const now = new Date();
+    const config = await this.getConfig();
+    const deadlineMinutes = config?.prediction_deadline_minutes || 15;
+    const deadline = new Date(matchDate.getTime() - deadlineMinutes * 60 * 1000);
+    const canPredict = now < deadline;
+
+    // Obtener predicción del usuario si existe
+    let userPrediction: string | undefined;
+    if (userId) {
+      try {
+        const { data: prediction } = await supabase
+          .from('prode_predictions')
+          .select('prediction')
+          .eq('user_id', userId)
+          .eq('partido_id', partido.id)
+          .maybeSingle();
+        
+        if (prediction) {
+          userPrediction = prediction.prediction;
+        }
+      } catch {
+        // No hay predicción o error, continuar
+      }
+    }
+
+    // Asegurarse de que equipo_local/visitante sean objetos y no arrays
+    const equipoLocal = Array.isArray(partido.equipo_local) ? partido.equipo_local[0] : partido.equipo_local;
+    const equipoVisitante = Array.isArray(partido.equipo_visitante) ? partido.equipo_visitante[0] : partido.equipo_visitante;
+    const zona = Array.isArray(partido.zona) ? partido.zona[0] : partido.zona;
+
+    return {
+      id: partido.id,
+      fecha: partido.fecha,
+      resultado_local: partido.resultado_local,
+      resultado_visitante: partido.resultado_visitante,
+      equipo_local: equipoLocal || { id: partido.equipo_local_id, nombre: `Equipo ${partido.equipo_local_id}` },
+      equipo_visitante: equipoVisitante || { id: partido.equipo_visitante_id, nombre: `Equipo ${partido.equipo_visitante_id}` },
+      zona: zona || { id: partido.zona_id, nombre: `Zona ${partido.zona_id}` },
+      user_prediction: userPrediction,
+      can_predict: canPredict,
+      prediction_deadline: deadline.toISOString(),
+      fixture_info: {
+        nombre: fixture.nombre,
+        fecha_partido: fixture.fecha_partido,
+        leyenda: fixture.leyenda,
+        texto_central: fixture.texto_central
+      }
+    };
   }
 
   // Aplicar filtros a los partidos
@@ -562,18 +569,12 @@ export class ProdeService {
       const config = await this.getConfig();
       const deadlineMinutes = config?.prediction_deadline_minutes || 15;
 
-      return (matches || []).map(match => {
-        const matchDate = new Date(match.fecha);
-        const deadline = new Date(matchDate.getTime() - deadlineMinutes * 60 * 1000);
-        const canPredict = now < deadline;
-
-        return {
-          ...match,
-          user_prediction: userPredictions[match.id],
-          can_predict: canPredict,
-          prediction_deadline: deadline.toISOString(),
-        };
-      });
+      const results = [];
+      for (const match of (matches || [])) {
+        const processedMatch = await this.processMatchData(match, {}, userId);
+        results.push(processedMatch);
+      }
+      return results;
     } catch (error) {
       console.error('Error en getMatchesByDate:', error);
       return [];
@@ -633,22 +634,12 @@ export class ProdeService {
       }
 
       // Procesar partidos
-      const now = new Date();
-      const config = await this.getConfig();
-      const deadlineMinutes = config?.prediction_deadline_minutes || 15;
-
-      return (matches || []).map(match => {
-        const matchDate = new Date(match.fecha);
-        const deadline = new Date(matchDate.getTime() - deadlineMinutes * 60 * 1000);
-        const canPredict = now < deadline;
-
-        return {
-          ...match,
-          user_prediction: userPredictions[match.id],
-          can_predict: canPredict,
-          prediction_deadline: deadline.toISOString(),
-        };
-      });
+      const results = [];
+      for (const match of (matches || [])) {
+        const processedMatch = await this.processMatchData(match, {}, userId);
+        results.push(processedMatch);
+      }
+      return results;
     } catch (error) {
       console.error('Error en getMatchesByCategory:', error);
       return [];
