@@ -850,42 +850,105 @@ const StandingsPage: React.FC = () => {
   const handleSaveAll = useCallback(async () => {
     setLoading(true);
     try {
-      // Guardar todos los standings modificados
-      for (const id of modifiedRows) {
-        const standing = localStandings.find(s => s.id === id);
-        if (!standing) continue;
-        await actualizarPosicion(
-          standing.teamId,
-          standing.zoneId,
-          standing.categoryId,
-          {
-            puntos: Number(standing.puntos) || 0,
-            pj: Number(standing.pj) || 0,
-            // Agrega aquí otros campos si tu función los soporta
+      console.log('🚀 Iniciando guardado de todos los cambios...', {
+        modifiedRows: Array.from(modifiedRows),
+        orderDirty
+      });
+
+      // 1. Si el orden ha cambiado, usamos handleSaveOrder ya que este
+      // guarda TODOS los equipos con sus respectivos puntos y pj.
+      // Es la forma más robusta de asegurar consistencia.
+      if (orderDirty) {
+        console.log('📝 Detectado cambio de orden, usando handleSaveOrder...');
+        await handleSaveOrder();
+      } else if (modifiedRows.size > 0) {
+        // 2. Si solo hay cambios en filas individuales (sin cambio de orden),
+        // guardamos solo esas filas para mayor eficiencia.
+        console.log(`📝 Guardando ${modifiedRows.size} filas modificadas...`);
+        for (const id of modifiedRows) {
+          const standing = localStandings.find(s => s.id === id);
+          if (!standing) {
+            console.warn(`⚠️ No se encontró standing para ID: ${id}`);
+            continue;
           }
-        );
+          
+          console.log(`💾 Guardando fila para equipo: ${standing.equipo_nombre} (ID: ${standing.teamId})`);
+          await actualizarPosicion(
+            standing.teamId,
+            standing.zoneId,
+            standing.categoryId,
+            {
+              puntos: Number(standing.puntos) || 0,
+              pj: Number(standing.pj) || 0,
+              equipo_nombre: standing.equipo_nombre?.trim() || ''
+            }
+          );
+        }
+      } else {
+        console.log('ℹ️ No se detectaron cambios para guardar.');
       }
+
       setModifiedRows(new Set());
+      setOrderDirty(false);
       await loadStandings();
+      console.log('✅ Guardado completo finalizado.');
     } catch (error) {
-      setError('Error al guardar los cambios');
-      console.error(error);
+      console.error('❌ Error fatal al guardar cambios:', error);
+      setError('Error al guardar los cambios en la base de datos.');
     } finally {
       setLoading(false);
     }
-  }, [modifiedRows, localStandings, loadStandings]);
+  }, [modifiedRows, orderDirty, localStandings, handleSaveOrder, loadStandings, actualizarPosicion]);
 
   // Recalculate standings from matches
   const handleRecalculateStandings = useCallback(() => {
     if (selectedZone) {
       try {
-        calculateStandingsFromMatches(selectedZone);
-        setError(null);
+        console.log('🔄 Recalculando posiciones desde partidos para zona:', selectedZone);
+        const calculated = calculateStandingsFromMatches(selectedZone);
+        
+        if (calculated && calculated.length > 0) {
+          // Actualizar localStandings con los datos calculados
+          setLocalStandings(prev => {
+            const newStandings = [...prev];
+            const modifiedIds = new Set(modifiedRows);
+
+            calculated.forEach(calc => {
+              const index = newStandings.findIndex(s => s.teamId === calc.teamId);
+              if (index !== -1) {
+                // Actualizar existente
+                newStandings[index] = {
+                  ...newStandings[index],
+                  puntos: calc.puntos,
+                  pj: calc.pj,
+                  won: calc.won,
+                  drawn: calc.drawn,
+                  lost: calc.lost,
+                  goalsFor: calc.goalsFor,
+                  goalsAgainst: calc.goalsAgainst,
+                  orden: calc.orden
+                };
+                modifiedIds.add(newStandings[index].id);
+              }
+            });
+
+            setModifiedRows(modifiedIds);
+            return newStandings;
+          });
+          
+          setOrderDirty(true); // Marcar que el orden pudo haber cambiado
+          console.log('✅ Recálculo completado localmente. Recuerda guardar los cambios.');
+          setError(null);
+        } else {
+          console.warn('⚠️ No se obtuvieron resultados del recálculo.');
+          setError('No se encontraron partidos jugados para esta zona.');
+        }
       } catch (error) {
+        console.error('❌ Error al recalcular:', error);
         setError('Error al recalcular posiciones.');
       }
     }
-  }, [selectedZone, calculateStandingsFromMatches]);
+  }, [selectedZone, calculateStandingsFromMatches, modifiedRows]);
   
   // Export standings to CSV
   const exportToCSV = useCallback(() => {
@@ -1145,7 +1208,7 @@ const StandingsPage: React.FC = () => {
   }, [filteredCategories]);
 
   // Validación para habilitar guardado
-  const canSave = !!selectedZone && !!selectedCategory && modifiedRows.size > 0 && !loading;
+  const canSave = !!selectedZone && !!selectedCategory && (modifiedRows.size > 0 || orderDirty) && !loading;
 
   console.log('Filtros StandingsPage:', { 
     selectedLeague, 

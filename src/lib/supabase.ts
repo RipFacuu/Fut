@@ -78,10 +78,15 @@ export async function updateEditablePositionsOrder(updates: PositionUpdate[]): P
       
       if (existingData) {
         // Actualizar existente
-        console.log(`Actualizando orden para equipo ${equipoId}: orden ${orden}`);
+        console.log(`Actualizando posición para equipo ${equipoId}: orden ${orden}, puntos ${update.puntos}, pj ${update.pj}`);
         const { data, error } = await supabase
           .from('posiciones_editable')
-          .update({ orden })
+          .update({ 
+            orden,
+            puntos: update.puntos !== undefined ? update.puntos : existingData.puntos,
+            pj: update.pj !== undefined ? update.pj : existingData.pj,
+            equipo_nombre: update.equipo_nombre || existingData.equipo_nombre
+          })
           .eq('equipo_id', equipoId)
           .eq('zona_id', zonaId)
           .eq('categoria_id', categoriaId)
@@ -91,13 +96,19 @@ export async function updateEditablePositionsOrder(updates: PositionUpdate[]): P
         operationResult = data;
       } else {
         // Crear nuevo
+        console.log(`Creando nueva posición para equipo ${equipoId}: orden ${orden}, puntos ${update.puntos}, pj ${update.pj}`);
         const { data, error } = await supabase
           .from('posiciones_editable')
           .insert([{ 
             equipo_id: equipoId, 
             zona_id: zonaId, 
             categoria_id: categoriaId, 
-            orden: orden, 
+            orden: orden,
+            puntos: update.puntos || 0,
+            pj: update.pj || 0,
+            equipo_nombre: update.equipo_nombre || ''
+          }])
+          .select();
             puntos: update.puntos || 0, 
             pj: update.pj || 0, 
             equipo_nombre: update.equipo_nombre || '' 
