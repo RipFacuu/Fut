@@ -310,6 +310,8 @@ const StandingsPage: React.FC = () => {
         zoneId: String(pos.zona_id),
         puntos: Number(pos.puntos) || 0,
         pj: Number(pos.pj) || 0,
+        goalsFor: 0,
+        goalsAgainst: 0,
         // Cargar orden: si es número > 0, usarlo; si es 0 o null, establecer undefined
         orden: (typeof pos.orden === 'number' && pos.orden > 0) ? pos.orden : undefined,
         equipo_nombre: pos.equipo_nombre || ''

@@ -98,14 +98,14 @@ const PublicStandingsTable: React.FC<PublicStandingsTableProps> = ({ leagueId, z
             zoneId: pos.zona_id,
             puntos: Number(pos.puntos) || 0,
             pj: Number(pos.pj) || 0,
+            goalsFor: 0,
+            goalsAgainst: 0,
             // Cargar orden: si es número > 0, usarlo; si es 0 o null, establecer null
             orden: (typeof pos.orden === 'number' && pos.orden > 0) ? pos.orden : null,
             equipo_nombre: pos.equipo_nombre || '',
             won: 0,
             drawn: 0,
-            lost: 0,
-            goalsFor: 0,
-            goalsAgainst: 0
+            lost: 0
           })));
         })
         // .catch(() => setError('Error al cargar la tabla de posiciones.'))

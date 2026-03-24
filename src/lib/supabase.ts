@@ -789,7 +789,7 @@ export async function obtenerPosicionesPorZona(zonaId: string) {
 export async function obtenerPosicionesPorZonaYCategoria(zonaId: string, categoriaId: string) {
   const { data, error } = await supabase
     .from('posiciones_editable')
-    .select('equipo_id, equipo_nombre, zona_id, pj, puntos, categoria_id, orden, id, goles_a_favor, goles_en_contra')
+    .select('equipo_id, equipo_nombre, zona_id, pj, puntos, categoria_id, orden, id')
     .eq('zona_id', zonaId)
     .eq('categoria_id', categoriaId);
   
@@ -828,18 +828,6 @@ export async function obtenerPosicionesPorZonaYCategoria(zonaId: string, categor
     const aPuntos = Number(a.puntos) || 0;
     if (bPuntos !== aPuntos) {
       return bPuntos - aPuntos;
-    }
-    
-    // Si tienen los mismos puntos, ordenar por diferencia de goles descendente
-    const aDiff = (Number(a.goles_a_favor) || 0) - (Number(a.goles_en_contra) || 0);
-    const bDiff = (Number(b.goles_a_favor) || 0) - (Number(b.goles_en_contra) || 0);
-    if (bDiff !== aDiff) {
-      return bDiff - aDiff;
-    }
-    
-    // Si tienen la misma diferencia, ordenar por goles a favor descendente
-    if ((Number(b.goles_a_favor) || 0) !== (Number(a.goles_a_favor) || 0)) {
-      return (Number(b.goles_a_favor) || 0) - (Number(a.goles_a_favor) || 0);
     }
     
     // Si tienen los mismos puntos, ordenar por partidos jugados ascendente

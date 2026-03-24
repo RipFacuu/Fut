@@ -346,11 +346,14 @@ export interface Database {
 }
 
 export interface PosicionesEditable {
-  equipo_id: number;
-  zona_id: number;
+  id: string | number;
+  equipo_id: string | number;
+  zona_id: string | number;
+  categoria_id: string | number | null;
   equipo_nombre: string;
   puntos: number | null;
   pj: number | null; // partidos jugados
+  orden?: number | null;
 }
 
 export interface StandingsLegend {
