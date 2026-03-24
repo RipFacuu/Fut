@@ -29,7 +29,9 @@ interface EditableCellProps {
   standing: Standing;
   field: keyof Standing | 'teamName';
   onUpdate: (id: string, field: keyof Standing | 'teamName', value: any) => void;
+  editingCell: string | null;
   setEditingCell: (cell: string | null) => void;
+  onNavigate?: (direction: 'next' | 'prev') => void;
   forceEditRowId?: string | null;
   setForceEditRowId?: (id: string | null) => void;
   type?: 'number' | 'text';
@@ -41,15 +43,19 @@ const EditableCell: React.FC<EditableCellProps> = React.memo(({
   standing, 
   field, 
   onUpdate, 
+  editingCell,
   setEditingCell,
+  onNavigate,
   forceEditRowId,
   setForceEditRowId,
   type = 'number',
   min = 0
 }) => {
   const { getTeamsByZone } = useLeague();
-  const [isEditing, setIsEditing] = useState(false);
+  const cellId = `${standing.id}-${field}`;
+  const isEditing = editingCell === cellId;
   const [tempValue, setTempValue] = useState<number | string>(value);
+  const inputRef = React.useRef<HTMLInputElement | HTMLSelectElement>(null);
   
   // Usar useMemo para evitar recálculos innecesarios
   const zoneTeams = useMemo(() => {
@@ -60,10 +66,17 @@ const EditableCell: React.FC<EditableCellProps> = React.memo(({
     setTempValue(value);
   }, [value]);
 
-  const handleBlur = useCallback(() => {
-    setIsEditing(false);
-    setEditingCell(null);
-    
+  // Enfocar el input cuando se entra en modo edición
+  useEffect(() => {
+    if (isEditing && inputRef.current) {
+      inputRef.current.focus();
+      if (inputRef.current instanceof HTMLInputElement) {
+        inputRef.current.select();
+      }
+    }
+  }, [isEditing]);
+
+  const handleCommit = useCallback(() => {
     // Validación de datos
     let finalValue = tempValue;
     if (type === 'number') {
@@ -80,15 +93,26 @@ const EditableCell: React.FC<EditableCellProps> = React.memo(({
     }
   }, [tempValue, value, standing.id, field, onUpdate, type, min]);
 
+  const handleBlur = useCallback(() => {
+    handleCommit();
+    setEditingCell(null);
+  }, [handleCommit, setEditingCell]);
+
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
-      handleBlur();
+      handleCommit();
+      setEditingCell(null);
     } else if (e.key === 'Escape') {
-      setIsEditing(false);
       setEditingCell(null);
       setTempValue(value);
+    } else if (e.key === 'Tab') {
+      e.preventDefault();
+      handleCommit();
+      if (onNavigate) {
+        onNavigate(e.shiftKey ? 'prev' : 'next');
+      }
     }
-  }, [handleBlur, value, setEditingCell]);
+  }, [handleCommit, value, setEditingCell, onNavigate]);
 
   const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const val = e.target.value;
@@ -109,12 +133,11 @@ const EditableCell: React.FC<EditableCellProps> = React.memo(({
   const handleTeamChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
     const selectedTeamId = e.target.value;
     onUpdate(String(standing.id), 'teamId', selectedTeamId);
-    setIsEditing(false);
-  }, [standing.id, onUpdate]);
+    setEditingCell(null);
+  }, [standing.id, onUpdate, setEditingCell]);
 
   useEffect(() => {
     if (forceEditRowId === standing.id && field === 'puntos') {
-      setIsEditing(true);
       setEditingCell(`${standing.id}-${field}`);
       setForceEditRowId && setForceEditRowId(null);
     }
@@ -123,22 +146,24 @@ const EditableCell: React.FC<EditableCellProps> = React.memo(({
   return (
     <td 
       className={cn(
-        "px-6 py-4 whitespace-nowrap text-sm text-center cursor-pointer align-middle",
-        field === 'teamName' ? "text-black font-medium" : "text-gray-500",
-        isEditing && "bg-violet-50/30"
+        "px-6 py-4 whitespace-nowrap text-sm text-center cursor-pointer align-middle relative",
+        field === 'teamName' ? "text-black font-medium text-left" : "text-gray-500",
+        isEditing && "bg-violet-50/50 outline outline-2 outline-violet-400 z-10"
       )}
-      onClick={() => {
-        setEditingCell(`${standing.id}-${field}`);
-        !isEditing && setIsEditing(true);
+      onClick={(e) => {
+        e.stopPropagation();
+        setEditingCell(cellId);
       }}
     >
       {isEditing ? (
         field === 'teamName' ? (
           <select
+            ref={inputRef as React.RefObject<HTMLSelectElement>}
             value={standing.teamId}
             onChange={handleTeamChange}
+            onBlur={handleBlur}
+            onKeyDown={handleKeyDown}
             className="w-full bg-white border border-violet-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-300 py-1 px-2 text-sm text-gray-800 shadow-sm"
-            autoFocus
           >
             {zoneTeams.map(team => (
               <option key={team.id} value={team.id}>
@@ -148,6 +173,7 @@ const EditableCell: React.FC<EditableCellProps> = React.memo(({
           </select>
         ) : (
           <input
+            ref={inputRef as React.RefObject<HTMLInputElement>}
             type={type}
             min={type === 'number' ? min : undefined}
             value={tempValue}
@@ -155,19 +181,17 @@ const EditableCell: React.FC<EditableCellProps> = React.memo(({
             onBlur={handleBlur}
             onKeyDown={handleKeyDown}
             className="w-full bg-white border border-violet-200 rounded-lg text-center focus:outline-none focus:ring-2 focus:ring-violet-300 py-1 px-2 text-sm text-gray-800 shadow-sm"
-            autoFocus
             style={{ 
               fontSize: 'inherit',
               fontFamily: 'inherit',
               height: '2.25rem',
               minWidth: '3.5rem',
-              maxWidth: '5rem',
               boxSizing: 'border-box'
             }}
           />
         )
       ) : (
-        <span>{value}</span>
+        <span className="block w-full">{value}</span>
       )}
     </td>
   );
@@ -206,6 +230,8 @@ const StandingsPage: React.FC = () => {
   const [isAddingTeam, setIsAddingTeam] = useState(false);
   const [availableTeams, setAvailableTeams] = useState<Team[]>([]);
   const [selectedTeamId, setSelectedTeamId] = useState<string>('');
+  const [newTeamPj, setNewTeamPj] = useState<number>(0);
+  const [newTeamPts, setNewTeamPts] = useState<number>(0);
   const [localStandings, setLocalStandings] = useState<Standing[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -581,7 +607,7 @@ const StandingsPage: React.FC = () => {
   // Reemplaza sortedStandings.map(...) por standings.map(...)
   // ... existing code ...
   // 5. Al guardar, persiste el orden de localStandings
-  const handleSaveOrder = async () => {
+  const handleSaveOrder = useCallback(async () => {
     setSavingOrder(true);
     setOrderSaved(false);
     
@@ -692,7 +718,7 @@ const StandingsPage: React.FC = () => {
     } finally {
       setSavingOrder(false);
     }
-  };
+  }, [localStandings, teams, loadStandings]);
 
   // Función para manejar actualizaciones - CORREGIDA
   const handleUpdate = useCallback((id: string, field: keyof Standing | 'teamName', value: any) => {
@@ -740,6 +766,35 @@ const StandingsPage: React.FC = () => {
     // Actualizar manualOrder para reflejar el nuevo orden
     // setManualOrder([...sortedStandings]); // This line is no longer needed
   }, [localStandings, updateTeam]); // Removed sortedStandings from dependencies
+
+  // Función para navegación entre celdas
+  const handleNavigate = useCallback((currentIndex: number, currentField: string, direction: 'next' | 'prev') => {
+    const fields = ['teamName', 'pj', 'puntos'];
+    let nextIndex = currentIndex;
+    let nextFieldIdx = fields.indexOf(currentField);
+
+    if (direction === 'next') {
+      nextFieldIdx++;
+      if (nextFieldIdx >= fields.length) {
+        nextFieldIdx = 0;
+        nextIndex++;
+      }
+    } else {
+      nextFieldIdx--;
+      if (nextFieldIdx < 0) {
+        nextFieldIdx = fields.length - 1;
+        nextIndex--;
+      }
+    }
+
+    if (nextIndex >= 0 && nextIndex < sortedStandings.length) {
+      const nextStanding = sortedStandings[nextIndex];
+      const nextField = fields[nextFieldIdx];
+      setEditingCell(`${nextStanding.id}-${nextField}`);
+    } else {
+      setEditingCell(null);
+    }
+  }, [sortedStandings]);
   
   // Función para guardar una fila - ACTUALIZADA para el nuevo esquema
   const handleSaveRow = useCallback(async (standing: Standing) => {
@@ -855,35 +910,11 @@ const StandingsPage: React.FC = () => {
         orderDirty
       });
 
-      // 1. Si el orden ha cambiado, usamos handleSaveOrder ya que este
-      // guarda TODOS los equipos con sus respectivos puntos y pj.
-      // Es la forma más robusta de asegurar consistencia.
-      if (orderDirty) {
-        console.log('📝 Detectado cambio de orden, usando handleSaveOrder...');
+      // Si hay cualquier cambio (puntos, pj, nombre o orden),
+      // usamos el guardado masivo para asegurar consistencia total.
+      if (orderDirty || modifiedRows.size > 0) {
+        console.log('📝 Guardando todos los cambios de la tabla masivamente...');
         await handleSaveOrder();
-      } else if (modifiedRows.size > 0) {
-        // 2. Si solo hay cambios en filas individuales (sin cambio de orden),
-        // guardamos solo esas filas para mayor eficiencia.
-        console.log(`📝 Guardando ${modifiedRows.size} filas modificadas...`);
-        for (const id of modifiedRows) {
-          const standing = localStandings.find(s => s.id === id);
-          if (!standing) {
-            console.warn(`⚠️ No se encontró standing para ID: ${id}`);
-            continue;
-          }
-          
-          console.log(`💾 Guardando fila para equipo: ${standing.equipo_nombre} (ID: ${standing.teamId})`);
-          await actualizarPosicion(
-            standing.teamId,
-            standing.zoneId,
-            standing.categoryId,
-            {
-              puntos: Number(standing.puntos) || 0,
-              pj: Number(standing.pj) || 0,
-              equipo_nombre: standing.equipo_nombre?.trim() || ''
-            }
-          );
-        }
       } else {
         console.log('ℹ️ No se detectaron cambios para guardar.');
       }
@@ -898,7 +929,7 @@ const StandingsPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [modifiedRows, orderDirty, localStandings, handleSaveOrder, loadStandings, actualizarPosicion]);
+  }, [modifiedRows, orderDirty, handleSaveOrder, loadStandings]);
 
   // Recalculate standings from matches
   const handleRecalculateStandings = useCallback(() => {
@@ -1063,8 +1094,8 @@ const StandingsPage: React.FC = () => {
       zona_id: String(selectedZone), // Usar el valor real
       categoria_id: String(selectedCategory), // Usar el valor real
       equipo_nombre: equipoNombre, // Usar el nombre del equipo obtenido
-      puntos: 0,
-      pj: 0
+      puntos: Number(newStandingData.puntos) || 0,
+      pj: Number(newStandingData.pj) || 0
     };
     console.log('Guardando nueva posición:', newPosicion);
     const result = await crearPosicion(newPosicion);
@@ -1077,6 +1108,8 @@ const StandingsPage: React.FC = () => {
     
     // Limpiar el formulario
     setSelectedTeamId('');
+    setNewTeamPj(0);
+    setNewTeamPts(0);
     setIsAddingTeam(false);
   };
   
@@ -1604,21 +1637,27 @@ const StandingsPage: React.FC = () => {
                             standing={standing}
                             field="teamName"
                             onUpdate={handleUpdate}
+                            editingCell={editingCell}
                             setEditingCell={setEditingCell}
+                            onNavigate={(dir) => handleNavigate(index, 'teamName', dir)}
                           />
                           <EditableCell
                             value={standing.pj}
                             standing={standing}
                             field="pj"
                             onUpdate={handleUpdate}
+                            editingCell={editingCell}
                             setEditingCell={setEditingCell}
+                            onNavigate={(dir) => handleNavigate(index, 'pj', dir)}
                           />
                           <EditableCell
                             value={standing.puntos}
                             standing={standing}
                             field="puntos"
                             onUpdate={handleUpdate}
+                            editingCell={editingCell}
                             setEditingCell={setEditingCell}
+                            onNavigate={(dir) => handleNavigate(index, 'puntos', dir)}
                           />
                           <td className="px-4 lg:px-6 py-4 whitespace-nowrap text-center">
                             <div className="flex justify-center space-x-2">
@@ -1864,12 +1903,12 @@ const StandingsPage: React.FC = () => {
 
             {/* Selector de equipo para agregar a la tabla de posiciones */}
             {isAddingTeam && (
-              <div className="mb-4 flex flex-col md:flex-row md:items-end md:space-x-4">
-                <div className="flex-1">
+              <div className="mb-4 bg-violet-50/50 p-4 rounded-xl border border-violet-100 flex flex-col md:flex-row md:items-end md:space-x-4 space-y-3 md:space-y-0">
+                <div className="flex-[2]">
                   <label className="form-label" htmlFor="teamSelect">Equipo</label>
                   <select
                     id="teamSelect"
-                    className="form-input"
+                    className="form-input focus:ring-violet-400 focus:border-violet-400"
                     value={selectedTeamId}
                     onChange={e => {
                       console.log('Nuevo equipo seleccionado:', e.target.value);
@@ -1882,50 +1921,71 @@ const StandingsPage: React.FC = () => {
                         {team.name}
                       </option>
                     ))}
-
-                    {/* fallback visual si se filtró */}
-                    {selectedTeamId &&
-                     !availableTeams.some(t => String(t.id) === selectedTeamId) && (
-                      <option value={selectedTeamId}>Equipo seleccionado</option>
-                    )}
                   </select>
                 </div>
-                <button
-                  className="btn btn-primary mt-2 md:mt-0"
-                  onClick={async () => {
-                    if (selectedTeamId) {
-                      await handleAddStanding({
-                        teamId: selectedTeamId,
-                        leagueId: selectedLeague,
-                        categoryId: selectedCategory,
-                        zoneId: selectedZone,
-                        puntos: 0,
-                        pj: 0,
-                        won: 0,
-                        drawn: 0,
-                        lost: 0,
-                        goalsFor: 0,
-                        goalsAgainst: 0
-                      });
-                      setSelectedTeamId('');
+                
+                <div className="flex-1">
+                  <label className="form-label" htmlFor="newTeamPj">PJ</label>
+                  <input
+                    id="newTeamPj"
+                    type="number"
+                    min="0"
+                    className="form-input text-center focus:ring-violet-400 focus:border-violet-400"
+                    value={newTeamPj}
+                    onChange={e => setNewTeamPj(Number(e.target.value) || 0)}
+                  />
+                </div>
+                
+                <div className="flex-1">
+                  <label className="form-label" htmlFor="newTeamPts">PTS</label>
+                  <input
+                    id="newTeamPts"
+                    type="number"
+                    min="0"
+                    className="form-input text-center focus:ring-violet-400 focus:border-violet-400"
+                    value={newTeamPts}
+                    onChange={e => setNewTeamPts(Number(e.target.value) || 0)}
+                  />
+                </div>
+
+                <div className="flex space-x-2">
+                  <button
+                    className="btn btn-primary h-[42px]"
+                    onClick={async () => {
+                      if (selectedTeamId) {
+                        await handleAddStanding({
+                          teamId: selectedTeamId,
+                          leagueId: selectedLeague,
+                          categoryId: selectedCategory,
+                          zoneId: selectedZone,
+                          puntos: newTeamPts,
+                          pj: newTeamPj,
+                          won: 0,
+                          drawn: 0,
+                          lost: 0,
+                          goalsFor: 0,
+                          goalsAgainst: 0
+                        });
+                      }
+                    }}
+                    disabled={!selectedTeamId}
+                  >
+                    <Plus size={18} className="mr-1" />
+                    <span>Agregar</span>
+                  </button>
+                  <button
+                    className="btn btn-outline h-[42px]"
+                    onClick={() => {
                       setIsAddingTeam(false);
-                    }
-                  }}
-                  disabled={!selectedTeamId}
-                >
-                  <Plus size={18} />
-                  <span>Agregar a posiciones</span>
-                </button>
-                <button
-                  className="btn btn-outline ml-2"
-                  onClick={() => {
-                    setIsAddingTeam(false);
-                    setSelectedTeamId('');
-                  }}
-                >
-                  <X size={18} />
-                  <span>Cancelar</span>
-                </button>
+                      setSelectedTeamId('');
+                      setNewTeamPj(0);
+                      setNewTeamPts(0);
+                    }}
+                  >
+                    <X size={18} className="mr-1" />
+                    <span>Cancelar</span>
+                  </button>
+                </div>
               </div>
             )}
           </div>

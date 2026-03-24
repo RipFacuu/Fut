@@ -37,97 +37,86 @@ export const supabase = createClient<Database>(supabaseUrl, supabaseKey)
  * @returns Array con los registros actualizados
  */
 export async function updateEditablePositionsOrder(updates: PositionUpdate[]): Promise<any[]> {
-  console.log('Actualizando orden de posiciones:', updates);
+  console.log('Actualizando masivamente posiciones:', updates.length, 'registros');
   
-  // Validación de entrada
-  if (!updates || !Array.isArray(updates) || updates.length === 0) {
-    throw new Error('No hay datos válidos para actualizar');
-  }
+  if (!updates || updates.length === 0) return [];
 
   try {
-    const results = [];
-    
-    for (const update of updates) {
-      // Validar campos requeridos
-      if (!update.equipo_id || !update.zona_id || !update.categoria_id) {
-        console.warn('Datos incompletos, omitiendo registro:', update);
-        continue;
-      }
+    // Preparar datos para upsert
+    // El upsert en Supabase requiere que la tabla tenga una restricción de unicidad
+    // en las columnas que usamos para identificar el registro.
+    const upsertData = updates.map(update => ({
+      equipo_id: String(update.equipo_id),
+      zona_id: String(update.zona_id),
+      categoria_id: String(update.categoria_id),
+      orden: Number(update.orden),
+      puntos: update.puntos !== undefined ? Number(update.puntos) : 0,
+      pj: update.pj !== undefined ? Number(update.pj) : 0,
+      equipo_nombre: update.equipo_nombre || ''
+    }));
+
+    // Intentar upsert masivo (más eficiente que un loop)
+    // Nota: onConflict especifica qué columnas deben ser únicas para decidir entre insert o update
+    const { data, error } = await supabase
+      .from('posiciones_editable')
+      .upsert(upsertData, { 
+        onConflict: 'equipo_id,zona_id,categoria_id',
+        ignoreDuplicates: false 
+      })
+      .select();
+
+    if (error) {
+      console.error('Error en upsert masivo, reintentando uno por uno:', error);
       
-      // Conversión consistente de tipos
-      const equipoId = String(update.equipo_id);
-      const zonaId = String(update.zona_id);
-      const categoriaId = String(update.categoria_id);
-      const orden = Number(update.orden);
-      
-      // Verificar existencia
-      const { data: existingData, error: checkError } = await supabase
-        .from('posiciones_editable')
-        .select('*')
-        .eq('equipo_id', equipoId)
-        .eq('zona_id', zonaId)
-        .eq('categoria_id', categoriaId)
-        .maybeSingle();
-      
-      if (checkError) {
-        console.error('Error verificando posición existente:', checkError);
-        throw checkError;
-      }
-      
-      let operationResult;
-      
-      if (existingData) {
-        // Actualizar existente
-        console.log(`Actualizando posición para equipo ${equipoId}: orden ${orden}, puntos ${update.puntos}, pj ${update.pj}`);
-        const { data, error } = await supabase
+      // Fallback: Si el upsert masivo falla (ej. por falta de restricción), reintentar uno por uno
+      const results = [];
+      for (const update of updates) {
+        const equipoId = String(update.equipo_id);
+        const zonaId = String(update.zona_id);
+        const categoriaId = String(update.categoria_id);
+        
+        const { data: existing } = await supabase
           .from('posiciones_editable')
-          .update({ 
-            orden,
-            puntos: update.puntos !== undefined ? update.puntos : existingData.puntos,
-            pj: update.pj !== undefined ? update.pj : existingData.pj,
-            equipo_nombre: update.equipo_nombre || existingData.equipo_nombre
-          })
+          .select('id')
           .eq('equipo_id', equipoId)
           .eq('zona_id', zonaId)
           .eq('categoria_id', categoriaId)
-          .select();
-        
-        if (error) throw error;
-        operationResult = data;
-      } else {
-        // Crear nuevo
-        console.log(`Creando nueva posición para equipo ${equipoId}: orden ${orden}, puntos ${update.puntos}, pj ${update.pj}`);
-        const { data, error } = await supabase
-          .from('posiciones_editable')
-          .insert([{ 
-            equipo_id: equipoId, 
-            zona_id: zonaId, 
-            categoria_id: categoriaId, 
-            orden: orden,
-            puntos: update.puntos || 0,
-            pj: update.pj || 0,
-            equipo_nombre: update.equipo_nombre || ''
-          }])
-          .select();
-            puntos: update.puntos || 0, 
-            pj: update.pj || 0, 
-            equipo_nombre: update.equipo_nombre || '' 
-          }])
-          .select();
-        
-        if (error) throw error;
-        operationResult = data;
+          .maybeSingle();
+
+        if (existing) {
+          const { data: updated } = await supabase
+            .from('posiciones_editable')
+            .update({
+              orden: update.orden,
+              puntos: update.puntos,
+              pj: update.pj,
+              equipo_nombre: update.equipo_nombre
+            })
+            .eq('id', existing.id)
+            .select();
+          if (updated) results.push(updated[0]);
+        } else {
+          const { data: inserted } = await supabase
+            .from('posiciones_editable')
+            .insert([{
+              equipo_id: equipoId,
+              zona_id: zonaId,
+              categoria_id: categoriaId,
+              orden: update.orden,
+              puntos: update.puntos || 0,
+              pj: update.pj || 0,
+              equipo_nombre: update.equipo_nombre || ''
+            }])
+            .select();
+          if (inserted) results.push(inserted[0]);
+        }
       }
-      
-      if (operationResult) {
-        results.push(...operationResult);
-      }
+      return results;
     }
 
-    console.log('Actualización completada:', results.length, 'registros');
-    return results;
+    return data || [];
   } catch (error) {
-    console.error('Error en updateEditablePositionsOrder:', error);
+    console.error('Error fatal en actualización masiva:', error);
     throw error;
   }
 }
