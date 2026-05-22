@@ -273,9 +273,9 @@ const StandingsPage: React.FC = () => {
       const yearB = getYear(b.name);
       
       if (yearA !== yearB) {
-        return yearB - yearA; // Orden decreciente
+        return yearA - yearB; // Orden creciente
       }
-      return b.name.localeCompare(a.name);
+      return a.name.localeCompare(b.name);
     });
   }, [selectedLeague, selectedZone, isLigaMasculina, getCategoriesByZone, getCategoriesByLeague]);
   

@@ -155,9 +155,9 @@ const LeaguePage: React.FC = () => {
     const yearB = getCatYear(b.name);
     
     if (yearA !== yearB) {
-      return yearB - yearA; // Orden decreciente
+      return yearA - yearB; // Orden creciente
     }
-    return b.name.localeCompare(a.name);
+    return a.name.localeCompare(b.name);
   });
   
   // Mover getLeagueIcon antes de cualquier uso

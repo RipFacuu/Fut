@@ -164,8 +164,8 @@ const FixturesPage: React.FC = () => {
         };
         const yearA = getYear(a.name);
         const yearB = getYear(b.name);
-        if (yearA !== yearB) return yearB - yearA;
-        return b.name.localeCompare(a.name);
+        if (yearA !== yearB) return yearA - yearB;
+        return a.name.localeCompare(b.name);
       });
     };
 
