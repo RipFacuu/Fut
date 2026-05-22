@@ -303,12 +303,13 @@ const StandingsPage: React.FC = () => {
   const zoneTeams = useMemo(() => selectedZone ? getTeamsByZone(selectedZone) : [], [selectedZone, getTeamsByZone]);
 
   // Selector de equipo para agregar a la tabla de posiciones
-  // Solo mostrar equipos de la zona seleccionada si es liga_masculina
+  // Solo mostrar equipos de la liga seleccionada si es liga_masculina
   const availableTeamsForStanding = useMemo(() => {
     // Mostrar todos los equipos de la liga seleccionada, sin importar categoría ni zona
     return teams
       .filter(t => String(t.leagueId) === String(selectedLeague))
-      .map(t => ({ ...t, id: String(t.id) }));
+      .map(t => ({ ...t, id: String(t.id) }))
+      .sort((a, b) => a.name.localeCompare(b.name));
   }, [teams, selectedLeague]);
   
   // Función para validar datos - SIMPLIFICADA
