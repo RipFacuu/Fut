@@ -85,8 +85,16 @@ const LeaguePage: React.FC = () => {
   // Get categories for this league
   const categories = useMemo(() => allCategories.filter(cat => cat.leagueId === leagueId), [allCategories, leagueId]);
   
-  // Filtrar zonas por liga
-  const leagueZones = useMemo(() => zones.filter(z => z.leagueId === leagueId), [zones, leagueId]);
+  // Filtrar y ordenar zonas por liga
+  const sortedZones = useMemo(() => {
+    const leagueZones = zones.filter(z => z.leagueId === leagueId);
+    return [...leagueZones].sort((a, b) => {
+      const nA = extractFirstZoneNumber(a.name);
+      const nB = extractFirstZoneNumber(b.name);
+      if (nA !== nB) return nA - nB;
+      return a.name.localeCompare(b.name);
+    });
+  }, [zones, leagueId]);
   
   // CÓDIGO DE DEBUGGING TEMPORAL - Agregar después de obtener categories y zones
   useEffect(() => {
@@ -340,7 +348,7 @@ const LeaguePage: React.FC = () => {
         {/* Categories/Zones y lógica de selección */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 my-6">
           {league.id === 'liga_masculina' ? (
-            leagueZones.map((zone) => (
+            sortedZones.map((zone) => (
               <ZonePanel
                 key={zone.id}
                 zone={zone}
@@ -401,7 +409,7 @@ const LeaguePage: React.FC = () => {
       {/* Categories/Zones */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {league.id === 'liga_masculina' ? (
-          leagueZones.map((zone) => (
+          sortedZones.map((zone) => (
             <ZonePanel
               key={zone.id}
               zone={zone}

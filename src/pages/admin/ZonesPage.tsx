@@ -172,12 +172,39 @@ const ZonesPage: React.FC = () => {
     }
   };
 
-// Removed unused categories variable
-  const filteredZones = selectedLeague === 'liga_masculina'
-    ? zones.filter(zone => zone.leagueId === selectedLeague)
-    : (watchCategoryId
-        ? zones.filter(zone => zone.categoryId === watchCategoryId)
-        : zones);
+  const sortZones = (zonesList: Zone[]) => {
+    return [...zonesList].sort((a, b) => {
+      const getNumber = (name: string) => {
+        const match = name.match(/\d+/);
+        return match ? parseInt(match[0], 10) : Infinity;
+      };
+      const numA = getNumber(a.name);
+      const numB = getNumber(b.name);
+      if (numA !== numB) return numA - numB;
+      return a.name.localeCompare(b.name);
+    });
+  };
+
+  const sortCats = (cats: any[]) => {
+    return [...cats].sort((a, b) => {
+      const getYear = (name: string) => {
+        const match = name.match(/\d+/);
+        return match ? parseInt(match[0], 10) : 0;
+      };
+      const yearA = getYear(a.name);
+      const yearB = getYear(b.name);
+      if (yearA !== yearB) return yearA - yearB;
+      return a.name.localeCompare(b.name);
+    });
+  };
+
+  const filteredZones = sortZones(
+    selectedLeague === 'liga_masculina'
+      ? zones.filter(zone => zone.leagueId === selectedLeague)
+      : (watchCategoryId
+          ? zones.filter(zone => zone.categoryId === watchCategoryId)
+          : zones)
+  );
 
   return (
     <div className="space-y-6">
@@ -237,7 +264,7 @@ const ZonesPage: React.FC = () => {
                 disabled={isAdding || !!editingId || !selectedLeague || loading}
               >
                 <option value="">Seleccionar Categoría</option>
-                {getCategoriesByLeague(selectedLeague).map((cat) => (
+                {sortCats(getCategoriesByLeague(selectedLeague)).map((cat) => (
                   <option key={cat.id} value={cat.id}>
                     {cat.name}
                   </option>
@@ -310,7 +337,7 @@ const ZonesPage: React.FC = () => {
                     disabled={loading}
                   >
                     <option value="">Seleccionar Categoría</option>
-                    {getCategoriesByLeague(watchLeagueId).map((cat) => (
+                    {sortCats(getCategoriesByLeague(watchLeagueId)).map((cat) => (
                       <option key={cat.id} value={cat.id}>
                         {cat.name}
                       </option>

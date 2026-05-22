@@ -36,13 +36,13 @@ interface Filters {
 }
 
 interface ComputedData {
-  leagueCategories: unknown[];
-  categoryZones: unknown[];
+  leagueCategories: any[];
+  categoryZones: any[];
   zoneTeams: Team[];
   formZoneTeams: Team[];
   leagueTeams: Team[];
-  availableZones: unknown[];
-  availableCategories: unknown[];
+  availableZones: any[];
+  availableCategories: any[];
 }
 
 const INITIAL_FORM_STATE: FormState = {
@@ -137,10 +137,11 @@ const FixturesPage: React.FC = () => {
   const teamsByZone = useMemo(() => {
     const cache = new Map<string, Team[]>();
     teams.forEach(team => {
-      if (!cache.has(team.zoneId)) {
-        cache.set(team.zoneId, []);
+      const zid = team.zoneId || '';
+      if (!cache.has(zid)) {
+        cache.set(zid, []);
       }
-      cache.get(team.zoneId)!.push(team);
+      cache.get(zid)!.push(team);
     });
     return cache;
   }, [teams]);
@@ -169,8 +170,21 @@ const FixturesPage: React.FC = () => {
       });
     };
 
+    const sortZones = (zonesList: any[]) => {
+      return [...zonesList].sort((a, b) => {
+        const getNumber = (name: string) => {
+          const match = name?.match(/\d+/);
+          return match ? parseInt(match[0], 10) : Infinity;
+        };
+        const numA = getNumber(a.name);
+        const numB = getNumber(b.name);
+        if (numA !== numB) return numA - numB;
+        return (a.name || "").localeCompare(b.name || "");
+      });
+    };
+
     const leagueCategories = sortCats(getCategoriesByLeague(filters.selectedLeague));
-    const categoryZones = getZonesByCategory(filters.selectedCategory);
+    const categoryZones = sortZones(getZonesByCategory(filters.selectedCategory));
     const zoneTeams = teamsByZone.get(filters.selectedZone) || [];
     const formZoneTeams = teamsByZone.get(watch('zoneId') || '') || [];
     const selectedLeagueId = watch('leagueId') || '';
@@ -178,9 +192,9 @@ const FixturesPage: React.FC = () => {
       ? teams.filter(team => team.leagueId === selectedLeagueId)
       : teams; // Mostrar todos los equipos si no hay liga seleccionada
 
-    const availableZones = isLigaMasculina 
+    const availableZones = sortZones(isLigaMasculina 
       ? getZonesByLeague(filters.selectedLeague)
-      : getZonesByCategory(filters.selectedCategory);
+      : getZonesByCategory(filters.selectedCategory));
 
     const availableCategories = sortCats(isLigaMasculina && filters.selectedZone 
       ? getCategoriesByZone(filters.selectedZone)
@@ -264,9 +278,9 @@ const FixturesPage: React.FC = () => {
     setShowForm(true);
     
     reset({
-      leagueId: fixture.leagueId,
-      categoryId: fixture.categoryId,
-      zoneId: fixture.zoneId,
+      leagueId: fixture.leagueId || '',
+      categoryId: fixture.categoryId || '',
+      zoneId: fixture.zoneId || '',
       date: fixture.date,
       matchDate: fixture.matchDate,
       leyenda: fixture.leyenda || '',
@@ -309,14 +323,13 @@ const FixturesPage: React.FC = () => {
         // Crear nuevo fixture
         await addFixture({
           ...data,
-          id: '', // Se generará automáticamente
-          matches: data.matches.filter(match => match.homeTeamId && match.awayTeamId)
+          matches: data.matches.filter(match => match.homeTeamId && match.awayTeamId) as any
         });
       } else if (formState.editingId) {
         // Actualizar fixture existente
         await updateFixture(formState.editingId, {
           ...data,
-          matches: data.matches.filter(match => match.homeTeamId && match.awayTeamId)
+          matches: data.matches.filter(match => match.homeTeamId && match.awayTeamId) as any
         });
       }
       

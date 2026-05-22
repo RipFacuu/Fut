@@ -249,10 +249,24 @@ const StandingsPage: React.FC = () => {
   // LOG PARA DEBUG
   console.log('StandingsPage: State check', { selectedLeague, isLigaMasculina, isCategoriaPrimero });
   
+  // Función para ordenar zonas por nombre (ZONA 1, ZONA 2, etc.)
+  const sortZones = (zonesList: any[]) => {
+    return [...zonesList].sort((a, b) => {
+      const getNumber = (name: string) => {
+        const match = name.match(/\d+/);
+        return match ? parseInt(match[0], 10) : Infinity;
+      };
+      const numA = getNumber(a.name);
+      const numB = getNumber(b.name);
+      if (numA !== numB) return numA - numB;
+      return a.name.localeCompare(b.name);
+    });
+  };
+
   // Get categories for selected league and zone (como en CategoriesPage)
   const filteredZones = useMemo(() => {
-    if (isLigaMasculina) return getZonesByLeague(selectedLeague);
-    return getZonesByCategory(selectedCategory);
+    const zones = isLigaMasculina ? getZonesByLeague(selectedLeague) : getZonesByCategory(selectedCategory);
+    return sortZones(zones);
   }, [selectedLeague, selectedCategory, isLigaMasculina, getZonesByLeague, getZonesByCategory]);
   
   const filteredCategories = useMemo(() => {
@@ -263,7 +277,7 @@ const StandingsPage: React.FC = () => {
       cats = getCategoriesByLeague(selectedLeague);
     }
 
-    // Ordenar categorías en orden decreciente por año
+    // Ordenar categorías en orden creciente por año
     return [...cats].sort((a, b) => {
       const getYear = (name: string) => {
         const match = name.match(/\d+/);
@@ -281,7 +295,8 @@ const StandingsPage: React.FC = () => {
   
   // Get zones for selected league
   const availableZones = useMemo(() => {
-    return isLigaMasculina ? getZonesByLeague(selectedLeague) : getZonesByCategory(selectedCategory);
+    const zones = isLigaMasculina ? getZonesByLeague(selectedLeague) : getZonesByCategory(selectedCategory);
+    return sortZones(zones);
   }, [selectedLeague, selectedCategory, isLigaMasculina, getZonesByLeague, getZonesByCategory]);
   
   // Get teams for the selected zone
