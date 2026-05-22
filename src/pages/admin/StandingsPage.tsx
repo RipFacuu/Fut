@@ -1060,12 +1060,12 @@ const StandingsPage: React.FC = () => {
   // Get teams that are not already in standings - CORREGIDA dependencias
   useEffect(() => {
     if (selectedLeague) {
-      const teamsInStandings = new Set(localStandings.map(s => s.teamId));
+      const teamsInStandings = new Set(localStandings.map(s => String(s.teamId)));
       const availableLeagueTeams = teams
         .filter(
-          team => String(team.leagueId) === String(selectedLeague) && !teamsInStandings.has(team.id)
+          team => String(team.leagueId) === String(selectedLeague) && !teamsInStandings.has(String(team.id))
         )
-        .sort((a, b) => a.name.localeCompare(b.name));
+        .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
       setAvailableTeams(availableLeagueTeams);
     } else {
       setAvailableTeams([]);
