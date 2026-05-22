@@ -62,7 +62,20 @@ const CategoriesPage: React.FC = () => {
       filtered = filtered.filter(category => (category as any).zoneId === selectedZone);
     }
     
-    return filtered;
+    // Ordenar categorías en orden decreciente por año
+    return [...filtered].sort((a, b) => {
+      const getYear = (name: string) => {
+        const match = name.match(/\d+/);
+        return match ? parseInt(match[0], 10) : 0;
+      };
+      const yearA = getYear(a.name);
+      const yearB = getYear(b.name);
+      
+      if (yearA !== yearB) {
+        return yearB - yearA; // Orden decreciente
+      }
+      return b.name.localeCompare(a.name);
+    });
   }, [categories, selectedLeague, selectedZone, isLigaParticipando]);
   
   // Agrupar categorías por zona para Liga Participando

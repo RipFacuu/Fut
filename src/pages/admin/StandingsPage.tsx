@@ -256,10 +256,27 @@ const StandingsPage: React.FC = () => {
   }, [selectedLeague, selectedCategory, isLigaMasculina, getZonesByLeague, getZonesByCategory]);
   
   const filteredCategories = useMemo(() => {
+    let cats = [];
     if (isLigaMasculina && selectedZone) {
-      return getCategoriesByZone(selectedZone);
+      cats = getCategoriesByZone(selectedZone);
+    } else {
+      cats = getCategoriesByLeague(selectedLeague);
     }
-    return getCategoriesByLeague(selectedLeague);
+
+    // Ordenar categorías en orden decreciente por año
+    return [...cats].sort((a, b) => {
+      const getYear = (name: string) => {
+        const match = name.match(/\d+/);
+        return match ? parseInt(match[0], 10) : 0;
+      };
+      const yearA = getYear(a.name);
+      const yearB = getYear(b.name);
+      
+      if (yearA !== yearB) {
+        return yearB - yearA; // Orden decreciente
+      }
+      return b.name.localeCompare(a.name);
+    });
   }, [selectedLeague, selectedZone, isLigaMasculina, getCategoriesByZone, getCategoriesByLeague]);
   
   // Get zones for selected league

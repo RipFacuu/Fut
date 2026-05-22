@@ -146,11 +146,18 @@ const LeaguePage: React.FC = () => {
   }
   
   // Sort categories based on league
-  const getYear = (cat: { name: string }) => parseInt(cat.name.split('/')[0]);
   const sortedCategories = [...categories].sort((a, b) => {
-    if (a.name === '2009/10') return -1;
-    if (b.name === '2009/10') return 1;
-    return getYear(a) - getYear(b);
+    const getCatYear = (name: string) => {
+      const match = name.match(/\d+/);
+      return match ? parseInt(match[0], 10) : 0;
+    };
+    const yearA = getCatYear(a.name);
+    const yearB = getCatYear(b.name);
+    
+    if (yearA !== yearB) {
+      return yearB - yearA; // Orden decreciente
+    }
+    return b.name.localeCompare(a.name);
   });
   
   // Mover getLeagueIcon antes de cualquier uso

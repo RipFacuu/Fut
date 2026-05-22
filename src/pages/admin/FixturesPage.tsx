@@ -156,7 +156,20 @@ const FixturesPage: React.FC = () => {
   const isLigaMasculina = filters.selectedLeague === 'liga_masculina';
 
   const computedData: ComputedData = useMemo(() => {
-    const leagueCategories = getCategoriesByLeague(filters.selectedLeague);
+    const sortCats = (cats: any[]) => {
+      return [...cats].sort((a, b) => {
+        const getYear = (name: string) => {
+          const match = name.match(/\d+/);
+          return match ? parseInt(match[0], 10) : 0;
+        };
+        const yearA = getYear(a.name);
+        const yearB = getYear(b.name);
+        if (yearA !== yearB) return yearB - yearA;
+        return b.name.localeCompare(a.name);
+      });
+    };
+
+    const leagueCategories = sortCats(getCategoriesByLeague(filters.selectedLeague));
     const categoryZones = getZonesByCategory(filters.selectedCategory);
     const zoneTeams = teamsByZone.get(filters.selectedZone) || [];
     const formZoneTeams = teamsByZone.get(watch('zoneId') || '') || [];
@@ -169,9 +182,9 @@ const FixturesPage: React.FC = () => {
       ? getZonesByLeague(filters.selectedLeague)
       : getZonesByCategory(filters.selectedCategory);
 
-    const availableCategories = isLigaMasculina && filters.selectedZone 
+    const availableCategories = sortCats(isLigaMasculina && filters.selectedZone 
       ? getCategoriesByZone(filters.selectedZone)
-      : getCategoriesByLeague(filters.selectedLeague);
+      : getCategoriesByLeague(filters.selectedLeague));
 
     return {
       leagueCategories,
