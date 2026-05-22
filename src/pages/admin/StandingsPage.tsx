@@ -1061,9 +1061,11 @@ const StandingsPage: React.FC = () => {
   useEffect(() => {
     if (selectedLeague) {
       const teamsInStandings = new Set(localStandings.map(s => s.teamId));
-      const availableLeagueTeams = teams.filter(
-        team => String(team.leagueId) === String(selectedLeague) && !teamsInStandings.has(team.id)
-      );
+      const availableLeagueTeams = teams
+        .filter(
+          team => String(team.leagueId) === String(selectedLeague) && !teamsInStandings.has(team.id)
+        )
+        .sort((a, b) => a.name.localeCompare(b.name));
       setAvailableTeams(availableLeagueTeams);
     } else {
       setAvailableTeams([]);
