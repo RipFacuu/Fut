@@ -69,16 +69,6 @@ const LeaguePage: React.FC = () => {
     })));
   }, [globalFixtures, leagueId, sortFixtures, zones, getFixtureOrder]);
 
-  // Actualizar al cambiar a vista fixture
-  useEffect(() => {
-    if (viewMode === 'fixture') {
-      refreshFixtures().then(() => {
-        const leagueFixtures = globalFixtures.filter(f => f.leagueId === leagueId);
-        setSortedFixtures(sortFixtures(leagueFixtures));
-      });
-    }
-  }, [viewMode, leagueId, refreshFixtures, sortFixtures]);
-
   // Get league data
   const league = getLeague(leagueId || '');
 
@@ -95,38 +85,6 @@ const LeaguePage: React.FC = () => {
       return a.name.localeCompare(b.name);
     });
   }, [zones, leagueId]);
-  
-  // CÓDIGO DE DEBUGGING TEMPORAL - Agregar después de obtener categories y zones
-  useEffect(() => {
-    if (leagueId === 'liga_masculina') {
-      console.log('=== DEBUGGING LIGA PARTICIPANDO ===');
-      console.log('League ID:', leagueId);
-      console.log('Todas las categorías:', categories);
-      console.log('Todas las zonas:', zones);
-      
-      // Verificar qué categorías tienen zoneId
-      const categoriesWithZone = categories.filter(cat => (cat as any).zoneId);
-      const categoriesWithoutZone = categories.filter(cat => !(cat as any).zoneId);
-      
-      console.log('Categorías CON zoneId:', categoriesWithZone);
-      console.log('Categorías SIN zoneId:', categoriesWithoutZone);
-      
-      // Para cada zona, mostrar qué categorías le corresponden
-      zones.forEach(zone => {
-        const zoneCategories = categories.filter(cat => (cat as any).zoneId === zone.id);
-        console.log(`Zona "${zone.name}" (ID: ${zone.id}) tiene ${zoneCategories.length} categorías:`, zoneCategories);
-      });
-      
-      // Verificar si las categorías tienen el campo zoneId
-      categories.forEach(cat => {
-        console.log(`Categoría "${cat.name}" (ID: ${cat.id}):`, {
-          leagueId: cat.leagueId,
-          zoneId: (cat as any).zoneId,
-          hasZoneId: !!(cat as any).zoneId
-        });
-      });
-    }
-  }, [categories, zones, leagueId]);
   
   // Set initial selected category if not set and categories exist
   React.useEffect(() => {

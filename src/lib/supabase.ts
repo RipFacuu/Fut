@@ -26,8 +26,8 @@ interface StandingData {
   goals_against?: number;
 }
 
-const supabaseUrl = 'https://mdulwygjcqvcyjyxtpum.supabase.co'
-const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1kdWx3eWdqY3F2Y3lqeXh0cHVtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDg0OTg3MTksImV4cCI6MjA2NDA3NDcxOX0.Dn6xzntOZKS0OBIbNjci0hnwv6Iu7ZPaFSzzyxqpBp0'
+const supabaseUrl = 'https://vzpkcmtwsdmuggfzqapw.supabase.co'
+const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ6cGtjbXR3c2RtdWdnZnpxYXB3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODExMjI4MzAsImV4cCI6MjA5NjY5ODgzMH0.5JVYC2xEEXzkQUq3GDwB6XIhkCmZX4eruzy97gK8mW8'
 
 export const supabase = createClient<Database>(supabaseUrl, supabaseKey)
 

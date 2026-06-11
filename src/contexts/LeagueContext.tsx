@@ -267,21 +267,19 @@ export interface Course {
 
 // Hook LeagueProvider refactorizado
 export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
-  // Estados usando el hook personalizado
-  const { data: leagues, refresh: refreshLeagues } = useDataLoader<League>(SupabaseService.getLeagues);
-  const { data: zones, refresh: refreshZones } = useDataLoader<Zone>(zonesService.getAllZones);
-  const { data: courses, refresh: refreshCourses } = useDataLoader<Course>(SupabaseService.getAllCourses);
+  // Estados usando el hook personalizado con caché
+  const { data: leagues, refresh: refreshLeagues } = useDataLoader<League>(SupabaseService.getLeagues, [], 'leagues');
+  const { data: zones, refresh: refreshZones } = useDataLoader<Zone>(zonesService.getAllZones, [], 'zones');
+  const { data: courses, refresh: refreshCourses } = useDataLoader<Course>(SupabaseService.getAllCourses, [], 'courses');
 
   // Cargar categorías solo cuando hay ligas
   const { data: categories, refresh: refreshCategories } = useDataLoader<Category>(
     async () => {
       if (!leagues.length) return [];
-      console.log('LeagueContext: Cargando categorías para ligas:', leagues.map(l => l.id));
       let allCategories: Category[] = [];
       for (const league of leagues) {
         try {
           const leagueCategories = await SupabaseService.getCategoriesByLeague(league.id);
-          console.log(`LeagueContext: Cargadas ${leagueCategories.length} categorías para liga ${league.id}`);
           allCategories = allCategories.concat(leagueCategories);
         } catch (err) {
           console.error(`LeagueContext: Error cargando categorías para liga ${league.id}:`, err);
@@ -289,7 +287,8 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
       }
       return allCategories;
     },
-    [leagues]
+    [leagues],
+    'categories'
   );
 
   // Cargar equipos solo cuando hay zonas
@@ -298,7 +297,8 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
       if (!zones.length) return [];
       return await SupabaseService.getAllTeams();
     },
-    [zones]
+    [zones],
+    'teams'
   );
 
   // Cargar fixtures solo cuando hay zonas
@@ -307,7 +307,8 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
       if (!zones.length) return [];
       return await SupabaseService.getFixtures();
     },
-    [zones]
+    [zones],
+    'fixtures'
   );
 
   // Cargar standings solo cuando hay zonas
@@ -321,7 +322,8 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
       }
       return allStandings;
     },
-    [zones]
+    [zones],
+    'standings'
   );
 
   // Memoized maps para lookup rápido (solo los realmente útiles)
@@ -788,28 +790,7 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
     refreshStandings
   };
 
-  // Efecto de carga inicial unificado
-  useEffect(() => {
-    const loadInitialData = async () => {
-      try {
-        await Promise.all([
-          refreshLeagues(),
-          refreshZones(),
-          refreshCourses()
-        ]);
-        if (leagues.length) await refreshCategories();
-        if (zones.length) await Promise.all([
-          refreshTeams(),
-          refreshStandings(),
-          refreshFixtures()
-        ]);
-      } catch (error) {
-        handleError(error, 'loadInitialData', 'Error al cargar los datos iniciales');
-      }
-    };
-    loadInitialData();
-    // eslint-disable-next-line
-  }, []);
+  // Eliminar carga doble - useDataLoader ya carga los datos iniciales
 
   return (
     <LeagueContext.Provider value={value}>

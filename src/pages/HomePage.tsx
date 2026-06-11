@@ -10,9 +10,6 @@ import { getLeaguePathId } from '../utils/leagueSlug';
 const HomePage: React.FC = () => {
   const { leagues } = useLeague();
   
-  // Debug: Log todas las ligas disponibles
-  console.log('Ligas disponibles:', leagues.map(league => ({ id: league.id, name: league.name, logo: league.logo })));
-  
   // Ordenar: primero las conocidas, luego el resto por id ascendente
   const knownOrder = ['liga_masculina', 'lifufe', 'mundialito'];
   const orderedLeagues = [

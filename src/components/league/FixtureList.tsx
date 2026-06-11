@@ -11,24 +11,8 @@ interface FixtureListProps {
 const FixtureList: React.FC<FixtureListProps> = ({ zoneId, resultsOnly = false }) => {
   const { getFixturesByZone, teams, fixtures: allFixtures } = useLeague();
   
-  // ENHANCED LOGS FOR DEBUGGING
-  console.log('=== FIXTURE LIST DEBUG ===');
-  console.log('zoneId received:', zoneId, 'type:', typeof zoneId);
-  console.log('resultsOnly:', resultsOnly);
-  console.log('all fixtures:', allFixtures?.map(f => ({
-    id: f.id,
-    zoneId: f.zoneId,
-    zoneIdType: typeof f.zoneId,
-    date: f.date,
-    matchesCount: f.matches.length,
-    playedMatches: f.matches.filter(m => m.played).length
-  })));
-  
   // Get fixtures for this zone
   const fixtures = getFixturesByZone(zoneId);
-  
-  console.log('fixtures found for zone:', fixtures);
-  console.log('fixtures length:', fixtures.length);
   
   const [isMobile, setIsMobile] = useState(false);
   
