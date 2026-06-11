@@ -267,37 +267,34 @@ export interface Course {
 
 // Hook LeagueProvider refactorizado
 export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
+  console.log('🔵 LeagueProvider: inicializando');
+  
   // Estados usando el hook personalizado con caché
   const { data: leagues, refresh: refreshLeagues } = useDataLoader<League>(SupabaseService.getLeagues, [], 'leagues');
   const { data: zones, refresh: refreshZones } = useDataLoader<Zone>(zonesService.getAllZones, [], 'zones');
   const { data: courses, refresh: refreshCourses } = useDataLoader<Course>(SupabaseService.getAllCourses, [], 'courses');
 
-  // Cargar categorías solo cuando hay ligas
+  // Cargar todas las categorías directamente
   const { data: categories, refresh: refreshCategories } = useDataLoader<Category>(
     async () => {
-      if (!leagues.length) return [];
-      let allCategories: Category[] = [];
-      for (const league of leagues) {
-        try {
-          const leagueCategories = await SupabaseService.getCategoriesByLeague(league.id);
-          allCategories = allCategories.concat(leagueCategories);
-        } catch (err) {
-          console.error(`LeagueContext: Error cargando categorías para liga ${league.id}:`, err);
-        }
-      }
+      console.log('🔵 LeagueContext: Cargando categorías...');
+      const allCategories = await SupabaseService.getAllCategories();
+      console.log('✅ LeagueContext: Todas las categorías cargadas:', allCategories);
       return allCategories;
     },
-    [leagues],
+    [],
     'categories'
   );
 
-  // Cargar equipos solo cuando hay zonas
+  // Cargar equipos directamente, sin esperar zonas
   const { data: teams, refresh: refreshTeams } = useDataLoader<Team>(
     async () => {
-      if (!zones.length) return [];
-      return await SupabaseService.getAllTeams();
+      console.log('🔵 LeagueContext: Cargando equipos...');
+      const allTeams = await SupabaseService.getAllTeams();
+      console.log('✅ LeagueContext: Equipos cargados:', allTeams);
+      return allTeams;
     },
-    [zones],
+    [],
     'teams'
   );
 
@@ -325,6 +322,15 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
     [zones],
     'standings'
   );
+  
+  // Logs de diagnóstico
+  useEffect(() => {
+    console.log('📊 Datos en LeagueContext:');
+    console.log('   leagues:', leagues);
+    console.log('   zones:', zones);
+    console.log('   categories:', categories);
+    console.log('   teams:', teams);
+  }, [leagues, zones, categories, teams]);
 
   // Memoized maps para lookup rápido (solo los realmente útiles)
   const categoriesByLeague = useMemo(() => {

@@ -29,7 +29,7 @@ export const UserAuthForm: React.FC<UserAuthFormProps> = ({ onSuccess, className
 
   // Estados para login
   const [loginData, setLoginData] = useState({
-    documento: '',
+    email: '',
     password: '',
   });
 
@@ -106,7 +106,7 @@ export const UserAuthForm: React.FC<UserAuthFormProps> = ({ onSuccess, className
       password: '',
     });
     setLoginData({
-      documento: '',
+      email: '',
       password: '',
     });
   };
@@ -148,24 +148,24 @@ export const UserAuthForm: React.FC<UserAuthFormProps> = ({ onSuccess, className
             // Formulario de Login
             <>
               <div>
-                <label htmlFor="documento" className="block text-sm font-medium text-gray-700 mb-1">
-                  📋 Documento
+                <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
+                  📧 Email
                 </label>
                 <input
-                  type="text"
-                  id="documento"
-                  name="documento"
-                  value={loginData.documento}
+                  type="email"
+                  id="email"
+                  name="email"
+                  value={loginData.email}
                   onChange={handleLoginInputChange}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="Ingresa tu documento"
+                  placeholder="Ingresa tu email"
                   required
                 />
               </div>
 
               <div>
                 <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
-                  🔒 Contraseña (opcional)
+                  🔒 Contraseña
                 </label>
                 <input
                   type="password"
@@ -174,11 +174,9 @@ export const UserAuthForm: React.FC<UserAuthFormProps> = ({ onSuccess, className
                   value={loginData.password}
                   onChange={handleLoginInputChange}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="Contraseña (opcional)"
+                  placeholder="Ingresa tu contraseña"
+                  required
                 />
-                <p className="text-xs text-gray-500 mt-1">
-                  Si no tienes contraseña, puedes iniciar sesión solo con tu documento
-                </p>
               </div>
             </>
           ) : (

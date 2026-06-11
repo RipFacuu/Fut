@@ -95,7 +95,7 @@ const LeaguePage: React.FC = () => {
   
   // NUEVO: Si es mundialito, ir directo a la tabla de posiciones
   useEffect(() => {
-    if (league && league.id === 'mundialito') {
+    if (league && (league.id === 'mundialito' || league.id === '3')) {
       setViewMode('standings');
     }
   }, [league]);

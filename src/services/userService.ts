@@ -7,17 +7,14 @@ type UsuarioUpdate = Database['public']['Tables']['usuarios']['Update'];
 
 export interface UserRegistrationData {
   nombre: string;
-  apellido: string;
-  fecha_nacimiento: string;
-  documento: string;
-  escuela: string;
-  equipo_id: string;
-  email?: string;
+  email: string;
+  liga_id?: string;
+  zona_id?: string;
   password?: string;
 }
 
 export interface UserLoginData {
-  documento: string;
+  email: string;
   password: string;
 }
 
@@ -33,10 +30,10 @@ export class UserService {
   // Crear nuevo usuario
   static async createUser(userData: UserRegistrationData): Promise<Usuario | null> {
     try {
-      // Verificar si ya existe un usuario con ese documento
-      const existingUser = await this.getUserByDocument(userData.documento);
+      // Verificar si ya existe un usuario con ese email
+      const existingUser = await this.getUserByEmail(userData.email);
       if (existingUser) {
-        throw new Error('Ya existe un usuario con ese documento');
+        throw new Error('Ya existe un usuario con ese email');
       }
 
       const { data, error } = await supabase
@@ -57,23 +54,23 @@ export class UserService {
     }
   }
 
-  // Obtener usuario por documento
-  static async getUserByDocument(documento: string): Promise<Usuario | null> {
+  // Obtener usuario por email
+  static async getUserByEmail(email: string): Promise<Usuario | null> {
     try {
       const { data, error } = await supabase
         .from('usuarios')
         .select('*')
-        .eq('documento', documento)
+        .eq('email', email)
         .single();
 
       if (error && error.code !== 'PGRST116') { // PGRST116 = no rows returned
-        console.error('Error obteniendo usuario por documento:', error);
+        console.error('Error obteniendo usuario por email:', error);
         throw error;
       }
 
       return data;
     } catch (error) {
-      console.error('Error en getUserByDocument:', error);
+      console.error('Error en getUserByEmail:', error);
       throw error;
     }
   }

@@ -43,7 +43,7 @@ const CategoriesPage: React.FC = () => {
   });
   
   const watchLeagueId = watch('leagueId');
-  const isLigaParticipando = selectedLeague === 'liga_masculina';
+  const isLigaParticipando = selectedLeague === 'liga_masculina' || selectedLeague === '1';
   
   // Obtener zonas de la liga seleccionada
   const availableZones = useMemo(() => {
@@ -126,7 +126,7 @@ const CategoriesPage: React.FC = () => {
   const onSubmit = async (data: CategoryFormData) => {
     try {
       // Validar que si es liga participando, debe tener zona
-      if (data.leagueId === 'liga_masculina' && !data.zoneId) {
+      if ((data.leagueId === 'liga_masculina' || data.leagueId === '1') && !data.zoneId) {
         alert('Debe seleccionar una zona para la Liga Participando');
         return;
       }
@@ -288,7 +288,7 @@ const CategoriesPage: React.FC = () => {
             </div>
             
             {/* Selector de zona solo para Liga Participando */}
-            {watchLeagueId === 'liga_masculina' && (
+            {(watchLeagueId === 'liga_masculina' || watchLeagueId === '1') && (
               <div className="mb-4">
                 <label className="form-label" htmlFor="zoneId">
                   Zona *

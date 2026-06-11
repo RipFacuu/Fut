@@ -15,27 +15,10 @@ export interface Zone {
 
 // Convertir de formato de base de datos a formato de aplicación
 const mapZonaToZone = (zona: ZonaRow): Zone => {
-  // Convertir liga_id de la base de datos a string para consistencia
-  const getStringLeagueId = (dbLeagueId: any): string => {
-    // Si ya es string, devolverlo tal como está
-    if (typeof dbLeagueId === 'string') {
-      return dbLeagueId;
-    }
-    
-    // Si es numérico, mapear a string
-    const idMap: { [key: number]: string } = {
-      1: 'liga_masculina',
-      2: 'lifufe', 
-      3: 'mundialito'
-    };
-    
-    return idMap[dbLeagueId] || String(dbLeagueId);
-  };
-  
   return {
-    id: zona.id,
+    id: String(zona.id),
     name: zona.nombre,
-    leagueId: getStringLeagueId(zona.liga_id),
+    leagueId: String(zona.liga_id),
     categoryId: String(zona.categoria_id),
     legend: zona.legend || undefined
   };
@@ -43,20 +26,9 @@ const mapZonaToZone = (zona: ZonaRow): Zone => {
 
 // Convertir de formato de aplicación a formato de base de datos
 const mapZoneToZona = (zone: Omit<Zone, 'id'>): ZonaInsert => {
-  // Mapear IDs de liga del formato de aplicación al formato de base de datos
-  const getDbLeagueId = (appLeagueId: string): any => {
-    // Mapear todos los nombres a su ID numérico
-    if (appLeagueId === 'liga_masculina') return 1;
-    if (appLeagueId === 'lifufe') return 2;
-    if (appLeagueId === 'mundialito') return 3;
-    // Si ya es número en string, convertir a número
-    if (!isNaN(Number(appLeagueId))) return Number(appLeagueId);
-    // Fallback: devolver null para evitar errores
-    return null;
-  };
   return {
     nombre: zone.name,
-    liga_id: getDbLeagueId(zone.leagueId),
+    liga_id: zone.leagueId,
     categoria_id: zone.categoryId,
     legend: zone.legend
   };

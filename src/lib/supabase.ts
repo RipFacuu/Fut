@@ -292,12 +292,10 @@ export async function obtenerLigas(): Promise<any[]> {
 
 // Funciones para Categorías
 export async function obtenerCategoriasPorLiga(ligaId: string) {
-  const numericLeagueId = getNumericLeagueId(ligaId);
-
   const { data, error } = await supabase
     .from('categorias')
     .select('*')
-    .eq('liga_id', numericLeagueId);
+    .eq('liga_id', ligaId);
 
   if (error) {
     console.error('Error obteniendo categorías:', error);
@@ -343,55 +341,14 @@ export async function crearZona(nombre: string, ligaId: string, categoriaId: str
   return data;
 }
 
-// Función helper para obtener IDs numéricos
+// Función helper para obtener IDs numéricos (obsoleta, se mantiene para compatibilidad)
 export async function getNumericIds(equipoUuid: string | null, zonaUuid: string, ligaUuid?: string, categoriaUuid?: string) {
-  try {
-    const promises = [];
-    let promiseIndex = 0;
-    const indexMap: { [key: string]: number } = {};
-
-    // Zona (siempre requerida)
-    promises.push(supabase.from('zonas').select('id').eq('id', zonaUuid).single());
-    indexMap.zona = promiseIndex++;
-
-    // Equipo (opcional)
-    if (equipoUuid) {
-      promises.push(supabase.from('equipos').select('id').eq('id', equipoUuid).single());
-      indexMap.equipo = promiseIndex++;
-    }
-
-    // Liga (opcional)
-    if (ligaUuid) {
-      promises.push(supabase.from('ligas').select('id').eq('id', ligaUuid).single());
-      indexMap.liga = promiseIndex++;
-    }
-
-    // Categoría (opcional)
-    if (categoriaUuid) {
-      promises.push(supabase.from('categorias').select('id').eq('id', categoriaUuid).single());
-      indexMap.categoria = promiseIndex++;
-    }
-
-    const results = await Promise.all(promises);
-    
-    // Verificar errores
-    for (const result of results) {
-      if (result.error) {
-        console.error('Error obteniendo ID numérico:', result.error);
-        throw new Error(`No se pudo obtener ID numérico: ${result.error.message}`);
-      }
-    }
-
-    return {
-      equipo_id: equipoUuid ? results[indexMap.equipo]?.data?.id || null : null,
-      zona_id: results[indexMap.zona]?.data?.id || null,
-      liga_id: ligaUuid ? results[indexMap.liga]?.data?.id || null : null,
-      categoria_id: categoriaUuid ? results[indexMap.categoria]?.data?.id || null : null
-    };
-  } catch (error) {
-    console.error('Error en getNumericIds:', error);
-    throw error;
-  }
+  return {
+    equipo_id: equipoUuid,
+    zona_id: zonaUuid,
+    liga_id: ligaUuid,
+    categoria_id: categoriaUuid
+  };
 }
 
 /**
@@ -405,19 +362,13 @@ export async function getNumericIds(equipoUuid: string | null, zonaUuid: string,
  */
 export async function agregarEquipoCompleto(nombre: string, zonaId: string, ligaId: string, categoriaId: string, logo?: string): Promise<any> {
   try {
-    // Convertir UUIDs a IDs numéricos
-    const numericIds = await getNumericIds(null, zonaId, ligaId, categoriaId);
-    
-    // Asegurar que liga_id sea numérico
-    const numericLeagueId = getNumericLeagueId(ligaId);
-    
     const { data, error } = await supabase
       .from('equipos')
       .insert([{ 
         nombre, 
-        zona_id: numericIds.zona_id,
-        liga_id: numericLeagueId, // Usar el ID numérico mapeado
-        categoria_id: numericIds.categoria_id,
+        zona_id: zonaId,
+        liga_id: ligaId,
+        categoria_id: categoriaId,
         logo: logo || null
       }])
       .select();
@@ -439,15 +390,17 @@ export async function agregarEquipoCompleto(nombre: string, zonaId: string, liga
  * @returns Array con todas las zonas
  */
 export async function obtenerTodasLasZonas(): Promise<any[]> {
+  console.log('📡 obtenerTodasLasZonas: iniciando consulta a la tabla zonas...');
   const { data, error } = await supabase
     .from('zonas')
     .select('*');
 
   if (error) {
-    console.error('Error obteniendo todas las zonas:', error);
+    console.error('❌ Error obteniendo todas las zonas:', error);
     throw error;
   }
-
+  
+  console.log('✅ obtenerTodasLasZonas: datos recibidos:', data);
   return data || [];
 }
 
@@ -507,7 +460,7 @@ export async function eliminarCategoria(id: string) {
  * @param texto_central Texto central del fixture (opcional)
  * @returns Datos del fixture creado
  */
-export async function crearFixture(nombre: string, fechaPartido: string, ligaId: number, categoriaId: number, zonaId: number | null, leyenda?: string | null, texto_central?: string | null): Promise<any> {
+export async function crearFixture(nombre: string, fechaPartido: string, ligaId: string, categoriaId: string, zonaId: string | null, leyenda?: string | null, texto_central?: string | null): Promise<any> {
   const { data, error } = await supabase
     .from('fixtures')
     .insert([{ 
@@ -536,7 +489,7 @@ export async function crearFixture(nombre: string, fechaPartido: string, ligaId:
  * @param fixtureId ID del fixture
  * @returns Datos del partido creado
  */
-export async function crearPartidoConFixture(equipoLocalId: number, equipoVisitanteId: number, zonaId: number | null, fecha: string, fixtureId: number): Promise<any> {
+export async function crearPartidoConFixture(equipoLocalId: string, equipoVisitanteId: string, zonaId: string | null, fecha: string, fixtureId: string): Promise<any> {
   const { data, error } = await supabase
     .from('partidos')
     .insert([{ 
@@ -986,13 +939,11 @@ export async function eliminarCurso(cursoId: string) {
 
 // Función para obtener zonas por liga
 export async function obtenerZonasPorLiga(leagueId: string) {
-  const numericLeagueId = getNumericLeagueId(leagueId);
-  
   const { data, error } = await supabase
     .from('zonas')
     .select('*')
-    .eq('liga_id', numericLeagueId);
-    
+    .eq('liga_id', leagueId);
+  
   if (error) {
     console.error('Error obteniendo zonas por liga:', error);
     return [];
@@ -1003,38 +954,36 @@ export async function obtenerZonasPorLiga(leagueId: string) {
 
 // Función para obtener categorías por liga con estructura dinámica
 export async function obtenerCategoriasPorLigaConEstructura(leagueId: string, zoneId?: string) {
-  const numericLeagueId = getNumericLeagueId(leagueId);
-  
+  console.log('📡 obtenerCategoriasPorLigaConEstructura: iniciando consulta con leagueId:', leagueId, 'y zoneId:', zoneId);
   let query = supabase
     .from('categorias')
     .select('*')
-    .eq('liga_id', numericLeagueId);
+    .eq('liga_id', leagueId);
   
   if (zoneId) {
-    query = query.eq('zona_id', parseInt(zoneId));
+    query = query.eq('zona_id', zoneId);
   }
   
   const { data, error } = await query;
   
   if (error) {
-    console.error('Error obteniendo categorías por liga con estructura:', error);
+    console.error('❌ Error obteniendo categorías por liga con estructura:', error);
     return [];
   }
   
+  console.log('✅ obtenerCategoriasPorLigaConEstructura: datos recibidos:', data);
   return data || [];
 }
 
 // Función para obtener zonas por liga con estructura dinámica
 export async function obtenerZonasPorLigaConEstructura(leagueId: string, categoryId?: string) {
-  const numericLeagueId = getNumericLeagueId(leagueId);
-  
   let query = supabase
     .from('zonas')
     .select('*')
-    .eq('liga_id', numericLeagueId);
+    .eq('liga_id', leagueId);
   
   if (categoryId) {
-    query = query.eq('categoria_id', parseInt(categoryId));
+    query = query.eq('categoria_id', categoryId);
   }
   
   const { data, error } = await query;
@@ -1049,15 +998,13 @@ export async function obtenerZonasPorLigaConEstructura(leagueId: string, categor
 
 // Función para crear categoría con estructura
 export async function crearCategoriaConEstructura(name: string, leagueId: string, zoneId?: string) {
-  const numericLeagueId = getNumericLeagueId(leagueId);
-  
   const insertData: any = {
     nombre: name,
-    liga_id: numericLeagueId
+    liga_id: leagueId
   };
   
   if (zoneId) {
-    insertData.zona_id = parseInt(zoneId);
+    insertData.zona_id = zoneId;
   }
   
   const { data, error } = await supabase
@@ -1076,15 +1023,13 @@ export async function crearCategoriaConEstructura(name: string, leagueId: string
 
 // Función para crear zona con estructura
 export async function crearZonaConEstructura(name: string, leagueId: string, categoryId?: string, legend?: string) {
-  const numericLeagueId = getNumericLeagueId(leagueId);
-  
   const insertData: any = {
     nombre: name,
-    liga_id: numericLeagueId
+    liga_id: leagueId
   };
   
   if (categoryId) {
-    insertData.categoria_id = parseInt(categoryId);
+    insertData.categoria_id = categoryId;
   }
   
   if (legend) {

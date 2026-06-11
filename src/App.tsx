@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
 import { LeagueProvider } from './contexts/LeagueContext';
@@ -23,8 +23,26 @@ import CourseDetailPage from './pages/CourseDetailPage';
 import LeaguesPage from './pages/admin/LeaguesPage';
 import UserAuthPage from './pages/UserAuthPage';
 import ProdePage from './pages/ProdePage';
+import { clearAllCache } from './hooks/useDataLoader';
+import { testSupabaseQueries } from './utils/debugSupabase';
 
 const App: React.FC = () => {
+  const [cacheCleared, setCacheCleared] = useState(false);
+
+  useEffect(() => {
+    if (!cacheCleared) {
+      // Limpiar caché al iniciar la app para cargar datos con los nuevos IDs
+      console.log('🧹 Limpiando caché global...');
+      clearAllCache();
+      setCacheCleared(true);
+      console.log('✅ Caché limpiada');
+
+      // Ejecutar tests de Supabase
+      console.log('🔬 Ejecutando tests de Supabase...');
+      testSupabaseQueries();
+    }
+  }, [cacheCleared]);
+
   return (
     <AuthProvider>
       <LeagueProvider>

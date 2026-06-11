@@ -56,80 +56,11 @@ export const UserAuthProvider: React.FC<UserAuthProviderProps> = ({ children }) 
       setIsLoading(true);
       setError(null);
 
-      console.log('🔐 Intentando login con documento:', data.documento);
+      console.log('🔐 Intentando login con email:', data.email);
 
-      // USUARIOS LOCALES PARA PRUEBAS (sin base de datos)
-      const localUsers = [
-        {
-          id: '1',
-          nombre: 'Juan',
-          apellido: 'Pérez',
-          fecha_nacimiento: '2010-05-15',
-          documento: '12345678',
-          escuela: 'Escuela Primaria San Martín',
-          equipo_id: undefined,
-          email: 'juan.perez@test.com',
-          password: 'password123',
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        },
-        {
-          id: '2',
-          nombre: 'María',
-          apellido: 'González',
-          fecha_nacimiento: '2009-08-22',
-          documento: '87654321',
-          escuela: 'Escuela Primaria San Martín',
-          equipo_id: undefined,
-          email: 'maria.gonzalez@test.com',
-          password: undefined, // Sin contraseña
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        },
-        {
-          id: '3',
-          nombre: 'Carlos',
-          apellido: 'Rodríguez',
-          fecha_nacimiento: '2011-03-10',
-          documento: '11223344',
-          escuela: 'Escuela Primaria Belgrano',
-          equipo_id: undefined,
-          email: 'carlos.rodriguez@test.com',
-          password: 'carlos123',
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        }
-      ];
-
-      // Buscar usuario local primero
-      const localUser = localUsers.find(u => u.documento === data.documento);
-      
-      if (localUser) {
-        console.log('👤 Usuario local encontrado:', localUser);
-        
-        // Verificar contraseña (si existe)
-        if (localUser.password) {
-          console.log('🔒 Verificando contraseña...');
-          if (localUser.password !== data.password) {
-            setError(`Contraseña incorrecta. Intenta con: ${localUser.password}`);
-            return false;
-          }
-          console.log('✅ Contraseña correcta');
-        } else {
-          console.log('⚠️ Usuario sin contraseña, login solo con documento');
-        }
-
-        // Login exitoso
-        setUser(localUser);
-        setIsAuthenticated(true);
-        localStorage.setItem('user_data', JSON.stringify(localUser));
-        console.log('🎉 Login exitoso para:', localUser.nombre);
-        return true;
-      }
-
-      // Si no es usuario local, intentar con la base de datos (cuando esté disponible)
+      // Primero intentar con la base de datos
       try {
-        const dbUser = await UserService.getUserByDocument(data.documento);
+        const dbUser = await UserService.getUserByEmail(data.email);
         
         if (dbUser) {
           console.log('👤 Usuario de BD encontrado:', dbUser);
@@ -142,13 +73,14 @@ export const UserAuthProvider: React.FC<UserAuthProviderProps> = ({ children }) 
           setUser(dbUser);
           setIsAuthenticated(true);
           localStorage.setItem('user_data', JSON.stringify(dbUser));
+          console.log('🎉 Login exitoso para:', dbUser.nombre);
           return true;
         }
-      } catch {
-        console.log('⚠️ Base de datos no disponible, usando solo usuarios locales');
+      } catch (error) {
+        console.error('Error al consultar BD:', error);
       }
 
-      setError('Usuario no encontrado. Usuarios disponibles: 12345678, 87654321, 11223344');
+      setError('Usuario no encontrado o contraseña incorrecta');
       return false;
 
     } catch (error: unknown) {

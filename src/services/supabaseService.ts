@@ -54,7 +54,7 @@ import { getLeagueStringId, getLeagueNumericId, getLeagueDefaultLogo } from '../
 export const mapSupabaseToLeague = (supabaseLeague: any): League => {
   if (!supabaseLeague) throw new Error('League data is required');
 
-  const leagueId = getLeagueStringId(supabaseLeague.id);
+  const leagueId = String(supabaseLeague.id);
 
   return {
     id: leagueId,
@@ -63,14 +63,29 @@ export const mapSupabaseToLeague = (supabaseLeague: any): League => {
   };
 };
 
+// Obtener todas las categorías directamente
+export const getAllCategories = async (): Promise<Category[]> => {
+  try {
+    console.log('📡 SupabaseService: Obteniendo todas las categorías...');
+    const { data, error } = await supabase.from('categorias').select('*');
+    if (error) throw error;
+
+    console.log('✅ SupabaseService: Todas las categorías recibidas:', data);
+    return data?.map(mapSupabaseToCategory) || [];
+  } catch (err) {
+    console.error('❌ SupabaseService: Error obteniendo todas las categorías:', err);
+    return [];
+  }
+};
+
 // Mapeo de zona
 export const mapSupabaseToZone = (supabaseZone: any): Zone => {
   if (!supabaseZone) throw new Error('Zone data is required');
 
   return {
-    id: supabaseZone.id || '',
+    id: String(supabaseZone.id || ''),
     name: supabaseZone.nombre || '',
-    leagueId: getLeagueStringId(supabaseZone.liga_id),
+    leagueId: String(supabaseZone.liga_id || ''),
     categoryId: String(supabaseZone.categoria_id || ''),
     legend: supabaseZone.legend || undefined
   };
@@ -80,7 +95,7 @@ export const mapSupabaseToZone = (supabaseZone: any): Zone => {
 export const mapSupabaseToCategory = (supabaseCategory: any): Category => {
   if (!supabaseCategory) throw new Error('Category data is required');
 
-  const leagueId = getLeagueStringId(supabaseCategory.liga_id);
+  const leagueId = String(supabaseCategory.liga_id || '');
 
   const category: Category & { zoneId?: string } = {
     id: String(supabaseCategory.id || ''),
@@ -163,16 +178,11 @@ export const mapSupabaseToTeam = (supabaseTeam: any): Team => {
     throw new Error('Team must have id and name');
   }
   
-  // Agregar validación y logging
-  console.log('Liga ID recibida:', supabaseTeam.liga_id);
-  const mappedLeagueId = getLeagueStringId(supabaseTeam.liga_id);
-  console.log('Liga ID mapeada:', mappedLeagueId);
-  
   return {
-    id: supabaseTeam.id,
+    id: String(supabaseTeam.id),
     name: supabaseTeam.nombre,
     logo: supabaseTeam.logo || '',
-    leagueId: mappedLeagueId,
+    leagueId: String(supabaseTeam.liga_id || ''),
     categoryId: String(supabaseTeam.categoria_id || ''),
     zoneId: String(supabaseTeam.zona_id || '')
   };
@@ -182,10 +192,10 @@ export const mapSupabaseToFixture = (supabaseFixture: any): Fixture & { invalidL
   console.log('Mapping fixture from Supabase:', supabaseFixture);
   
   // Asegurarse de que todos los IDs sean strings y manejar valores nulos
-  const fixtureId = supabaseFixture.id ? supabaseFixture.id.toString() : '';
-  const leagueId = getLeagueStringId(supabaseFixture.liga_id);
-  const categoryId = supabaseFixture.categoria_id ? supabaseFixture.categoria_id.toString() : '';
-  const zoneId = supabaseFixture.zona_id ? supabaseFixture.zona_id.toString() : '';
+  const fixtureId = String(supabaseFixture.id || '');
+  const leagueId = String(supabaseFixture.liga_id || '');
+  const categoryId = String(supabaseFixture.categoria_id || '');
+  const zoneId = String(supabaseFixture.zona_id || '');
   const invalidLeagueId = leagueId === '__INVALID__';
   
   console.log('Mapped IDs:', { fixtureId, leagueId, categoryId, zoneId, invalidLeagueId });
@@ -276,6 +286,11 @@ export class SupabaseService {
       console.error('Error getting leagues:', error);
       return [];
     }
+  }
+
+  // Todas las categorías
+  static async getAllCategories(): Promise<Category[]> {
+    return getAllCategories();
   }
 
   // Categorías
@@ -553,14 +568,12 @@ static async updateTeam(
     }[];
   }): Promise<{ success: boolean; fixtureId?: string; error?: string }> {
     try {
-      // Mapear leagueId string a número SIEMPRE antes de guardar
-      const numericLeagueId = getNumericLeagueId(fixtureData.ligaId);
       const fixtureResult = await crearFixture(
         fixtureData.nombre,
         fixtureData.fechaPartido,
-        numericLeagueId, // Usar el ID numérico correcto
-        Number(fixtureData.categoriaId),
-        fixtureData.zonaId ? Number(fixtureData.zonaId) : null,
+        fixtureData.ligaId,
+        fixtureData.categoriaId,
+        fixtureData.zonaId || null,
         fixtureData.leyenda || null,
         fixtureData.texto_central || null
       );
