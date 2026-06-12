@@ -267,6 +267,25 @@ const StandingsPage: React.FC = () => {
   const isLigaMasculina = selectedLeague === '1';
   const isCategoriaPrimero = !selectedLeague || !isLigaMasculina;
 
+  // Cargar leyenda cuando cambian zona o categoría
+  useEffect(() => {
+    if (selectedZone && selectedCategory) {
+      console.log('🔍 StandingsPage: Cargando leyenda para zona:', selectedZone, 'categoria:', selectedCategory);
+      standingsLegendService.getLegend(selectedZone, selectedCategory)
+        .then(existingLegend => {
+          console.log('✅ StandingsPage: Leyenda cargada:', existingLegend);
+          if (existingLegend) {
+            setLegend(existingLegend.leyenda || '');
+          } else {
+            setLegend('');
+          }
+        })
+        .catch(err => {
+          console.error('❌ StandingsPage: Error cargando leyenda:', err);
+        });
+    }
+  }, [selectedZone, selectedCategory]);
+
   // ─── Zonas ordenadas ────────────────────────
   const sortZones = (zonesList: any[]) =>
     [...zonesList].sort((a, b) => {
@@ -955,7 +974,7 @@ const StandingsPage: React.FC = () => {
               <label className="block text-sm font-medium text-gray-700 mb-1 sm:mb-0 sm:mr-2 whitespace-nowrap">
                 📝 Leyenda de la Tabla de Posiciones
               </label>
-              {isAuthenticated && user?.username === 'admin' ? (
+              {isAuthenticated ? (
                 <div className="flex items-center gap-2 w-full max-w-lg">
                   <input
                     type="text"
