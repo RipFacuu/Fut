@@ -269,20 +269,27 @@ const StandingsPage: React.FC = () => {
 
   // Cargar leyenda cuando cambian zona o categoría
   useEffect(() => {
+    console.log('🔄 Leyenda useEffect triggered with:', { selectedZone, selectedCategory });
+    
     if (selectedZone && selectedCategory) {
       console.log('🔍 StandingsPage: Cargando leyenda para zona:', selectedZone, 'categoria:', selectedCategory);
       standingsLegendService.getLegend(selectedZone, selectedCategory)
         .then(existingLegend => {
           console.log('✅ StandingsPage: Leyenda cargada:', existingLegend);
           if (existingLegend) {
+            console.log('👉 Estableciendo leyenda:', existingLegend.leyenda);
             setLegend(existingLegend.leyenda || '');
           } else {
+            console.log('👉 No hay leyenda existente, estableciendo vacío');
             setLegend('');
           }
         })
         .catch(err => {
           console.error('❌ StandingsPage: Error cargando leyenda:', err);
         });
+    } else {
+      console.log('👉 No hay zona o categoría seleccionada, limpiando leyenda');
+      setLegend('');
     }
   }, [selectedZone, selectedCategory]);
 
@@ -706,12 +713,19 @@ const StandingsPage: React.FC = () => {
     setLegendDirty(false);
   }, [selectedZone, selectedCategory]);
 
-  // FIX #4: handleSaveLegend memoizado con useCallback
+  // FIX #4: handleSaveLegend memoized con useCallback
   const handleSaveLegend = useCallback(async () => {
+    console.log('💾 Guardando leyenda:', { selectedZone, selectedCategory, legend });
     setLegendLoading(true);
-    await standingsLegendService.upsertLegend(selectedZone, selectedCategory, legend);
-    setLegendDirty(false);
-    setLegendLoading(false);
+    try {
+      const result = await standingsLegendService.upsertLegend(selectedZone, selectedCategory, legend);
+      console.log('✅ Leyenda guardada:', result);
+      setLegendDirty(false);
+    } catch (error) {
+      console.error('❌ Error guardando leyenda:', error);
+    } finally {
+      setLegendLoading(false);
+    }
   }, [selectedZone, selectedCategory, legend]);
 
   // FIX #5: handleSaveAllWithLegend con deps correctas y sin recursión infinita
