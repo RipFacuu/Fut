@@ -33,8 +33,14 @@ const CategoryPanel: React.FC<CategoryPanelProps> = ({
       setLoading(true);
       const categoryZones = await zonesService.getZonesByCategory(category.id);
       setZones(categoryZones);
-      if (!activeZoneId && categoryZones.length > 0) {
-        setActiveZoneId(categoryZones[0].id);
+      if (categoryZones.length > 0) {
+        const defaultZoneId = activeZoneId && categoryZones.some((zone) => zone.id === activeZoneId)
+          ? activeZoneId
+          : categoryZones[0].id;
+        setActiveZoneId(defaultZoneId);
+        if (isSelected) {
+          onSelect(category.id, defaultZoneId);
+        }
       }
     } catch (error) {
       console.error('Error loading zones:', error);

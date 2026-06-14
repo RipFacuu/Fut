@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useLeague, Standing } from '../../contexts/LeagueContext';
-import { standingsLegendService } from '../../services/standingsLegendService';
+import { resolveStandingsLegend } from '../../services/standingsLegendService';
 
 interface PublicStandingsTableProps {
   leagueId: string;
@@ -17,15 +17,23 @@ const medalIcons = [
 ];
 
 const PublicStandingsTable: React.FC<PublicStandingsTableProps> = ({ leagueId, zoneId, categoryId }) => {
-  const { teams } = useLeague();
+  const { teams, zones } = useLeague();
   const [standings, setStandings] = useState<StandingWithNombre[]>([]);
   const [legend, setLegend] = useState('');
 
   useEffect(() => {
-    if (!zoneId || !categoryId) return;
-    standingsLegendService.getLegend(zoneId, categoryId)
-      .then(data => setLegend(data?.leyenda || ''));
-  }, [zoneId, categoryId]);
+    if (!zoneId || !categoryId) {
+      setLegend('');
+      return;
+    }
+
+    resolveStandingsLegend(zoneId, categoryId, zones)
+      .then(setLegend)
+      .catch(() => {
+        const zoneLegend = zones.find((zone) => zone.id === zoneId)?.legend?.trim() || '';
+        setLegend(zoneLegend);
+      });
+  }, [zoneId, categoryId, zones]);
 
   useEffect(() => {
     if (!zoneId || !categoryId) {
@@ -175,13 +183,9 @@ const PublicStandingsTable: React.FC<PublicStandingsTableProps> = ({ leagueId, z
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 space-y-2 sm:space-y-0 sm:space-x-2">
           <div>
             <h3 className="text-lg font-semibold">Tabla de Posiciones</h3>
-            {legend ? (
+            {legend && (
               <div className="mt-2 p-2 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg flex items-center space-x-2">
                 <span className="text-sm font-medium text-blue-800">{legend}</span>
-              </div>
-            ) : (
-              <div className="mt-2 p-2 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg flex items-center space-x-2">
-                <span className="text-sm font-medium text-blue-800"><span className="text-gray-400">Agregar leyenda</span></span>
               </div>
             )}
           </div>

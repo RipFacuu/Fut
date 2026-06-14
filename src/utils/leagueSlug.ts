@@ -1,31 +1,57 @@
 import type { League } from '../contexts/LeagueContext';
 
-// Mapa de IDs reales de liga -> slug legible para la URL
-const idToSlug: Record<string, string> = {
-  // Ejemplo: la liga con ID '6' es Copa Lobitos
-  '6': 'copa-lobitos',
+// Slugs antiguos que siguen funcionando aunque el nombre haya cambiado
+const legacySlugToId: Record<string, string> = {
+  'copa-lobitos': '6',
 };
 
-// Mapa inverso para resolver desde el slug al ID real
-const slugToId: Record<string, string> = Object.fromEntries(
-  Object.entries(idToSlug).map(([id, slug]) => [slug, id])
-);
+/**
+ * Convierte el nombre de una liga en un segmento de URL legible.
+ * Ej: "TORNEO 'MINI CUP'" → "torneo-mini-cup"
+ */
+export function slugifyLeagueName(name: string): string {
+  return name
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/['"]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
 
 /**
  * Devuelve el segmento que se usa en la URL para una liga.
- * Si hay un slug definido para ese ID, lo usa; si no, usa el propio ID.
+ * Se genera a partir del nombre actual, así la URL se actualiza si cambia el torneo.
  */
 export function getLeaguePathId(leagueOrId: League | string): string {
-  const id = typeof leagueOrId === 'string' ? leagueOrId : leagueOrId.id;
-  return idToSlug[id] || id;
+  if (typeof leagueOrId === 'string') {
+    return leagueOrId;
+  }
+
+  const slug = slugifyLeagueName(leagueOrId.name);
+  return slug || leagueOrId.id;
 }
 
 /**
  * A partir de un slug de la URL, devuelve el ID real de la liga.
- * Si no hay mapeo, devuelve el propio slug (para ligas que ya usan IDs legibles).
  */
-export function resolveLeagueIdFromSlug(slugOrId: string): string {
+export function resolveLeagueIdFromSlug(
+  slugOrId: string,
+  leagues: League[] = []
+): string {
   if (!slugOrId) return slugOrId;
-  return slugToId[slugOrId] || slugOrId;
-}
 
+  if (legacySlugToId[slugOrId]) {
+    return legacySlugToId[slugOrId];
+  }
+
+  const byId = leagues.find((league) => league.id === slugOrId);
+  if (byId) return byId.id;
+
+  const bySlug = leagues.find(
+    (league) => slugifyLeagueName(league.name) === slugOrId
+  );
+  if (bySlug) return bySlug.id;
+
+  return slugOrId;
+}

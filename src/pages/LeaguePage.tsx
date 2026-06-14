@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { useLeague, Fixture } from '../contexts/LeagueContext';
-import { resolveLeagueIdFromSlug } from '../utils/leagueSlug';
+import { getLeaguePathId, resolveLeagueIdFromSlug } from '../utils/leagueSlug';
 import CategoryPanel from '../components/league/CategoryPanel';
 import FixtureList from '../components/league/FixtureList';
 import StandingsTable from '../components/league/StandingsTable';
@@ -16,10 +16,9 @@ type Tab = 'fixtures' | 'results' | 'standings' | 'teams';
 
 const LeaguePage: React.FC = () => {
   const { leagueId: routeLeagueId } = useParams<{ leagueId: string }>();
-  // Resolver el ID real de liga a partir del slug o ID de la URL
-  const leagueId = resolveLeagueIdFromSlug(routeLeagueId || '');
-  // Extraer todos los valores de useLeague() al inicio
+  const navigate = useNavigate();
   const {
+    leagues,
     getLeague,
     refreshFixtures,
     zones,
@@ -27,6 +26,11 @@ const LeaguePage: React.FC = () => {
     categories: allCategories,
     teams
   } = useLeague();
+
+  const leagueId = useMemo(
+    () => resolveLeagueIdFromSlug(routeLeagueId || '', leagues),
+    [routeLeagueId, leagues]
+  );
 
   const [activeTab, setActiveTab] = useState<Tab>('fixtures');
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
@@ -72,6 +76,16 @@ const LeaguePage: React.FC = () => {
   // Get league data
   const league = getLeague(leagueId || '');
 
+  // Redirigir a la URL canónica si el nombre del torneo cambió
+  useEffect(() => {
+    if (!league || !routeLeagueId) return;
+
+    const canonicalSlug = getLeaguePathId(league);
+    if (routeLeagueId !== canonicalSlug) {
+      navigate(`/league/${canonicalSlug}`, { replace: true });
+    }
+  }, [league, routeLeagueId, navigate]);
+
   // Get categories for this league
   const categories = useMemo(() => allCategories.filter(cat => cat.leagueId === leagueId), [allCategories, leagueId]);
   
@@ -92,6 +106,25 @@ const LeaguePage: React.FC = () => {
       setSelectedCategoryId(categories[0].id);
     }
   }, [categories, selectedCategoryId]);
+
+  // Auto-seleccionar una zona válida para la categoría elegida
+  useEffect(() => {
+    if (!selectedCategoryId || leagueId === 'liga_masculina' || leagueId === '1') return;
+
+    const categoryZones = zones.filter(
+      (zone) => String(zone.categoryId) === String(selectedCategoryId) && String(zone.leagueId) === String(leagueId)
+    );
+
+    if (categoryZones.length === 0) {
+      setSelectedZoneId(null);
+      return;
+    }
+
+    const zoneStillValid = selectedZoneId && categoryZones.some((zone) => zone.id === selectedZoneId);
+    if (!zoneStillValid) {
+      setSelectedZoneId(categoryZones[0].id);
+    }
+  }, [selectedCategoryId, selectedZoneId, zones, leagueId]);
   
   // NUEVO: Si es mundialito, ir directo a la tabla de posiciones
   useEffect(() => {

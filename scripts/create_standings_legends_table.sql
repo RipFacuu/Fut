@@ -39,4 +39,20 @@ COMMENT ON COLUMN standings_legends.categoria_id IS 'ID de la categoría';
 COMMENT ON COLUMN standings_legends.leyenda IS 'Texto de la leyenda (ej: Apertura 2024, Clausura 2024)';
 
 -- Verificar que la tabla se creó correctamente
-SELECT 'Tabla standings_legends creada exitosamente' as mensaje; 
+SELECT 'Tabla standings_legends creada exitosamente' as mensaje;
+
+-- Permitir lectura pública de leyendas en la vista de torneos
+ALTER TABLE standings_legends ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Public read standings legends" ON standings_legends;
+CREATE POLICY "Public read standings legends"
+  ON standings_legends
+  FOR SELECT
+  USING (true);
+
+DROP POLICY IF EXISTS "Authenticated manage standings legends" ON standings_legends;
+CREATE POLICY "Authenticated manage standings legends"
+  ON standings_legends
+  FOR ALL
+  USING (auth.role() = 'authenticated')
+  WITH CHECK (auth.role() = 'authenticated');

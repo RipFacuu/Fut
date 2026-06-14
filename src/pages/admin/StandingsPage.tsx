@@ -715,14 +715,14 @@ const StandingsPage: React.FC = () => {
 
   // FIX #4: handleSaveLegend memoized con useCallback
   const handleSaveLegend = useCallback(async () => {
-    console.log('💾 Guardando leyenda:', { selectedZone, selectedCategory, legend });
     setLegendLoading(true);
     try {
-      const result = await standingsLegendService.upsertLegend(selectedZone, selectedCategory, legend);
-      console.log('✅ Leyenda guardada:', result);
+      await standingsLegendService.upsertLegend(selectedZone, selectedCategory, legend);
       setLegendDirty(false);
+      setError(null);
     } catch (error) {
-      console.error('❌ Error guardando leyenda:', error);
+      console.error('Error guardando leyenda:', error);
+      setError('No se pudo guardar la leyenda. Verificá que la tabla standings_legends exista en Supabase.');
     } finally {
       setLegendLoading(false);
     }
@@ -877,7 +877,7 @@ const StandingsPage: React.FC = () => {
     [filteredCategories],
   );
 
-  const canSave = !!selectedZone && !!selectedCategory && (modifiedRows.size > 0 || orderDirty) && !loading;
+  const canSave = !!selectedZone && !!selectedCategory && (modifiedRows.size > 0 || orderDirty || legendDirty) && !loading;
 
   // ─── RENDER ──────────────────────────────────
   return (
