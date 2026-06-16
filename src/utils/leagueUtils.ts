@@ -9,6 +9,17 @@ export const LEAGUE_IDS = {
   MUNDIALITO: '3'
 } as const;
 
+/** Liga Participando usa zona → categoría (no al revés). */
+export const isLigaParticipando = (
+  leagueId: string | null | undefined,
+  leagueName?: string
+): boolean => {
+  if (!leagueId) return false;
+  const id = String(leagueId);
+  if (id === LEAGUE_IDS.LIGA_MASCULINA || id === 'liga_masculina') return true;
+  return (leagueName?.toLowerCase().includes('participando') ?? false);
+};
+
 /**
  * Convierte un ID de liga (string o número) a su representación en string.
  */

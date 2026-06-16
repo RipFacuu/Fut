@@ -11,6 +11,7 @@ import { cn } from '../utils/cn';
 import ZonePanel from '../components/league/ZonePanel';
 import PublicStandingsTable from '../components/league/PublicStandingsTable';
 import { formatShortDate } from '../utils/dateUtils';
+import { isLigaParticipando } from '../utils/leagueUtils';
 
 type Tab = 'fixtures' | 'results' | 'standings' | 'teams';
 
@@ -24,7 +25,8 @@ const LeaguePage: React.FC = () => {
     zones,
     fixtures: globalFixtures,
     categories: allCategories,
-    teams
+    teams,
+    getCategoriesByZone,
   } = useLeague();
 
   const leagueId = useMemo(
@@ -75,6 +77,7 @@ const LeaguePage: React.FC = () => {
 
   // Get league data
   const league = getLeague(leagueId || '');
+  const ligaParticipando = isLigaParticipando(leagueId, league?.name);
 
   // Redirigir a la URL canónica si el nombre del torneo cambió
   useEffect(() => {
@@ -100,16 +103,43 @@ const LeaguePage: React.FC = () => {
     });
   }, [zones, leagueId]);
   
-  // Set initial selected category if not set and categories exist
+  // Set initial selected category for ligas que usan categoría → zona
   React.useEffect(() => {
+    if (ligaParticipando) return;
     if (!selectedCategoryId && categories.length > 0) {
       setSelectedCategoryId(categories[0].id);
     }
-  }, [categories, selectedCategoryId]);
+  }, [categories, selectedCategoryId, ligaParticipando]);
 
-  // Auto-seleccionar una zona válida para la categoría elegida
+  // Liga Participando: auto-seleccionar zona y categoría (zona → categoría)
   useEffect(() => {
-    if (!selectedCategoryId || leagueId === 'liga_masculina' || leagueId === '1') return;
+    if (!ligaParticipando || !leagueId) return;
+
+    const leagueZones = zones.filter((zone) => String(zone.leagueId) === String(leagueId));
+
+    if (!selectedZoneId && leagueZones.length > 0) {
+      setSelectedZoneId(leagueZones[0].id);
+      return;
+    }
+
+    if (selectedZoneId && !selectedCategoryId) {
+      const zoneCategories = getCategoriesByZone(selectedZoneId);
+      if (zoneCategories.length > 0) {
+        setSelectedCategoryId(zoneCategories[0].id);
+      }
+    }
+  }, [
+    ligaParticipando,
+    leagueId,
+    zones,
+    selectedZoneId,
+    selectedCategoryId,
+    getCategoriesByZone,
+  ]);
+
+  // Auto-seleccionar una zona válida para la categoría elegida (resto de ligas)
+  useEffect(() => {
+    if (!selectedCategoryId || ligaParticipando) return;
 
     const categoryZones = zones.filter(
       (zone) => String(zone.categoryId) === String(selectedCategoryId) && String(zone.leagueId) === String(leagueId)
@@ -161,9 +191,10 @@ const LeaguePage: React.FC = () => {
   
   // Mover getLeagueIcon antes de cualquier uso
   const getLeagueIcon = () => {
+    if (ligaParticipando) {
+      return <Trophy size={32} className="text-primary-600" />;
+    }
     switch (league.id) {
-      case 'liga_masculina':
-        return <Trophy size={32} className="text-primary-600" />;
       case 'lifufe':
         return <Users size={32} className="text-accent-600" />;
       case 'mundialito':
@@ -338,7 +369,7 @@ const LeaguePage: React.FC = () => {
         </header>
         {/* Categories/Zones y lógica de selección */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 my-6">
-          {league.id === 'liga_masculina' ? (
+          {ligaParticipando ? (
             sortedZones.map((zone) => (
               <ZonePanel
                 key={zone.id}
@@ -374,7 +405,7 @@ const LeaguePage: React.FC = () => {
             />
           ) : (
             <div className="text-center py-12 text-gray-500">
-              {league.id === 'liga_masculina'
+              {ligaParticipando
                 ? 'Selecciona una zona y categoría para ver la información'
                 : 'Selecciona una categoría y zona para ver la información'}
             </div>
@@ -399,7 +430,7 @@ const LeaguePage: React.FC = () => {
 
       {/* Categories/Zones */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {league.id === 'liga_masculina' ? (
+        {ligaParticipando ? (
           sortedZones.map((zone) => (
             <ZonePanel
               key={zone.id}

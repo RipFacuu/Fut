@@ -31,10 +31,16 @@ const ZonePanel: React.FC<ZonePanelProps> = ({
       setLoading(true);
       const zoneCategories = await categoriesService.getCategoriesByZone(zone.id);
       setCategories(zoneCategories);
-      
-      // Set the first category as active if none is selected and categories exist
-      if (!activeCategoryId && zoneCategories.length > 0) {
-        setActiveCategoryId(zoneCategories[0].id);
+
+      if (zoneCategories.length > 0) {
+        const defaultCategoryId =
+          activeCategoryId && zoneCategories.some((cat) => cat.id === activeCategoryId)
+            ? activeCategoryId
+            : zoneCategories[0].id;
+        setActiveCategoryId(defaultCategoryId);
+        if (isSelected) {
+          onSelect(zone.id, defaultCategoryId);
+        }
       }
     } catch (error) {
       console.error('Error loading categories:', error);

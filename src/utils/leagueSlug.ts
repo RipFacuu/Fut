@@ -3,6 +3,10 @@ import type { League } from '../contexts/LeagueContext';
 // Slugs antiguos que siguen funcionando aunque el nombre haya cambiado
 const legacySlugToId: Record<string, string> = {
   'copa-lobitos': '6',
+  'liga_masculina': '1',
+  'liga-participando': '1',
+  'lifufe': '2',
+  'mundialito': '3',
 };
 
 /**

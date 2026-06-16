@@ -100,15 +100,14 @@ const PublicStandingsTable: React.FC<PublicStandingsTableProps> = ({ leagueId, z
 
           setStandings(uniqueData.map(pos => ({
             id: `${pos.equipo_id}-${pos.zona_id}-${pos.categoria_id}`,
-            teamId: pos.equipo_id,
+            teamId: String(pos.equipo_id),
             leagueId,
             categoryId: String(pos.categoria_id),
-            zoneId: pos.zona_id,
+            zoneId: String(pos.zona_id),
             puntos: Number(pos.puntos) || 0,
             pj: Number(pos.pj) || 0,
             goalsFor: 0,
             goalsAgainst: 0,
-            // Cargar orden: si es número > 0, usarlo; si es 0 o null, establecer null
             orden: (typeof pos.orden === 'number' && pos.orden > 0) ? pos.orden : null,
             equipo_nombre: pos.equipo_nombre || '',
             won: 0,
@@ -116,10 +115,12 @@ const PublicStandingsTable: React.FC<PublicStandingsTableProps> = ({ leagueId, z
             lost: 0
           })));
         })
-        // .catch(() => setError('Error al cargar la tabla de posiciones.'))
-        // .finally(() => setLoading(false));
+        .catch((err) => {
+          console.error('Error al cargar tabla de posiciones:', err);
+          setStandings([]);
+        });
     });
-  }, [zoneId, categoryId, leagueId]);
+  }, [zoneId, categoryId, leagueId, teams, zones]);
 
   // Ordenar standings por el mismo criterio que el admin y la base de datos
   // Respetar el orden manual si existe, igual que en el admin

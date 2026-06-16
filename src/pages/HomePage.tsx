@@ -11,7 +11,7 @@ const HomePage: React.FC = () => {
   const { leagues } = useLeague();
   
   // Ordenar: primero las conocidas, luego el resto por id ascendente
-  const knownOrder = ['liga_masculina', 'lifufe', 'mundialito'];
+  const knownOrder = ['1', '2', '3', 'liga_masculina', 'lifufe', 'mundialito'];
   const orderedLeagues = [
     ...knownOrder.map(id => leagues.find(l => l.id === id)).filter(Boolean),
     ...leagues.filter(l => !knownOrder.includes(l.id)).sort((a, b) => {
